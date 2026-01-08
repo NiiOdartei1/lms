@@ -17,12 +17,11 @@ from utils.extensions import db, mail, socketio
 
 # your project imports
 from config import Config
-from utils.extensions import db, mail  # must exist
 
 # -------------------------
 # App factory-ish setup
 # -------------------------
-app = Flask(__name__)  # keep static_folder if you use it
+app = Flask(__name__)
 app.config.from_object(Config)
 
 app.config.setdefault('SQLALCHEMY_DATABASE_URI', 'sqlite:///lms.db')
@@ -45,7 +44,7 @@ os.makedirs(app.config['PAYMENT_PROOF_FOLDER'], exist_ok=True)
 os.makedirs(app.config['RECEIPT_FOLDER'], exist_ok=True)
 os.makedirs(app.config['PROFILE_PICS_FOLDER'], exist_ok=True)
 
-# initialize extensions
+# initialize extensions (before importing models/blueprints)
 db.init_app(app)
 mail.init_app(app)
 migrate = Migrate(app, db)
@@ -65,36 +64,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.info("App instance path: %s", app.instance_path)
 
-# expose generate_csrf to templates as callable: use in template as {{ csrf_token() }}
-@app.context_processor
-def inject_csrf():
-    return dict(csrf_token=generate_csrf)
-
-# inject current time
-@app.context_processor
-def inject_now():
-    return {'now': datetime.utcnow()}
-
-@app.context_processor
-def inject_active_assessment_period():
-    def get_active_period():
-        try:
-            return TeacherAssessmentPeriod.query.filter_by(is_active=True).first()
-        except Exception:
-            return None
-
-    return {
-        'active_assessment_period': get_active_period
-    }
-
 # -------------------------
 # Import models and blueprints AFTER extensions are ready
 # -------------------------
-# (this avoids circular imports where models import `db` from utils.extensions)
 from models import (
     PasswordResetToken, TeacherAssessmentPeriod, User, Admin, SchoolClass, StudentProfile,
     TeacherProfile, ParentProfile, Exam, Quiz, ExamSet, PasswordResetRequest
 )
+
+# Import call_window BEFORE registering blueprints (so SocketIO handlers are registered)
+import call_window
 
 # blueprints
 from admin_routes import admin_bp
@@ -117,7 +96,28 @@ app.register_blueprint(vclass_bp, url_prefix="/vclass")
 app.register_blueprint(chat_bp, url_prefix="/chat")
 
 # -------------------------
-# Login loader (adjust to your user id format)
+# Context processors (these run per-request, no app context issues)
+# -------------------------
+@app.context_processor
+def inject_csrf():
+    from flask_wtf.csrf import generate_csrf
+    return dict(csrf_token=generate_csrf)
+
+@app.context_processor
+def inject_now():
+    return {'now': datetime.utcnow()}
+
+@app.context_processor
+def inject_active_assessment_period():
+    def get_active_period():
+        try:
+            return TeacherAssessmentPeriod.query.filter_by(is_active=True).first()
+        except Exception:
+            return None
+    return {'active_assessment_period': get_active_period}
+
+# -------------------------
+# Login loader
 # -------------------------
 @login_manager.user_loader
 def load_user(user_id):
@@ -125,39 +125,12 @@ def load_user(user_id):
         if isinstance(user_id, str) and user_id.startswith("admin:"):
             uid = user_id.split(":", 1)[1]
             return Admin.query.filter_by(public_id=uid).first()
-
         elif isinstance(user_id, str) and user_id.startswith("user:"):
             uid = user_id.split(":", 1)[1]
             return User.query.filter_by(public_id=uid).first()
-
     except Exception as e:
         logger.exception("user_loader error: %s", e)
-
     return None
-
-# -------------------------
-with app.app_context():
-    import call_window
-    db.create_all()
-
-    # create default super admin
-    super_admin = Admin.query.filter_by(username='SuperAdmin').first()
-    if not super_admin:
-        admin = Admin(username='SuperAdmin', admin_id='ADM001')
-        admin.set_password('Password123')
-        db.session.add(admin)
-        db.session.commit()
-
-    # create default classes
-    try:
-        from utils.helpers import get_class_choices
-        existing = {c.name for c in SchoolClass.query.all()}
-        for name, _ in get_class_choices():
-            if name not in existing:
-                db.session.add(SchoolClass(name=name))
-        db.session.commit()
-    except Exception:
-        pass
 
 # -------------------------
 # Error handlers
@@ -168,42 +141,44 @@ def handle_csrf(e):
 
 @app.after_request
 def set_headers(response):
-    # keep these; adjust caching policy as needed
     response.headers['X-Content-Type-Options'] = 'nosniff'
-    # Do NOT aggressively cache dynamic pages — keep small default
     response.headers.setdefault('Cache-Control', 'no-store')
     return response
 
 # -------------------------
-# DB initialization — run once per server start (not on every request)
+# DB initialization on startup (using @app.before_request is too late)
+# This runs ONCE when the app starts
 # -------------------------
-@app.before_request
-#def initialize_database_once():
-#    try:
-#        db.create_all()
-#        # create a default super admin if missing
-#        super_admin = Admin.query.filter_by(username='SuperAdmin').first()
-#        if not super_admin:
-#            admin = Admin(username='SuperAdmin', admin_id='ADM001')
-#            admin.set_password('Password123')
-#            db.session.add(admin)
-#            db.session.commit()
-#            logger.info("SuperAdmin created.")
-#        # ensure default classes exist, using your helper
-#        try:
-#            from utils.helpers import get_class_choices
-#            existing = {c.name for c in SchoolClass.query.all()}
-#            for name, _ in get_class_choices():
-#                if name not in existing:
-#                    db.session.add(SchoolClass(name=name))
-#            db.session.commit()
-#        except Exception:
-#            logger.exception("Failed to populate default classes (helper error)")
-#    except Exception:
-#        logger.exception("Error creating database/tables")
+def _init_db():
+    """Initialize database — call this in app_context"""
+    try:
+        db.create_all()
+        
+        # Create default super admin if missing
+        super_admin = Admin.query.filter_by(username='SuperAdmin').first()
+        if not super_admin:
+            admin = Admin(username='SuperAdmin', admin_id='ADM001')
+            admin.set_password('Password123')
+            db.session.add(admin)
+            db.session.commit()
+            logger.info("SuperAdmin created.")
+        
+        # Ensure default classes exist
+        try:
+            from utils.helpers import get_class_choices
+            existing = {c.name for c in SchoolClass.query.all()}
+            for name, _ in get_class_choices():
+                if name not in existing:
+                    db.session.add(SchoolClass(name=name))
+            db.session.commit()
+            logger.info("Default classes initialized.")
+        except Exception as e:
+            logger.exception("Failed to populate default classes: %s", e)
+    except Exception as e:
+        logger.exception("Error initializing database: %s", e)
 
 # -------------------------
-# Routes (kept small — move heavy routes to blueprints)
+# Routes
 # -------------------------
 @app.route('/')
 def home():
@@ -253,24 +228,22 @@ def list_routes():
     return "<pre>" + "\n".join(sorted(lines)) + "</pre>"
 
 # -------------------------
-# Helpful debug endpoint to inspect session storage (only in debug mode)
+# Run initialization ONCE at startup (before request handling)
 # -------------------------
-#@app.route('/_debug/session-files')
-#def debug_session_files():
-#    if not app.debug:
-#        abort(403)
-#    d = app.config['SESSION_FILE_DIR']
-#    try:
-#        files = os.listdir(d)
-#        return jsonify({"session_dir": d, "files": files})
-#    except Exception as e:
-#        return jsonify({"error": str(e), "dir": d}), 500
+_init_db_done = False
+
+@app.before_request
+def ensure_db_init():
+    global _init_db_done
+    if not _init_db_done:
+        _init_db()
+        _init_db_done = True
 
 # -------------------------
 # Run
 # -------------------------
 if __name__ == "__main__":
-    # show important runtime info
     logger.info("Starting LMS app on 0.0.0.0:5000")
     logger.info("SESSION_TYPE=%s", app.config['SESSION_TYPE'])
     socketio.run(app, host="0.0.0.0", port=int(os.environ.get('PORT', 5000)), debug=app.debug)
+    
