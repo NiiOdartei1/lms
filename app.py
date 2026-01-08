@@ -26,7 +26,8 @@ app = Flask(__name__)  # keep static_folder if you use it
 app.config.from_object(Config)
 
 app.config.setdefault('SQLALCHEMY_DATABASE_URI', 'sqlite:///lms.db')
-app.config.setdefault('SESSION_TYPE', 'sqlalchemy')            # use database for sessions
+app.config.setdefault('SESSION_TYPE', 'sqlalchemy')
+app.config['SESSION_SQLALCHEMY'] = db
 app.config.setdefault('SESSION_SQLALCHEMY_TABLE', 'sessions')
 app.config.setdefault('SESSION_PERMANENT', False)
 app.config.setdefault('SESSION_USE_SIGNER', True)
@@ -38,7 +39,6 @@ app.config.setdefault('PROFILE_PICS_FOLDER', os.path.join(app.instance_path, 'pr
 
 # ensure instance & session dirs exist
 os.makedirs(app.instance_path, exist_ok=True)
-os.makedirs(app.config['SESSION_FILE_DIR'], exist_ok=True)
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['MATERIALS_FOLDER'], exist_ok=True)
 os.makedirs(app.config['PAYMENT_PROOF_FOLDER'], exist_ok=True)
@@ -64,7 +64,6 @@ login_manager.login_view = 'select_portal'
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.info("App instance path: %s", app.instance_path)
-logger.info("Session file dir: %s", app.config['SESSION_FILE_DIR'])
 
 # expose generate_csrf to templates as callable: use in template as {{ csrf_token() }}
 @app.context_processor
@@ -229,16 +228,16 @@ def list_routes():
 # -------------------------
 # Helpful debug endpoint to inspect session storage (only in debug mode)
 # -------------------------
-@app.route('/_debug/session-files')
-def debug_session_files():
-    if not app.debug:
-        abort(403)
-    d = app.config['SESSION_FILE_DIR']
-    try:
-        files = os.listdir(d)
-        return jsonify({"session_dir": d, "files": files})
-    except Exception as e:
-        return jsonify({"error": str(e), "dir": d}), 500
+#@app.route('/_debug/session-files')
+#def debug_session_files():
+#    if not app.debug:
+#        abort(403)
+#    d = app.config['SESSION_FILE_DIR']
+#    try:
+#        files = os.listdir(d)
+#        return jsonify({"session_dir": d, "files": files})
+#    except Exception as e:
+#        return jsonify({"error": str(e), "dir": d}), 500
 
 # -------------------------
 # Run
