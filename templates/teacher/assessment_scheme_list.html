@@ -1,0 +1,27 @@
+{% extends 'teacher/base_teacher.html' %}
+{% block content %}
+<h3>Your Courses – Assessment Schemes</h3>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Class</th>
+            <th>Course</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for course in courses %}
+        <tr>
+            <td>{{ course.assigned_class }}</td>
+            <td>{{ course.name }}</td>
+            <td>
+                <a href="{{ url_for('teacher.assessment_scheme', course_id=course.id) }}" class="btn btn-sm btn-primary">
+                    Edit Scheme
+                </a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

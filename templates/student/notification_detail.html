@@ -1,0 +1,38 @@
+{% extends "student/base_student.html" %}
+{% block title %}{{ title }} Notifications{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <div class="mb-4 text-center">
+    <h4 class="fw-bold text-gradient">{{ title }}</h4>
+    <p class="text-muted small">All updates and announcements under this category.</p>
+  </div>
+
+  {% if recipients %}
+    <div class="list-group shadow-sm rounded-4 overflow-hidden">
+      {% for r in recipients %}
+        <div class="list-group-item">
+          <div class="d-flex justify-content-between">
+            <div class="fw-semibold">{{ r.notification.sender.full_name if r.notification.sender else 'System' }}</div>
+            <span class="small text-muted">{{ r.notification.created_at.strftime('%d %b %Y, %I:%M %p') }}</span>
+          </div>
+          <p class="mb-1 mt-2">{{ r.notification.message | replace('\n', '<br>') | safe }}</p>
+          {% if r.notification.due_date %}
+            <p class="text-danger small mb-0"><strong>Due:</strong> {{ r.notification.due_date.strftime('%d %b %Y, %I:%M %p') }}</p>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="alert alert-info text-center">No notifications in this category.</div>
+  {% endif %}
+
+  <div class="text-center mt-4">
+    <a href="{{ url_for('student.student_notifications') }}" class="btn btn-outline-dark rounded-pill px-4">
+      ⬅ Back to Notifications
+    </a>
+  </div>
+
+</div>
+{% endblock %}

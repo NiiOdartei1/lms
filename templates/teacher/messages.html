@@ -1,0 +1,25 @@
+{% extends 'teacher/base_teacher.html' %}
+{% block title %}Messages{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Messages</h2>
+
+    <div class="list-group">
+        <a href="#" class="list-group-item list-group-item-action">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">Parent of Jane Doe</h5>
+                <small>2 hours ago</small>
+            </div>
+            <p class="mb-1">Hello teacher, I wanted to ask about the homework...</p>
+        </a>
+        <a href="#" class="list-group-item list-group-item-action">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">Student: John Smith</h5>
+                <small>Yesterday</small>
+            </div>
+            <p class="mb-1">Can you help me understand question 3 from the assignment?</p>
+        </a>
+    </div>
+</div>
+{% endblock %}

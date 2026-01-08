@@ -1,0 +1,124 @@
+{% extends 'teacher/base_teacher.html' %}
+{% block title %}View Attendance{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="card shadow border-0">
+    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+      <h4 class="mb-0"><i class="fas fa-eye me-2"></i>View Attendance Records</h4>
+      <button class="btn btn-light btn-sm" id="toggleExcelView">
+        <i class="fas fa-table me-1"></i> Toggle Excel View
+      </button>
+    </div>
+
+    <div class="card-body">
+      <!-- Filters -->
+      <form class="row g-3 mb-4" method="GET" action="{{ url_for('teacher.view_attendance') }}">
+        <div class="col-md-5">
+          <label class="form-label"><i class="fas fa-chalkboard"></i> Class</label>
+          <select name="classSelect" class="form-select" onchange="this.form.submit()">
+            <option value="">-- All Classes --</option>
+            {% for cls in classes %}
+              <option value="{{ cls }}" {% if cls == selected_class %}selected{% endif %}>{{ cls }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-5">
+          <label class="form-label"><i class="fas fa-calendar-day"></i> Date</label>
+          <select name="date" class="form-select" onchange="this.form.submit()">
+            <option value="">-- All Dates --</option>
+            {% for d in dates %}
+              <option value="{{ d.isoformat() }}" {% if selected_date and d == selected_date %}selected{% endif %}>
+                {{ d.strftime('%b %d, %Y') }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      </form>
+
+      {% if records %}
+      <!-- Standard View Table -->
+      <div class="table-responsive mb-4" id="standardTable">
+        <table class="table table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>#</th>
+              <th>Date</th>
+              <th>Class</th>
+              <th>Student</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in records %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ r.date.strftime('%b %d, %Y') }}</td>
+              <td>{{ r.current_class }}</td>
+              <td>{{ r.full_name }}</td>
+              <td>
+                {% if r.is_present %}
+                  <span class="badge bg-success">Present</span>
+                {% else %}
+                  <span class="badge bg-danger">Absent</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      <!-- Excel-style Attendance Table -->
+      {% if students and dates %}
+      <div class="table-responsive d-none" id="excelTable" style="overflow-x:auto;">
+        <table class="table table-bordered table-sm align-middle text-center" style="min-width: 800px;">
+          <thead class="table-light">
+            <tr>
+              <th style="position: sticky; left: 0; background: #f8f9fa; z-index: 2; width: 200px;" class="text-start">
+                Student
+              </th>
+              {% for d in dates %}
+                <th>{{ d.strftime('%b %d') }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for student in students %}
+            <tr>
+              <td style="position: sticky; left: 0; background: white; z-index: 1;" class="text-start">
+                {{ student.full_name }}
+              </td>
+              {% for d in dates %}
+                {% set val = attendance_map.get((student.id, d), 0) %}
+                <td>
+                  {% if val == 1 %}
+                    <span class="text-success fw-bold">✓</span>
+                  {% else %}
+                    <span class="text-danger fw-bold">×</span>
+                  {% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="alert alert-info mt-3">No attendance data available for the selected class.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById('toggleExcelView').addEventListener('click', function () {
+    const stdTable = document.getElementById('standardTable');
+    const excelTable = document.getElementById('excelTable');
+    stdTable.classList.toggle('d-none');
+    excelTable.classList.toggle('d-none');
+  });
+</script>
+{% endblock %}

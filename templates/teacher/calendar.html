@@ -1,0 +1,153 @@
+{% extends "teacher/base_teacher.html" %}
+{% block title %}Academic Calendar{% endblock %}
+
+{% block content %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+<style>
+  .calendar-card { background:#fff; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08); padding:12px; min-height:500px; }
+  .fc-button { border-radius:6px !important; font-size:12px !important; padding:2px 6px !important; }
+  .fc-day-sat, .fc-day-sun { background-color:#fafafa !important; }
+  .fc-event { transition:all .18s ease; border-radius:4px; font-size:12px; padding:2px 4px; }
+  .calendar-legend { display:flex; gap:10px; margin-top:10px; font-size:12px; }
+  .legend-item { display:flex; align-items:center; gap:6px; }
+  .legend-color { width:10px; height:10px; border-radius:3px; display:inline-block; }
+  .fc .fc-toolbar-title { font-size:16px; }
+</style>
+
+<div class="container mt-4">
+  <h3 class="mb-3">📅 Academic Calendar</h3>
+  <div class="calendar-card">
+    <div id="calendar" style="min-height:480px;"></div>
+  </div>
+
+  <div class="calendar-legend mt-3">
+    <div class="legend-item"><span class="legend-color" style="background:#28a745"></span> Lecture</div>
+    <div class="legend-item"><span class="legend-color" style="background:#ffc107"></span> Exam</div>
+    <div class="legend-item"><span class="legend-color" style="background:#dc3545"></span> Holiday</div>
+  </div>
+</div>
+
+<!-- Event details modal -->
+<div class="modal fade" id="eventDetailsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Event details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+      <div class="modal-body" id="event-details-body"></div>
+    </div>
+  </div>
+</div>
+
+<script id="calendarData" type="application/json">
+  {{ cal_events|tojson|safe }}
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // parse events safely
+  let raw = document.getElementById('calendarData').textContent || '[]';
+  let events = [];
+  try {
+    events = JSON.parse(raw);
+    if (!Array.isArray(events)) events = [];
+  } catch (e) {
+    console.error("Calendar JSON parse error:", e, raw);
+    events = [];
+  }
+
+  // quick debug print to console
+  console.debug("Calendar events:", events);
+
+  // ensure only one calendar element exists
+  const calendarEl = document.getElementById('calendar');
+  if (!calendarEl) {
+    console.error("No #calendar element found.");
+    return;
+  }
+
+  // Destroy existing FullCalendar instance if any (safe re-init)
+  if (window._fcCalendar && typeof window._fcCalendar.destroy === 'function') {
+    try { window._fcCalendar.destroy(); } catch (e) { console.warn("existing calendar destroy failed", e); }
+  }
+
+  const calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'dayGridMonth',
+    height: 'auto',
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,listWeek'
+    },
+    events: events || [],
+    eventDisplay: 'block',
+    dayMaxEvents: true,
+    selectable: false,
+    eventDidMount: function(info) {
+      // attach bootstrap tooltip (destroy previous if present)
+      try {
+        // use title+extendedProps for tooltip text
+        const props = info.event.extendedProps || {};
+        const t = props.tooltip || info.event.title;
+        if (info.el._bsTooltip) {
+          info.el._bsTooltip.dispose();
+        }
+        new bootstrap.Tooltip(info.el, {
+          title: t,
+          placement: 'top',
+          trigger: 'hover',
+          container: 'body',
+          html: false
+        });
+      } catch (err) {
+        console.warn("tooltip attach failed:", err);
+      }
+    },
+    eventClick: function(info) {
+      info.jsEvent.preventDefault();
+      const e = info.event;
+      const p = e.extendedProps || {};
+      const start = e.start ? new Date(e.start).toLocaleString() : '—';
+      const end   = e.end   ? new Date(e.end).toLocaleString() : '—';
+      const html = `
+        <h5>${e.title}</h5>
+        ${p.type ? `<p><strong>Type:</strong> ${p.type}</p>` : ''}
+        ${p.course ? `<p><strong>Course:</strong> ${p.course}</p>` : ''}
+        <p><strong>Starts:</strong> ${start}</p>
+        <p><strong>Ends:</strong> ${end}</p>
+        ${p.description ? `<p><strong>Note:</strong> ${p.description}</p>` : ''}
+      `;
+      document.getElementById('event-details-body').innerHTML = html;
+      new bootstrap.Modal(document.getElementById('eventDetailsModal')).show();
+    },
+    dateClick: function(info) {
+      // show events on that day in modal
+      const dateStr = info.dateStr;
+      const matches = (events || []).filter(ev => {
+        if (!ev.start) return false;
+        // normalize to ISO date prefix (YYYY-MM-DD)
+        const s = String(ev.start).slice(0,10);
+        const e = ev.end ? String(ev.end).slice(0,10) : null;
+        if (e) {
+          // inclusive check for multi-day events: treat end exclusive -> check range
+          return (s <= dateStr && dateStr < e) || (s === dateStr);
+        }
+        return s === dateStr;
+      });
+
+      const list = matches.length ? matches.map(ev => `<li class="list-group-item"><strong>${ev.title}</strong><div class="small text-muted">${ev.start || ''} ${ev.end ? ' — ' + ev.end : ''}</div></li>`).join('') : '<li class="list-group-item text-muted">No events</li>';
+      document.getElementById('event-details-body').innerHTML = `<h6>${new Date(dateStr).toDateString()}</h6><ul class="list-group">${list}</ul>`;
+      new bootstrap.Modal(document.getElementById('eventDetailsModal')).show();
+    }
+  });
+
+  calendar.render();
+  window._fcCalendar = calendar;
+
+  // If your layout has a sidebar that toggles width, expose a helper to update size
+  window.safeUpdateCalendar = (delay=50) => { setTimeout(()=>{ try{ window._fcCalendar?.updateSize(); }catch(e){console.warn(e);} }, delay); };
+
+  // example: if your page toggles a sidebar, call safeUpdateCalendar after the toggle
+});
+</script>
+{% endblock %}

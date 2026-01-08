@@ -1,0 +1,46 @@
+{% extends "teacher/base_teacher.html" %}
+{% block title %}Schedule Meeting{% endblock %}
+
+{% block content %}
+<div class="container mt-3">
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <h5>Schedule New Meeting</h5>
+    </div>
+    <div class="card-body">
+      <form method="POST">
+        {{ form.hidden_tag() }}
+
+        <div class="mb-3">
+          {{ form.title.label(class="form-label fw-bold") }}
+          {{ form.title(class="form-control") }}
+        </div>
+
+        <div class="mb-3">
+          {{ form.description.label(class="form-label fw-bold") }}
+          {{ form.description(class="form-control", rows=3) }}
+        </div>
+
+        <div class="mb-3">
+          {{ form.course_id.label(class="form-label fw-bold") }}
+          {{ form.course_id(class="form-select") }}
+        </div>
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            {{ form.scheduled_start.label(class="form-label fw-bold") }}
+            {{ form.scheduled_start(class="form-control", type="datetime-local") }}
+          </div>
+          <div class="col-md-6 mb-3">
+            {{ form.scheduled_end.label(class="form-label fw-bold") }}
+            {{ form.scheduled_end(class="form-control", type="datetime-local") }}
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-success">{{ form.submit.label.text }}</button>
+        <a href="{{ url_for('teacher.meetings') }}" class="btn btn-secondary">Cancel</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

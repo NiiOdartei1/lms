@@ -1,0 +1,204 @@
+{% extends 'student/base_student.html' %}
+
+{% block title %}Student Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid pt-2">
+  <!-- Toast Welcome Banner -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
+    <div id="welcomeToast" class="toast align-items-center text-white bg-primary border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+      <div class="d-flex">
+        <div class="toast-body">
+          <strong>Welcome, {{ current_user.first_name }}!</strong><br>
+          Your personal student dashboard. Stay updated and organized.
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard Tiles -->
+  <div class="row g-4 py-3">
+
+    <!-- My Profile -->
+    <div class="col-md-6 col-lg-4">
+      <div class="card text-center shadow-sm h-100">
+        <div class="card-body">
+          <i class="fas fa-user-circle fa-3x text-secondary mb-3"></i>
+          <h5 class="card-title">My Profile</h5>
+          <p class="card-text">View and update your personal information.</p>
+          <a href="{{ url_for('student.profile') }}" class="btn btn-outline-primary btn-sm">View Profile</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- My Courses -->
+    <div class="col-md-6 col-lg-4">
+      <div class="card text-center shadow-sm h-100">
+        <div class="card-body">
+          <i class="fas fa-book-open fa-3x text-success mb-3"></i>
+          <h5 class="card-title">My Courses</h5>
+          <p class="card-text">Access your enrolled courses and materials.</p>
+          <a href="{{ url_for('student.register_courses') }}" class="btn btn-outline-success btn-sm">Go to Courses</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Academic Results -->
+    <div class="col-md-6 col-lg-4">
+      <div class="card text-center shadow-sm h-100">
+        <div class="card-body">
+          <i class="fas fa-chart-line fa-3x text-warning mb-3"></i>
+          <h5 class="card-title">Academic Results</h5>
+          <p class="card-text">Check your semester grades and GPA.</p>
+          <a href="{{ url_for('student.my_results') }}" class="btn btn-outline-warning btn-sm">View Results</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exam Timetable -->
+    <div class="col-md-6 col-lg-4">
+      <div class="card text-center shadow-sm h-100">
+        <div class="card-body">
+          <i class="fas fa-calendar-alt fa-3x text-danger mb-3"></i>
+          <h5 class="card-title">Exam Timetable</h5>
+          <p class="card-text">See your upcoming exams and schedule.</p>
+          <a href="#" class="btn btn-outline-danger btn-sm">View Timetable</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Student Notices -->
+    <div class="col-md-6 col-lg-4">
+      <div class="card text-center shadow-sm h-100">
+        <div class="card-body">
+          <i class="fas fa-bullhorn fa-3x text-info mb-3"></i>
+          <h5 class="card-title">Student Notices</h5>
+          <p class="card-text">Stay updated with important announcements.</p>
+          <a href="#" class="btn btn-outline-info btn-sm">View Notices</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="col-md-6 col-lg-4">
+      <div class="card text-center shadow-sm h-100">
+        <div class="card-body">
+          <i class="fas fa-envelope fa-3x text-dark mb-3"></i>
+          <h5 class="card-title">Messages</h5>
+          <p class="card-text">Check messages from staff or admin.</p>
+          <a href="#" class="btn btn-outline-dark btn-sm">Open Messages</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exams -->
+<div class="col-md-6 col-lg-4">
+  <div class="card text-center shadow-sm h-100">
+    <div class="card-body">
+      <i class="fas fa-file-alt fa-3x text-primary mb-3"></i>
+      <h5 class="card-title">Exams</h5>
+      <p class="card-text">View available exams and instructions.</p>
+      <a href="{{ url_for('exam.welcome') }}" class="btn btn-outline-primary btn-sm">Go to Exams</a>
+    </div>
+  </div>
+</div>
+
+<!-- Transcript -->
+<div class="col-md-6 col-lg-4">
+  <div class="card text-center shadow-sm h-100">
+    <div class="card-body">
+      <i class="fas fa-file-signature fa-3x text-secondary mb-3"></i>
+      <h5 class="card-title">Transcript</h5>
+      <p class="card-text">View your full academic transcript.</p>
+      <a href="{{ url_for('student.transcript') }}" class="btn btn-outline-secondary btn-sm">View Transcript</a>
+    </div>
+  </div>
+</div>
+
+<!-- Timetable -->
+<div class="col-md-6 col-lg-4">
+  <div class="card text-center shadow-sm h-100">
+    <div class="card-body">
+      <i class="fas fa-calendar-alt fa-3x text-warning mb-3"></i>
+      <h5 class="card-title">Timetable</h5>
+      <p class="card-text">Check your daily class schedule.</p>
+      <a href="{{ url_for('student.view_timetable') }}" class="btn btn-outline-warning btn-sm">View Timetable</a>
+    </div>
+  </div>
+</div>
+
+<!-- Appointments -->
+<div class="col-md-6 col-lg-4">
+  <div class="card text-center shadow-sm h-100">
+    <div class="card-body">
+      <i class="fas fa-calendar-plus fa-3x text-info mb-3"></i>
+      <h5 class="card-title">Appointments</h5>
+      <p class="card-text">Book appointments with staff or advisors.</p>
+      <a href="{{ url_for('student.book_appointment') }}" class="btn btn-outline-info btn-sm">Book Appointment</a>
+    </div>
+  </div>
+</div>
+
+<!-- Chat -->
+<div class="col-md-6 col-lg-4">
+  <div class="card text-center shadow-sm h-100">
+    <div class="card-body">
+      <i class="fas fa-comments fa-3x text-dark mb-3"></i>
+      <h5 class="card-title">Chat</h5>
+      <p class="card-text">Communicate with staff and peers.</p>
+      <a href="{{ url_for('chat.chat_home') }}" class="btn btn-outline-dark btn-sm">Open Chat</a>
+    </div>
+  </div>
+</div>
+
+<!-- Notifications -->
+<div class="col-md-6 col-lg-4">
+  <div class="card text-center shadow-sm h-100">
+    <div class="card-body">
+      <i class="fas fa-info-circle fa-3x text-danger mb-3"></i>
+      <h5 class="card-title">Notifications</h5>
+      <p class="card-text">View unread messages and alerts.</p>
+      <a href="{{ url_for('student.student_notifications') }}" class="btn btn-outline-danger btn-sm">View Notifications</a>
+    </div>
+  </div>
+</div>
+
+<!-- Fees -->
+<div class="col-md-6 col-lg-4">
+  <div class="card text-center shadow-sm h-100">
+    <div class="card-body">
+      <i class="fas fa-money-check-alt fa-3x text-success mb-3"></i>
+      <h5 class="card-title">Fees</h5>
+      <p class="card-text">View and pay your school fees.</p>
+      <a href="{{ url_for('student.pay_fees', year='2025/2026', semester='First') }}" class="btn btn-outline-success btn-sm">View Fees</a>
+    </div>
+  </div>
+</div>
+
+
+    <!-- Virtual Class -->
+    <div class="col-md-6 col-lg-4">
+      <div class="card text-center shadow-sm h-100">
+        <div class="card-body">
+          <i class="fas fa-chalkboard-teacher fa-3x text-primary mb-3"></i>
+          <h5 class="card-title">Virtual Class</h5>
+          <p class="card-text">Access your quizzes, assignments, and learning materials.</p>
+          <a href="{{ url_for('vclass.dashboard') }}" class="btn btn-outline-primary btn-sm">Go to Virtual Class</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  window.addEventListener('DOMContentLoaded', (event) => {
+    const toastEl = document.getElementById('welcomeToast');
+    if (toastEl) {
+      const toast = new bootstrap.Toast(toastEl);
+      toast.show();
+    }
+  });
+</script>
+{% endblock %}

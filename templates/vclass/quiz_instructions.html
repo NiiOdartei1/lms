@@ -1,0 +1,51 @@
+{% extends 'vclass/base_vclass.html' %}
+{% block title %}Quiz Instructions{% endblock %}
+
+{% block content %}
+<div class="container py-2">
+  <h4 class="mb-3">Quiz Instructions: {{ quiz.title }}</h4>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <!-- Quiz Info -->
+      <p><strong>Course:</strong> {{ quiz.subject }}</p>
+      <p><strong>Assigned Class:</strong> {{ quiz.assigned_class }}</p>
+      <p><strong>Scheduled Date:</strong> {{ quiz.start_datetime.strftime('%B %d, %Y') }}</p>
+      <p><strong>Start Time:</strong> {{ quiz.start_datetime.strftime('%I:%M %p') }}</p>
+      <p><strong>End Time:</strong> {{ quiz.end_datetime.strftime('%I:%M %p') }}</p>
+      <p><strong>Duration:</strong> {{ quiz.duration_minutes }} minutes</p>
+      <p><strong>Attempts Used:</strong> {{ attempts_made }} / {{ quiz.attempts_allowed }}</p>
+
+      <hr>
+
+      <!-- Guidelines -->
+      <h5 class="mb-3">Before You Begin:</h5>
+      <ul>
+        <li>Find a quiet place free from distractions.</li>
+        <li>Ensure your device is charged or plugged in.</li>
+        <li>Connect to a reliable internet source.</li>
+        <li>The quiz timer starts immediately and cannot be paused.</li>
+        <li>Avoid refreshing or closing the browser during the quiz.</li>
+        <li>Submit all answers before time runs out.</li>
+      </ul>
+
+      <div class="mt-4">
+        {% if can_attempt %}
+          <form action="{{ url_for('vclass.take_quiz', quiz_id=quiz.id) }}" method="get" class="d-inline">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-play me-2"></i> Start Quiz
+            </button>
+          </form>
+          <a href="{{ url_for('vclass.switch_to_vclass') }}" class="btn btn-secondary ms-2">Back to Virtual Class</a>
+        {% else %}
+          <div class="alert alert-danger">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            You have reached the maximum number of attempts ({{ quiz.attempts_allowed }}).
+          </div>
+          <a href="{{ url_for('vclass.switch_to_vclass') }}" class="btn btn-secondary">Back to Virtual Class</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

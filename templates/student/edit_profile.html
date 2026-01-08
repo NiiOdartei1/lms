@@ -1,0 +1,76 @@
+{% extends 'student/base_student.html' %}
+{% block title %}Edit Profile{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <div class="card shadow-sm">
+    <div class="card-header fw-bold">
+      <i class="bi bi-pencil"></i> Edit Personal Details
+    </div>
+
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="card-body row g-3">
+
+        <div class="col-md-6">
+          <label class="form-label">Phone</label>
+          <input type="text" name="phone" class="form-control" value="{{ profile.phone or '' }}">
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control" value="{{ profile.email or '' }}">
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">City</label>
+          <input type="text" name="city" class="form-control" value="{{ profile.city or '' }}">
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Postal Code</label>
+          <input type="text" name="postal_code" class="form-control" value="{{ profile.postal_code or '' }}">
+        </div>
+
+        <div class="col-md-12">
+          <label class="form-label">Address</label>
+          <textarea name="address" class="form-control" rows="2">{{ profile.address or '' }}</textarea>
+        </div>
+
+        <hr>
+
+        <div class="col-md-6">
+          <label class="form-label">Blood Group</label>
+          <input type="text" name="blood_group" class="form-control" value="{{ profile.blood_group or '' }}">
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Medical Conditions</label>
+          <input type="text" name="medical_conditions" class="form-control" value="{{ profile.medical_conditions or '' }}">
+        </div>
+
+        <hr>
+
+        <div class="col-md-6">
+          <label class="form-label">Emergency Contact Name</label>
+          <input type="text" name="emergency_contact_name" class="form-control"
+                 value="{{ profile.emergency_contact_name or '' }}">
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Emergency Contact Number</label>
+          <input type="text" name="emergency_contact_number" class="form-control"
+                 value="{{ profile.emergency_contact_number or '' }}">
+        </div>
+
+      </div>
+
+      <div class="card-footer text-end">
+        <a href="{{ url_for('student.profile') }}" class="btn btn-secondary btn-sm">Cancel</a>
+        <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

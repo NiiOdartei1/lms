@@ -1,0 +1,40 @@
+{% extends "teacher/base_teacher.html" %}
+{% block title %}Submissions – {{ assignment.title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3>Submissions for {{ assignment.title }}</h3>
+
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Student</th>
+        <th>File</th>
+        <th>Score</th>
+        <th>Feedback</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in submissions %}
+      <tr>
+        <td>{{ s.student.full_name }}</td>
+        <td>
+          <a href="{{ url_for('static', filename='uploads/assignments/' ~ s.filename) }}" target="_blank">
+            Download
+          </a>
+        </td>
+        <td>{{ s.score if s.score is not none else "Not Scored" }}</td>
+        <td>{{ s.feedback or "" }}</td>
+        <td>
+          <a href="{{ url_for('teacher.score_submission', submission_id=s.id) }}"
+             class="btn btn-sm btn-primary">Enter Score</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <a href="{{ url_for('teacher.manage_assignments') }}" class="btn btn-secondary">Back</a>
+</div>
+{% endblock %}

@@ -1,0 +1,139 @@
+{% extends 'teacher/base_teacher.html' %}
+{% block title %}Add New Assignment{% endblock %}
+
+{% block content %}
+<div class="container mt-3">
+  <div class="card shadow-sm border-0">
+    <div class="card-header text-white rounded-top-3" style="background: linear-gradient(90deg,#2b2d42,#3a3d63);">
+      <h5 class="mb-0"><i class="fas fa-plus-circle me-2"></i> Add New Assignment</h5>
+    </div>
+    <div class="card-body">
+      <form id="wizardForm" method="POST" enctype="multipart/form-data" novalidate>
+        {{ form.hidden_tag() }}
+
+        <input type="hidden" id="course_id" name="course_id" value="{{ form.course_id.data or '' }}">
+
+        <!-- Step 1: Class & Course -->
+        <div class="step">
+          <h5 class="fw-bold mb-2">Class & Course</h5>
+          <div class="row">
+            <div class="col-md-6 mb-2">
+              {{ form.assigned_class.label(class="form-label fw-semibold") }}
+              {{ form.assigned_class(class="form-select", id="assigned_class") }}
+            </div>
+            <div class="col-md-6 mb-2">
+              {{ form.course_name.label(class="form-label fw-semibold") }}
+              {{ form.course_name(class="form-select", id="course_name") }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Title -->
+        <div class="step" style="display:none;">
+          {{ form.title.label(class="form-label fw-semibold") }}
+          {{ form.title(class="form-control", placeholder="Enter assignment title") }}
+        </div>
+
+        <!-- Step 3: Description -->
+        <div class="step" style="display:none;">
+          {{ form.description.label(class="form-label fw-semibold") }}
+          {{ form.description(class="form-control", rows=3, placeholder="Brief overview of the assignment") }}
+        </div>
+
+        <!-- Step 4: Instructions -->
+        <div class="step" style="display:none;">
+          {{ form.instructions.label(class="form-label fw-semibold") }}
+          {{ form.instructions(class="form-control", rows=3, placeholder="Detailed instructions for students") }}
+        </div>
+
+        <!-- Step 5: Due Date & Max Score -->
+        <div class="step" style="display:none;">
+          <div class="row">
+            <div class="col-md-6 mb-2">
+              {{ form.due_date.label(class="form-label fw-semibold") }}
+              {{ form.due_date(class="form-control", type="datetime-local") }}
+            </div>
+            <div class="col-md-6 mb-2">
+              {{ form.max_score.label(class="form-label fw-semibold") }}
+              {{ form.max_score(class="form-control", type="number", step="0.5", min="0") }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 6: File Upload -->
+        <div class="step" style="display:none;">
+          {{ form.file.label(class="form-label fw-semibold") }}
+          {{ form.file(class="form-control") }}
+        </div>
+
+        <!-- Navigation -->
+        <div class="d-flex justify-content-between mt-3">
+          <button type="button" class="btn btn-outline-secondary" id="prevBtn">Back</button>
+          <button type="button" class="btn btn-primary" id="nextBtn">Next</button>
+          <button type="submit" class="btn btn-success" id="submitBtn" style="display:none;">Save Assignment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+const steps = document.querySelectorAll(".step");
+let currentStep = 0;
+
+function showStep(n) {
+  steps.forEach((step, i) => step.style.display = i === n ? "block" : "none");
+  document.getElementById("prevBtn").style.display = n === 0 ? "none" : "inline-block";
+  document.getElementById("nextBtn").style.display = n === steps.length - 1 ? "none" : "inline-block";
+  document.getElementById("submitBtn").style.display = n === steps.length - 1 ? "inline-block" : "none";
+}
+showStep(currentStep);
+document.getElementById("prevBtn").onclick = () => { if (currentStep>0) showStep(--currentStep); };
+document.getElementById("nextBtn").onclick = () => { if (currentStep<steps.length-1) showStep(++currentStep); };
+
+// Dependent Class -> Course dropdown
+const classSelect = document.getElementById('assigned_class');
+const courseSelect = document.getElementById('course_name');
+const courseIdInput = document.getElementById('course_id');
+
+if (classSelect) {
+  classSelect.addEventListener('change', async () => {
+    const cls = classSelect.value;
+    courseSelect.disabled = true;
+    courseSelect.innerHTML = '<option>Loading...</option>';
+    courseIdInput.value = '';
+
+    const res = await fetch(`/teacher/courses_for_class/${cls}`);
+    const courses = await res.json();
+
+    courseSelect.innerHTML = '';
+    if (!courses.length) {
+      const opt = document.createElement('option');
+      opt.text = 'No courses available';
+      opt.value = '';
+      courseSelect.appendChild(opt);
+      return;
+    }
+
+    courses.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.name;
+      opt.dataset.id = c.id;
+      opt.textContent = c.name;
+      courseSelect.appendChild(opt);
+    });
+
+    courseSelect.selectedIndex = 0;
+    courseIdInput.value = courseSelect.options[0].dataset.id;
+    courseSelect.disabled = false;
+  });
+}
+
+if (courseSelect && courseIdInput) {
+  courseSelect.addEventListener('change', () => {
+    const selected = courseSelect.options[courseSelect.selectedIndex];
+    courseIdInput.value = selected?.dataset?.id || '';
+  });
+}
+</script>
+{% endblock %}

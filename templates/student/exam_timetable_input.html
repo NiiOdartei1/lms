@@ -1,0 +1,27 @@
+{% extends 'student/base_student.html' %}
+{% block title %}Exam Timetable{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h4 class="text-center mb-4">Download Exam Timetable</h4>
+          <form method="POST" action="{{ url_for('student.download_student_exam_timetable') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-3">
+              <label for="index_number" class="form-label fw-bold">Enter Index Number</label>
+              <input type="text" name="index_number" id="index_number"
+                     class="form-control" placeholder="e.g. 02234567" required>
+            </div>
+            <div class="d-grid">
+              <button type="submit" class="btn btn-primary">Download Timetable</button>
+            </div>
+        </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,184 @@
+{% extends 'vclass/base_vclass.html' %}
+{% block title %}Course Materials — Courses{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+<style>
+.course-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.25rem;
+  align-items: start;
+  margin-top: 0.5rem;
+}
+
+.card-upsa {
+  background: #ffffff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(17, 24, 39, 0.06);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  border: 1px solid rgba(15, 23, 42, 0.03);
+  position: relative;
+  cursor: pointer;
+}
+
+.card-upsa:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.09);
+}
+
+/* Different background colors for banners */
+.banner-color-0 { background-color: #3b82f6; }
+.banner-color-1 { background-color: #0ea5a4; }
+.banner-color-2 { background-color: #8b5cf6; }
+.banner-color-3 { background-color: #f59e0b; }
+.banner-color-4 { background-color: #ef4444; }
+.banner-color-5 { background-color: #14b8a6; }
+.banner-color-6 { background-color: #6366f1; }
+.banner-color-7 { background-color: #10b981; }
+
+.card-upsa .banner {
+  position: relative;
+  height: 120px;
+  overflow: hidden;
+}
+
+.banner svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.12;
+}
+
+.banner .overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.35));
+}
+
+.card-upsa .badge-top {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #111827;
+  font-size: 0.75rem;
+  padding: 0.28rem 0.5rem;
+  border-radius: 5px;
+  z-index: 2;
+}
+
+.card-upsa .card-body {
+  padding: 0.9rem 1rem;
+  flex: 1 1 auto;
+}
+
+.card-upsa .title {
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+  color: #0f172a;
+}
+
+.card-upsa .meta {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin-bottom: 0.6rem;
+}
+
+.chips {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.chips .chip {
+  font-size: 0.72rem;
+  padding: 0.22rem 0.45rem;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid rgba(15, 23, 42, 0.02);
+}
+
+.card-upsa .stretched-link {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  text-decoration: none;
+}
+
+@media (max-width: 600px) {
+  .card-upsa .banner {
+    height: 90px;
+  }
+}
+</style>
+
+<div class="container py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex align-items-center gap-3">
+      <i class="fas fa-folder-open fa-lg text-info"></i>
+      <h4 class="mb-0">Course Materials</h4>
+    </div>
+    <a href="{{ url_for('vclass.dashboard') }}" class="btn btn-sm btn-outline-secondary">Back to Dashboard</a>
+  </div>
+
+  <div class="course-grid">
+    {% if courses %}
+      {% for c in courses %}
+        {% set color_index = loop.index0 % 8 %}
+        <div class="card-upsa" role="article" aria-label="Course {{ c.course_name }}">
+          <div class="banner banner-color-{{ color_index }}">
+            <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="{{ (loop.index0 * 37) % 180 }}" cy="{{ (loop.index0 * 53) % 100 }}" r="40" fill="white"></circle>
+              <rect x="{{ (loop.index0 * 23) % 160 }}" y="{{ (loop.index0 * 61) % 80 }}" width="70" height="50" rx="10" fill="white"></rect>
+              <polygon points="100,10 140,90 60,90" fill="white"></polygon>
+            </svg>
+            <div class="overlay"></div>
+            {% if c.count %}
+              <div class="badge-top">{{ c.count }} item{{ 's' if c.count > 1 else '' }}</div>
+            {% endif %}
+          </div>
+
+          <div class="card-body">
+            <div class="title">{{ c.course_name }}</div>
+            <div class="meta">
+              {% if c.instructor %}
+                Instructor: {{ c.instructor }}
+              {% else %}
+                Materials: {{ c.count or 0 }}
+              {% endif %}
+            </div>
+
+            <div class="chips">
+              {% if c.count %}
+                <div class="chip"><i class="fas fa-file-alt"></i>&nbsp;{{ c.count }}</div>
+              {% endif %}
+              {% if c.assigned_class %}
+                <div class="chip">{{ c.assigned_class }}</div>
+              {% endif %}
+              {% if c.progress %}
+                <div class="chip">Progress: {{ c.progress }}%</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <a href="{{ url_for('vclass.materials_by_course', course_name=c.course_name) }}" class="stretched-link" aria-label="View materials for {{ c.course_name }}"></a>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="col-12">
+        <div class="alert alert-info">No course materials have been uploaded yet.</div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

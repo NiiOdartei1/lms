@@ -1,0 +1,132 @@
+{% extends "teacher/base_teacher.html" %}
+{% block title %}Assessment Results{% endblock %}
+
+{% block content %}
+<style>
+  .results-container { font-size: 0.9rem; }
+  .results-card {
+    background: rgba(255,255,255,0.9);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(200,200,200,0.3);
+    border-radius: 1rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    transition: 0.3s ease;
+  }
+  .results-card:hover { box-shadow: 0 6px 14px rgba(0,0,0,0.08); }
+  .table th, .table td { padding: 0.45rem 0.75rem !important; vertical-align: middle; }
+  .table thead { background: #0d6efd; color: white; font-size: 0.85rem; text-transform: uppercase; }
+  .nav-tabs .nav-link { font-size: 0.85rem; font-weight: 600; color: #555; border-radius: 0.5rem 0.5rem 0 0; }
+  .nav-tabs .nav-link.active { color: #0d6efd; background: #f8f9fa; border-bottom: 2px solid #0d6efd; }
+  .filter-bar input, .filter-bar select { font-size: 0.85rem; }
+  #resetFilters { font-size: 0.8rem; }
+</style>
+
+<div class="container-fluid py-1 results-container">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-semibold text-primary mb-0"><i class="fas fa-chart-line me-2"></i>Assessment Results</h5>
+  </div>
+
+  {% if results|length == 0 %}
+    <div class="alert alert-secondary small py-2">No results available yet.</div>
+  {% else %}
+
+  <!-- Tabs: Quiz / Exam / Assignment -->
+  <ul class="nav nav-tabs mb-3" id="typeTabs" role="tablist">
+    {% for t in ['Quiz', 'Exam', 'Assignment'] %}
+    <li class="nav-item">
+      <button class="nav-link {% if t=='Quiz' %}active{% endif %}" id="{{ t|lower }}-tab" data-bs-toggle="tab" data-bs-target="#{{ t|lower }}-pane" type="button" role="tab">
+        {% if t=='Quiz' %}Quizzes{% elif t=='Exam' %}Exams{% else %}Assignments{% endif %}
+      </button>
+    </li>
+    {% endfor %}
+  </ul>
+
+  <!-- Filters -->
+  <div class="row mb-3 g-2 filter-bar align-items-center">
+    <div class="col-md-4 col-12">
+      <input type="text" id="searchStudent" class="form-control form-control-sm" placeholder="Search student name...">
+    </div>
+    <div class="col-md-4 col-12">
+      <select id="filterCourse" class="form-select form-select-sm">
+        <option value="">All Courses</option>
+        {% for c in courses %}
+          <option value="{{ c }}">{{ c }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4 col-12 text-md-end text-center">
+      <button class="btn btn-sm btn-outline-secondary" id="resetFilters"><i class="fas fa-undo me-1"></i>Reset</button>
+    </div>
+  </div>
+
+  <div class="tab-content" id="typeTabsContent">
+    {% for t in ['Quiz', 'Exam', 'Assignment'] %}
+    <div class="tab-pane fade {% if t=='Quiz' %}show active{% endif %}" id="{{ t|lower }}-pane" role="tabpanel">
+      <div class="results-card p-2">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0" id="{{ t|lower }}Table">
+            <thead>
+              <tr>
+                <th>Course</th>
+                <th>Student</th>
+                <th>Raw Score</th>
+                <th>Weight (%)</th>
+                <th>Weighted Score</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in results if r.type == t %}
+              <tr data-course="{{ r.course }}" data-student="{{ r.student|lower }}">
+                <td>{{ r.course }}</td>
+                <td>{{ r.student }}</td>
+                <td>{{ "%.2f"|format(r.raw_score or r.score or 0) }}</td>
+                <td>{{ r.weight_percent if r.weight_percent is not none else '-' }}</td>
+                <td class="fw-semibold
+                    {% if t=='Quiz' %}text-success
+                    {% elif t=='Exam' %}text-primary
+                    {% else %}text-warning{% endif %}">
+                  {{ "%.2f"|format(r.weighted_score or 0) if r.weighted_score is not none else '-' }}
+                </td>
+                <td>{{ r.date or '' }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const searchInput = document.getElementById('searchStudent');
+  const courseFilter = document.getElementById('filterCourse');
+  const resetBtn = document.getElementById('resetFilters');
+
+  function applyFilters() {
+    const search = searchInput.value.toLowerCase();
+    const course = courseFilter.value;
+    document.querySelectorAll('table tbody tr').forEach(row => {
+      const student = row.dataset.student || '';
+      const rowCourse = row.dataset.course || '';
+      const visible =
+        (!search || student.includes(search)) &&
+        (!course || rowCourse === course);
+      row.style.display = visible ? '' : 'none';
+    });
+  }
+
+  searchInput.addEventListener('input', applyFilters);
+  courseFilter.addEventListener('change', applyFilters);
+  resetBtn.addEventListener('click', () => {
+    searchInput.value = '';
+    courseFilter.value = '';
+    applyFilters();
+  });
+});
+</script>
+{% endblock %}

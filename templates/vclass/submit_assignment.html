@@ -1,0 +1,24 @@
+{% extends "vclass/base_vclass.html" %}
+{% block title %}Submit Assignment{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3>Submit Assignment: {{ assignment.title }}</h3>
+  <p class="text-muted">Course: {{ assignment.course_name }}</p>
+
+  <form method="post" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  
+  <div class="mb-3">
+    <label class="form-label">Upload File</label>
+    <input type="file" name="file" class="form-control" required>
+    <small class="form-text text-muted">
+      Allowed formats: .doc, .docx, .xls, .xlsx, .pdf, .ppt, .txt
+    </small>
+  </div>
+  <button type="submit" class="btn btn-primary">Submit</button>
+  <a href="{{ url_for('vclass.my_results') }}" class="btn btn-secondary">Cancel</a>
+</form>
+
+</div>
+{% endblock %}

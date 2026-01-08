@@ -1,0 +1,50 @@
+{% extends layout %}
+{% block title %}Submissions by Course{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="mb-0">Assignment Submissions</h4>
+      <div class="small text-muted">Grouped by course — click an assignment to view its submissions</div>
+    </div>
+  </div>
+
+  {% if grouped %}
+    {% for course, assignments in grouped.items() %}
+      <div class="card mb-3 shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <strong>{{ course }}</strong>
+          <span class="small text-muted">{{ assignments|length }} assignment{{ assignments|length > 1 and 's' or '' }}</span>
+        </div>
+
+        <div class="card-body p-2">
+          <div class="list-group">
+            {% for a in assignments %}
+              <div class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                  <div class="fw-semibold">{{ a.title }}</div>
+                  <div class="small text-muted">
+                    Class: {{ a.assigned_class }} • Due: {{ a.due_date.strftime('%d %b %Y %H:%M') if a.due_date else '—' }}
+                  </div>
+                </div>
+
+                <div class="text-end">
+                  <a href="{{ url_for('teacher.view_submissions', assignment_id=a.id) }}" class="btn btn-sm btn-primary">
+                    <i class="fas fa-file-alt me-1"></i> View Submissions
+                  </a>
+                  <a href="{{ url_for('teacher.edit_assignment', assignment_id=a.id) }}" class="btn btn-sm btn-outline-secondary ms-2">
+                    Edit
+                  </a>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="alert alert-info">No assignments found.</div>
+  {% endif %}
+</div>
+{% endblock %}

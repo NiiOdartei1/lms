@@ -1,0 +1,37 @@
+{% extends 'teacher/base_teacher.html' %}
+{% block title %}Assignments{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Assignments</h2>
+
+    <div class="mb-3">
+        <a href="#" class="btn btn-success">+ Create New Assignment</a>
+    </div>
+
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Class</th>
+                <th>Due Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Algebra Homework</td>
+                <td>Class 6A</td>
+                <td>2025-06-10</td>
+                <td><span class="badge bg-success">Open</span></td>
+                <td>
+                    <a href="#" class="btn btn-sm btn-primary">View</a>
+                    <a href="#" class="btn btn-sm btn-warning">Edit</a>
+                    <a href="#" class="btn btn-sm btn-danger">Delete</a>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}

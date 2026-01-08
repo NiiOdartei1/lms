@@ -1,0 +1,153 @@
+{% extends 'student/base_student.html' %}
+{% block title %}Pay Fees{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <!-- Filter Bar -->
+  <form method="get" class="row g-3 mb-4">
+    <div class="col-md-4">
+      <label for="year" class="form-label">Academic Year</label>
+      <input type="text" id="year" name="year" class="form-control" placeholder="e.g. 2025/2026" value="{{ year }}" required>
+    </div>
+    <div class="col-md-4">
+      <label for="semester" class="form-label">Semester</label>
+      <select id="semester" name="semester" class="form-select" required>
+        <option value="">-- Select --</option>
+        <option value="First" {% if semester == 'First' %}selected{% endif %}>First</option>
+        <option value="Second" {% if semester == 'Second' %}selected{% endif %}>Second</option>
+      </select>
+    </div>
+    <div class="col-md-4 d-grid align-items-end">
+      <button type="submit" class="btn btn-primary">Load</button>
+    </div>
+  </form>
+
+  <!-- Fee Card -->
+  <div class="card shadow">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">Fee Details - {{ year }} | {{ semester }} Semester</h5>
+    </div>
+    <div class="card-body">
+
+      <!-- Flash Messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <!-- Assigned Fees -->
+      <h6 class="mb-3">Assigned Fees</h6>
+      {% if assigned_fees %}
+      <table class="table table-sm table-bordered">
+        <thead class="table-light">
+          <tr>
+            <th>Description</th>
+            <th class="text-end">Amount (GHS)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fee in assigned_fees %}
+          <tr>
+            <td>{{ fee.description }}</td>
+            <td class="text-end">{{ "%.2f"|format(fee.amount) }}</td>
+          </tr>
+          {% endfor %}
+          <tr class="fw-bold">
+            <td>Total</td>
+            <td class="text-end">{{ "%.2f"|format(total_fee) }}</td>
+          </tr>
+        </tbody>
+      </table>
+      {% else %}
+      <p class="text-muted">No fees assigned for this period.</p>
+      {% endif %}
+
+      <hr>
+
+      <!-- Payment Summary -->
+      <div class="mt-4">
+        <h6>Payment Summary</h6>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item d-flex justify-content-between">
+            <strong>Approved Payments:</strong>
+            <span class="text-success">GHS {{ "%.2f"|format(current_balance) }}</span>
+          </li>
+          {% if pending_balance > 0 %}
+          <li class="list-group-item d-flex justify-content-between">
+            <strong>Awaiting Approval:</strong>
+            <span class="text-warning">GHS {{ "%.2f"|format(pending_balance) }}</span>
+          </li>
+          {% endif %}
+          <li class="list-group-item d-flex justify-content-between">
+            <strong>Total Fee:</strong>
+            <span>GHS {{ "%.2f"|format(total_fee) }}</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between fw-bold">
+            <strong>Outstanding Balance:</strong>
+            {% set total_paid = current_balance + pending_balance %}
+            {% set remaining = total_fee - current_balance %}
+            {% if remaining > 0 %}
+              <span class="text-danger">GHS {{ "%.2f"|format(remaining) }}</span>
+            {% else %}
+              <span class="text-success">All fees covered</span>
+            {% endif %}
+          </li>
+        </ul>
+      </div>
+
+      <hr>
+
+      <!-- Payment History -->
+      <div class="mt-4">
+        <h6>Payment History</h6>
+        {% if transactions %}
+        <table class="table table-bordered table-sm">
+          <thead class="table-light">
+            <tr>
+              <th>Date</th>
+              <th>Description</th>
+              <th class="text-end">Amount (GHS)</th>
+              <th>Status</th>
+              <th>Receipt</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for txn in transactions %}
+            <tr>
+              <td>{{ txn.timestamp.strftime('%d %b %Y') }}</td>
+              <td>{{ txn.description }}</td>
+              <td class="text-end">{{ "%.2f"|format(txn.amount) }}</td>
+              <td>
+                {% if txn.is_approved %}
+                  <span class="badge bg-success">Approved</span>
+                {% else %}
+                  <span class="badge bg-warning text-dark">Pending</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if txn.is_approved %}
+                  <a href="{{ url_for('student.download_receipt', txn_id=txn.id) }}" class="btn btn-sm btn-outline-secondary">Download</a>
+                {% else %}
+                  <span class="text-muted">N/A</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted">No payment history for this period.</p>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

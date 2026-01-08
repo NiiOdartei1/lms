@@ -1,0 +1,151 @@
+{% extends 'teacher/base_teacher.html' %}
+{% block title %}Teacher Dashboard{% endblock %}
+
+{% block content %}
+<style>
+    body {
+        background: #ffffff !important;
+        color: #333;
+        font-family: 'Poppins', sans-serif;
+    }
+
+    h2 {
+        font-weight: 600;
+        color: #222;
+    }
+
+    .dashboard-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 20px;
+        transition: all 0.3s ease-in-out;
+        border: 1px solid #eee;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .dashboard-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+
+    .card-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #444;
+    }
+
+    .card-text {
+        font-size: 0.9rem;
+        color: #666;
+    }
+
+    .btn-futuristic {
+        border: none;
+        padding: 8px 16px;
+        border-radius: 10px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        background: linear-gradient(135deg, #4facfe, #00f2fe);
+        color: #fff;
+        transition: all 0.3s ease;
+    }
+
+    .btn-futuristic:hover {
+        background: linear-gradient(135deg, #00f2fe, #4facfe);
+        box-shadow: 0 4px 15px rgba(0, 242, 254, 0.5);
+        transform: scale(1.05);
+    }
+
+    /* Date & time in top right */
+    .datetime-box {
+        position: absolute;
+        top: 60px; /* just under navbar */
+        right: 25px;
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        padding: 8px 14px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: #333;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        z-index: 10;
+    }
+</style>
+
+<!-- Date & Time -->
+<div class="datetime-box" id="datetimeBox"></div>
+
+<div class="container mt-4">
+    <h2 class="mb-5 text-center">🚀 Welcome, {{ user.first_name }} {{ user.last_name }}</h2>
+
+    <div class="row g-4">
+        <!-- My Classes -->
+        <div class="col-md-6 col-lg-4">
+            <div class="dashboard-card">
+                <div class="card-body">
+                    <h5 class="card-title">📚 My Classes</h5>
+                    <p class="card-text">Manage your class list and subjects.</p>
+                    <a href="{{ url_for('teacher.classes') }}" class="btn-futuristic">View Classes</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Assignments -->
+        <div class="col-md-6 col-lg-4">
+            <div class="dashboard-card">
+                <div class="card-body">
+                    <h5 class="card-title">📝 Assignments</h5>
+                    <p class="card-text">Create, review, and grade assignments.</p>
+                    <a href="{{ url_for('teacher.manage_assignments') }}" class="btn-futuristic">Manage Assignments</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Attendance -->
+        <div class="col-md-6 col-lg-4">
+            <div class="dashboard-card">
+                <div class="card-body">
+                    <h5 class="card-title">📊 Attendance</h5>
+                    <p class="card-text">Take and review attendance records.</p>
+                    <a href="{{ url_for('teacher.attendance') }}" class="btn-futuristic">Record Attendance</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports -->
+        <div class="col-md-6 col-lg-4">
+            <div class="dashboard-card">
+                <div class="card-body">
+                    <h5 class="card-title">📑 Reports</h5>
+                    <p class="card-text">Generate student performance reports.</p>
+                    <a href="{{ url_for('teacher.reports') }}" class="btn-futuristic">Generate Reports</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function updateDateTime() {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString("en-GB", {
+            weekday: 'short',
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            timeZone: 'Africa/Accra'
+        });
+        const timeStr = now.toLocaleTimeString("en-GB", {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            timeZone: 'Africa/Accra'
+        });
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        document.getElementById("datetimeBox").innerHTML = `${dateStr} — ${timeStr} (${tz})`;
+    }
+    setInterval(updateDateTime, 1000);
+    updateDateTime();
+</script>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends 'teacher/base_teacher.html' %}
+
+{% block title %}My Profile{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+
+  <!-- Header with picture -->
+  <div class="text-center mb-4">
+    <img src="{{ current_user.profile_picture_url }}"
+         class="rounded-circle shadow-sm"
+         alt="Profile Picture"
+         style="width: 120px; height: 120px; object-fit: cover; border: 4px solid #2b2d42;">
+    <h3 class="mt-3 text-primary">{{ current_user.full_name }}</h3>
+    <p class="text-muted">{{ profile.department or 'Teacher' }}</p>
+  </div>
+
+  <div class="row g-4">
+    <!-- Personal Info -->
+    <div class="col-md-6">
+      <div class="card p-3">
+        <h5 class="text-muted">Personal Info</h5>
+        <p><strong>Full Name:</strong> {{ current_user.full_name }}</p>
+        <p><strong>Employee ID:</strong> {{ profile.employee_id or 'N/A' }}</p>
+        <p><strong>Date of Birth:</strong> {{ profile.dob.strftime('%B %d, %Y') if profile.dob else 'N/A' }}</p>
+        <p><strong>Gender:</strong> {{ profile.gender or 'N/A' }}</p>
+        <p><strong>Nationality:</strong> {{ profile.nationality or 'N/A' }}</p>
+      </div>
+    </div>
+
+    <!-- Professional Background -->
+    <div class="col-md-6">
+      <div class="card p-3">
+        <h5 class="text-muted">Professional Background</h5>
+        <p><strong>Qualification:</strong> {{ profile.qualification or 'N/A' }}</p>
+        <p><strong>Specialization:</strong> {{ profile.specialization or 'N/A' }}</p>
+        <p><strong>Years of Experience:</strong> {{ profile.years_of_experience or 'N/A' }}</p>
+        <p><strong>Subjects Taught:</strong> {{ profile.subjects_taught or 'N/A' }}</p>
+        <p><strong>Employment Type:</strong> {{ profile.employment_type or 'N/A' }}</p>
+      </div>
+    </div>
+
+    <!-- Institutional Placement -->
+    <div class="col-md-6">
+      <div class="card p-3">
+        <h5 class="text-muted">Institutional Placement</h5>
+        <p><strong>Department:</strong> {{ profile.department or 'N/A' }}</p>
+        <p><strong>Date of Hire:</strong> {{ profile.date_of_hire.strftime('%B %d, %Y') if profile.date_of_hire else 'N/A' }}</p>
+        <p><strong>Office Location:</strong> {{ profile.office_location or 'N/A' }}</p>
+        <p><strong>Date Joined (System):</strong> {{ profile.date_joined.strftime('%B %d, %Y') if profile.date_joined else 'N/A' }}</p>
+      </div>
+    </div>
+
+    <!-- Login Info -->
+    <div class="col-md-6">
+      <div class="card p-3">
+        <h5 class="text-muted">Login Info</h5>
+        <p><strong>Username:</strong> {{ current_user.username }}</p>
+        <p><strong>Role:</strong> {{ current_user.role|capitalize }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

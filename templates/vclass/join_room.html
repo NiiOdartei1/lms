@@ -1,0 +1,12 @@
+{% extends 'vclass/base_vclass.html' %}
+
+{% block title %}Join Room{% endblock %}
+
+{% block content %}
+<h3>Available Rooms</h3>
+<ul>
+  {% for m in meetings %}
+    <li>{{ m.title }} (Starts: {{ m.start_time }})</li>
+  {% endfor %}
+</ul>
+{% endblock %}

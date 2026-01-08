@@ -1,0 +1,12 @@
+{% extends 'vclass/base_vclass.html' %}
+
+{% block title %}Participants{% endblock %}
+
+{% block content %}
+<h3>Participants</h3>
+<ul>
+  {% for p in participants %}
+    <li>{{ p.user.full_name }} ({{ p.user.username }})</li>
+  {% endfor %}
+</ul>
+{% endblock %}

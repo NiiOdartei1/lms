@@ -1,0 +1,100 @@
+{% extends 'vclass/base_vclass.html' %}
+{% block title %}Calculator - Virtual Class{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="fas fa-calculator me-2"></i>Casio / ClassWiz Calculator</h4>
+    <small class="text-muted">Official ClassWiz / ClassPad experience when available — open in new tab if blocked.</small>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <p class="small text-muted mb-3">
+        This view tries to load the official ClassWiz/ClassPad web workspace (official Casio online environment). If your browser or the provider blocks embedding, use the "Open in new tab" button below.
+      </p>
+
+      <!-- container for the embedded calculator -->
+      <div id="calc-wrapper" class="ratio ratio-16x9 mb-3" style="min-height:420px;">
+        <!-- Primary attempt: ClassPad.net (official ClassWiz sticky)
+             ClassPad is the official Casio web platform that hosts ClassWiz sticky emulators.
+             NOTE: embedding might be blocked by ClassPad server policies in some regions/browsers. -->
+        <iframe id="calcFrame"
+                src="https://classpad.net/intl/" 
+                title="ClassPad / ClassWiz Calculator"
+                style="border:1px solid #e3e3e3; width:100%; height:100%;"
+                loading="lazy"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                referrerpolicy="no-referrer-when-downgrade"></iframe>
+      </div>
+
+      <!-- Fallback CTA area (will be shown if iframe fails) -->
+      <div id="calcFallback" class="alert alert-warning d-none" role="alert">
+        <strong>Embedded calculator blocked</strong> — the official ClassPad web workspace cannot be framed in this browser or region.
+        <div class="mt-2">
+          <a id="openClassPad" class="btn btn-primary me-2" target="_blank" rel="noopener noreferrer"
+             href="https://classpad.net/intl/">
+            Open ClassPad (official) in new tab
+          </a>
+
+          <!-- Optional community demo fallback (may or may not be available/embeddable) -->
+          <a id="openCommunity" class="btn btn-outline-secondary" target="_blank" rel="noopener noreferrer"
+             href="https://mondalsurojit.github.io/Casio-fx-991ES_Plus/">
+            Try web fx-991ES demo (community)
+          </a>
+        </div>
+        <small class="d-block text-muted mt-2">Note: the official emulator is best. Community demos are third-party and may not implement all features.</small>
+      </div>
+
+      <hr>
+
+      <div class="small text-muted">
+        Tips:
+        <ul>
+          <li>If ClassPad asks you to log in, you may use a guest option or create a Casio/ClassPad account depending on their current policy.</li>
+          <li>If embedding is blocked, open the ClassPad link in a new tab for the full experience.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Try to detect whether the iframe loaded or was blocked.
+  (function () {
+    const iframe = document.getElementById('calcFrame');
+    const fallback = document.getElementById('calcFallback');
+
+    // If the frame fires the 'load' event, it _may_ have loaded — but cross-origin prevents us checking content.
+    // We'll attempt to detect framing errors by waiting a short time and verifying the iframe's computed display.
+    let loaded = false;
+    iframe.addEventListener('load', () => {
+      loaded = true;
+      // some hosts still respond with an 'embeddable' page that shows an error inside frame;
+      // we rely on the load event as a good-enough signal for success.
+      setTimeout(() => {
+        // In some environments, iframe is loadable but content is an error page. We can't read its content cross-origin.
+        // So we do a quick heuristic: if the frame's height remains tiny or the network indicates blocked, show fallback:
+        try {
+          const rect = iframe.getBoundingClientRect();
+          if (rect.width === 0 || rect.height === 0) {
+            fallback.classList.remove('d-none');
+          }
+        } catch (e) {
+          // ignore cross-origin issues
+        }
+      }, 600);
+    });
+
+    // If the iframe didn't fire load within 3 seconds, show fallback CTA.
+    setTimeout(() => {
+      if (!loaded) fallback.classList.remove('d-none');
+    }, 3000);
+  })();
+</script>
+
+<style>
+  /* a little polish so embedded area looks consistent with theme */
+  #calc-wrapper iframe { background: #fff; border-radius: 6px; }
+</style>
+{% endblock %}

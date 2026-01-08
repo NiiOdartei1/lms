@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}VClass Login{% endblock %}
+
+{% block content %}
+<div class="container mt-5 d-flex justify-content-center">
+  <div class="card shadow-lg border-0 w-50">
+    <!-- Card Header -->
+    <div class="card-header text-center text-white py-3"
+         style="background: linear-gradient(90deg, #4e73df, #1cc88a);">
+      <h3 class="mb-0 fw-bold">🎓 Welcome to VClass</h3>
+      <small class="text-light">Log in with your account credentials to join your virtual classes</small>
+    </div>
+
+    <!-- Card Body -->
+    <div class="card-body p-4">
+      <!-- Instructions -->
+      <div class="alert alert-info small mb-4" role="alert">
+        <i class="fas fa-info-circle"></i>
+        Enter your <strong>Username</strong>, your <strong>Student ID</strong>, 
+        and your <strong>Password</strong> to access your virtual classroom.
+      </div>
+
+      <form method="POST">
+        {{ form.hidden_tag() }}
+
+        <!-- Username -->
+        <div class="mb-3">
+          <label class="form-label fw-bold text-primary">{{ form.username.label }}</label>
+          <div class="input-group">
+            <span class="input-group-text bg-primary text-white"><i class="fas fa-user"></i></span>
+            {{ form.username(class="form-control", placeholder="Enter your Username") }}
+          </div>
+        </div>
+
+        <!-- User ID -->
+        <div class="mb-3">
+          <label class="form-label fw-bold text-success">Student</label>
+          <div class="input-group">
+            <span class="input-group-text bg-success text-white"><i class="fas fa-id-card"></i></span>
+            {{ form.user_id(class="form-control", placeholder="e.g. STD001, TCH001") }}
+          </div>
+          <small class="text-muted">💡 Ask your administrator if you don’t know your ID.</small>
+        </div>
+
+        <!-- Password -->
+        <div class="mb-3">
+          <label class="form-label fw-bold text-danger">{{ form.password.label }}</label>
+          <div class="input-group">
+            <span class="input-group-text bg-danger text-white"><i class="fas fa-lock"></i></span>
+            {{ form.password(class="form-control", placeholder="Enter your Password", id="passwordField") }}
+            <button type="button" class="btn btn-outline-secondary" id="togglePassword">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="d-grid">
+          <button type="submit" class="btn btn-gradient fw-bold py-2">
+            <i class="fas fa-sign-in-alt"></i> Login
+          </button>
+        </div>
+      </form>
+
+      <!-- Forgot Password -->
+      <div class="text-center mt-3">
+        <a href="{{ url_for('vclass.forgot_password') }}" class="link-primary">
+          <i class="fas fa-question-circle"></i> Forgot Password?
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Custom Styles -->
+<style>
+.btn-gradient {
+  background: linear-gradient(90deg, #1cc88a, #4e73df);
+  color: white;
+  border: none;
+  transition: 0.3s;
+}
+.btn-gradient:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+</style>
+
+<!-- Script for Show/Hide Password -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const passwordField = document.getElementById("passwordField");
+  const togglePassword = document.getElementById("togglePassword");
+  const icon = togglePassword.querySelector("i");
+
+  togglePassword.addEventListener("click", function() {
+    if (passwordField.type === "password") {
+      passwordField.type = "text";
+      icon.classList.remove("fa-eye");
+      icon.classList.add("fa-eye-slash");
+    } else {
+      passwordField.type = "password";
+      icon.classList.remove("fa-eye-slash");
+      icon.classList.add("fa-eye");
+    }
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends 'student/base_student.html' %}
+{% block title %}Student Fees{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h4 class="mb-4">Student Fees Portal</h4>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <h5 class="card-title">Student Information</h5>
+      <p><strong>Name:</strong> {{ current_user.full_name }}</p>
+      <p><strong>Index Number:</strong> {{ current_user.username }}</p>
+      <p><strong>Programme:</strong> {{ current_user.profile.programme }}</p>
+      <p><strong>Level:</strong> {{ current_user.profile.level }}</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">Fee Payment Information</h5>
+      {% if fees %}
+        <table class="table table-bordered table-sm">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th>Amount (GHS)</th>
+              <th>Status</th>
+              <th>Payment Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for fee in fees %}
+            <tr>
+              <td>{{ fee.description }}</td>
+              <td>{{ "{:,.2f}".format(fee.amount) }}</td>
+              <td>
+                {% if fee.is_paid %}
+                  <span class="badge bg-success">Paid</span>
+                {% else %}
+                  <span class="badge bg-danger">Unpaid</span>
+                {% endif %}
+              </td>
+              <td>{{ fee.paid_on.strftime('%Y-%m-%d') if fee.paid_on else '---' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="text-muted">No fee records found.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

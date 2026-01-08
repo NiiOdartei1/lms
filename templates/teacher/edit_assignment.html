@@ -1,0 +1,104 @@
+{% extends 'teacher/base_teacher.html' %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="card shadow-lg border-0 rounded-4 p-4"
+       style="background: linear-gradient(135deg, #1a1a2e, #16213e); color: #fff;">
+    <h3 class="mb-4 text-center fw-bold"
+        style="color: #00d4ff; text-shadow: 0 0 8px rgba(0,212,255,0.8);">
+        ✨ Edit Assignment
+    </h3>
+
+    <form method="POST" class="glow-form">
+      {{ form.hidden_tag() }}
+
+      <div class="mb-3">
+        {{ form.title.label(class="form-label fw-semibold text-info") }}
+        {{ form.title(class="form-control glow-input") }}
+      </div>
+
+      <div class="mb-3">
+        {{ form.course_name.label(class="form-label fw-semibold text-info") }}
+        {{ form.course_name(class="form-control glow-input") }}
+      </div>
+
+      <div class="mb-3">
+        {{ form.assigned_class.label(class="form-label fw-semibold text-info") }}
+        {{ form.assigned_class(class="form-control glow-input") }}
+      </div>
+
+      <div class="mb-3">
+        {{ form.due_date.label(class="form-label fw-semibold text-info") }}
+        {{ form.due_date(class="form-control glow-input", type="datetime-local") }}
+      </div>
+
+      <div class="mb-3">
+        {{ form.description.label(class="form-label fw-semibold text-info") }}
+        {{ form.description(class="form-control glow-input", rows=3) }}
+      </div>
+
+      <div class="mb-3">
+        {{ form.instructions.label(class="form-label fw-semibold text-info") }}
+        {{ form.instructions(class="form-control glow-input", rows=3) }}
+      </div>
+
+      <div class="mb-3">
+        {{ form.max_score.label(class="form-label fw-semibold text-info") }}
+        {{ form.max_score(class="form-control glow-input") }}
+      </div>
+
+      <div class="mb-3">
+        {{ form.file.label(class="form-label fw-semibold text-info") }}
+        {{ form.file(class="form-control glow-input") }}
+      </div>
+
+      <div class="d-flex justify-content-between mt-4">
+        <button type="submit" class="btn btn-primary px-4 py-2 fw-bold"
+                style="background: linear-gradient(90deg, #00c6ff, #0072ff); border: none;
+                       box-shadow: 0 0 12px rgba(0, 114, 255, 0.6);">
+          💾 Save Changes
+        </button>
+        <a href="{{ url_for('teacher.manage_assignments') }}"
+           class="btn btn-secondary px-4 py-2 fw-bold"
+           style="background: linear-gradient(90deg, #ff6a00, #ee0979); border: none;
+                  box-shadow: 0 0 12px rgba(238, 9, 121, 0.6);">
+          ❌ Cancel
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+  /* Glowing input fields */
+  .glow-input {
+    background: #0f3460;
+    border: 1px solid #00d4ff;
+    color: #fff;
+    transition: all 0.3s ease-in-out;
+    border-radius: 10px;
+    padding: 10px;
+  }
+  .glow-input:focus {
+    box-shadow: 0 0 15px #00d4ff;
+    outline: none;
+    border-color: #00f0ff;
+  }
+
+  /* Card hover glow */
+  .card:hover {
+    box-shadow: 0 0 25px rgba(0,212,255,0.5), 0 0 40px rgba(0,114,255,0.4);
+    transition: 0.3s ease-in-out;
+  }
+
+  /* Buttons glow on hover */
+  .btn-primary:hover {
+    box-shadow: 0 0 20px #00f0ff;
+    transform: scale(1.05);
+  }
+  .btn-secondary:hover {
+    box-shadow: 0 0 20px #ff0099;
+    transform: scale(1.05);
+  }
+</style>
+{% endblock %}

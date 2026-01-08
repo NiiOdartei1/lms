@@ -1,0 +1,120 @@
+{% extends 'teacher/base_teacher.html' %}
+{% block title %}Manage Appointment Slots{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="fas fa-calendar-plus me-2"></i> Manage Appointment Slots</h4>
+    <a href="{{ url_for('teacher.appointment_requests') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="fas fa-envelope-open-text me-1"></i> View Appointment Requests
+    </a>
+  </div>
+
+  <!-- Flash Toasts -->
+  <div aria-live="polite" aria-atomic="true" class="position-relative">
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="toast text-bg-{{ 'success' if category == 'success' else 'danger' }} border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true">
+              <div class="d-flex">
+                <div class="toast-body">{{ message }}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+              </div>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+    </div>
+  </div>
+
+  <!-- Add Slot Form -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <form method="POST" class="row g-2 align-items-end">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="col-md-3">
+          <label class="form-label">Date</label>
+          <input type="date" name="date" class="form-control form-control-sm" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Start Time</label>
+          <input type="time" name="start_time" class="form-control form-control-sm" required>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">End Time</label>
+          <input type="time" name="end_time" class="form-control form-control-sm" required>
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-sm btn-primary w-100">
+            <i class="fas fa-plus-circle me-1"></i> Add Slot
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Slots Table -->
+  <div class="card shadow-sm">
+    <div class="card-header bg-light">
+      <strong>Available Slots</strong>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Date</th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Status</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for slot in slots %}
+            <tr>
+              <td>{{ slot.date }}</td>
+              <td>{{ slot.start_time.strftime('%H:%M') }}</td>
+              <td>{{ slot.end_time.strftime('%H:%M') }}</td>
+              <td>
+                {% if slot.is_booked %}
+                  <span class="badge bg-danger">Booked</span>
+                {% else %}
+                  <span class="badge bg-success">Available</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                {% if not slot.is_booked %}
+                  <form method="POST" action="{{ url_for('teacher.delete_slot', slot_id=slot.id) }}" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-sm btn-outline-danger btn-sm" onclick="return confirm('Delete this slot?');">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </form>
+                {% else %}
+                  <small class="text-muted">—</small>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="5" class="text-center text-muted py-3">No slots added yet.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('.toast').forEach(toastEl => new bootstrap.Toast(toastEl).show());
+    });
+  </script>
+{% endblock %}

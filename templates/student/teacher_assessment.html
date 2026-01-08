@@ -1,0 +1,132 @@
+{% extends "student/base_student.html" %} 
+{% block title %}Teacher Assessment{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+
+  <!-- STEP 1: SELECT TEACHER -->
+  {% if not selected_teacher %}
+    <div class="card shadow-sm">
+      <div class="card-header fw-bold text-primary">
+        <i class="bi bi-person-lines-fill"></i> Pick a Teacher to Rate
+      </div>
+
+      <!-- Progress bar -->
+      {% if total_teachers %}
+      <style>.progress-bar { width: var(--progress-width) !important; }</style>
+      <div class="teacher-assessment-progress">
+        <h6>How Far You've Got: {{ completed_count }} / {{ total_teachers }} done</h6>
+        <div class="progress">
+          <div class="progress-bar bg-success" role="progressbar"
+               style="--progress-width: {{ progress_percent }}%;"
+               aria-valuenow="{{ progress_percent }}" aria-valuemin="0" aria-valuemax="100">
+            {{ progress_percent }}%
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="card-body p-0">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Instructor</th>
+              <th>Classes</th>
+              <th class="text-end">What to Do</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for teacher, courses in teachers %}
+            <tr class="{% if teacher.user_id in assessed_teacher_ids %}table-success{% endif %}">
+              <td>
+                <div class="d-flex align-items-center gap-3">
+                  <img src="{{ teacher.profile_picture_url }}" class="rounded-circle" width="45" height="45">
+                  <div>
+                    <div class="fw-bold">{{ teacher.full_name }}</div>
+                    <small class="text-muted">{{ teacher.user_id }}</small>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="badge bg-info-subtle text-dark">{{ courses }}</span>
+              </td>
+              <td class="text-end">
+                {% if teacher.user_id in assessed_teacher_ids %}
+                <span class="badge bg-success">
+                  <i class="bi bi-check-circle"></i> Done
+                </span>
+                {% else %}
+                <a href="{{ url_for('student.teacher_assessment', teacher=teacher.user_id) }}" class="btn btn-sm btn-outline-primary">
+                  Rate Them
+                </a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- STEP 2: ASSESSMENT FORM -->
+  {% if selected_teacher %}
+  <div class="card shadow-sm">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <div>
+        <img src="{{ selected_teacher.profile_picture_url }}" class="rounded-circle me-2" width="40" height="40">
+        <strong>{{ selected_teacher.full_name }}</strong>
+      </div>
+      <a href="{{ url_for('student.teacher_assessment') }}" class="btn btn-sm btn-outline-secondary">← Pick Someone Else</a>
+    </div>
+
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="teacher_id" value="{{ selected_teacher.user_id }}">
+      <div class="card-body">
+
+        <h6 class="fw-bold text-success mb-3">Part A: How the Teacher Gets Along with Students</h6>
+        {% for q in questions_behavior %}
+        <div class="mb-3">
+          <label class="form-label">{{ q.question }}</label>
+          <div class="d-flex gap-3">
+            {% for i in range(1,6) %}
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="q_{{ q.id }}" value="{{ i }}" required>
+              <label class="form-check-label">{{ i }}</label>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+
+        <hr>
+
+        <h6 class="fw-bold text-info mb-3">Part B: How Students React to the Teacher</h6>
+        {% for q in questions_response %}
+        <div class="mb-3">
+          <label class="form-label">{{ q.question }}</label>
+          <div class="d-flex gap-3">
+            {% for i in range(1,6) %}
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="q_{{ q.id }}" value="{{ i }}" required>
+              <label class="form-check-label">{{ i }}</label>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+
+      </div>
+
+      <div class="card-footer text-end">
+        <button class="btn btn-primary btn-sm">
+          <i class="bi bi-send"></i> Send My Rating
+        </button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

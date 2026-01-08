@@ -1,0 +1,176 @@
+{% extends "vclass/base_vclass.html" %}
+{% block title %}My Results{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">📊 My Performance</h3>
+    <small class="text-muted">Scores shown as <strong>obtained / max</strong>.</small>
+  </div>
+
+  <ul class="nav nav-tabs" id="resultsTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="quizzes-tab" data-bs-toggle="tab" data-bs-target="#quizzes" type="button">Quizzes</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="assignments-tab" data-bs-toggle="tab" data-bs-target="#assignments" type="button">Assignments</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="exams-tab" data-bs-toggle="tab" data-bs-target="#exams" type="button">Exams</button>
+    </li>
+  </ul>
+
+  <div class="tab-content mt-3">
+    <!-- Quizzes Tab -->
+    <div class="tab-pane fade show active" id="quizzes" role="tabpanel">
+      {% if quiz_results %}
+        <div class="list-group futuristic-list">
+          {% for item in quiz_results %}
+            {% set q = item.quiz %}
+            {% set percent = (item.score / item.max_score * 100) if item.score is not none and item.max_score else None %}
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+              <div>
+                <h6 class="fw-bold mb-0">{{ q.title if q else '—' }}</h6>
+                <small class="text-muted"><i class="fas fa-book me-1"></i> {{ q.subject if q else '—' }}</small>
+                <div class="small mt-1">
+                  {% if item.score is not none %}
+                    <strong>Score:</strong>
+                    <span class="badge 
+                      {% if percent is not none %}
+                        {% if percent >= 80 %}bg-success
+                        {% elif percent >= 50 %}bg-warning text-dark
+                        {% else %}bg-danger
+                        {% endif %}
+                      {% else %}bg-secondary{% endif %}">
+                      {{ item.score|round(2) }}{% if item.max_score %} / {{ item.max_score|round(2) }}{% endif %}
+                    </span>
+                    &nbsp;•&nbsp;<span class="badge bg-secondary">Recorded</span>
+                  {% else %}
+                    <span class="text-muted">Not scored</span>
+                  {% endif %}
+                  {% if item.submitted_at %}
+                    &nbsp;•&nbsp;<i class="fas fa-clock text-info"></i> Submitted: {{ item.submitted_at.strftime('%d %B %Y') }}
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="text-end">
+                {% if item.submission %}
+                  <div class="mt-2">
+                    <a href="{{ url_for('vclass.download_quiz', filename=item.submission.filename) }}" class="btn btn-sm btn-outline-light">Download</a>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-center text-muted">No quiz submissions found.</p>
+      {% endif %}
+    </div>
+
+    <!-- Assignments Tab -->
+    <div class="tab-pane fade" id="assignments" role="tabpanel">
+      {% if assignment_results %}
+        <div class="list-group futuristic-list">
+          {% for item in assignment_results %}
+            {% set a = item.assignment %}
+            {% set percent = (item.score / item.max_score * 100) if item.score is not none and item.max_score else None %}
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+              <div>
+                <h6 class="fw-bold mb-0">{{ a.title }}</h6>
+                <small class="text-muted"><i class="fas fa-book me-1"></i> {{ a.course_name }}</small>
+                <div class="small mt-1">
+                  {% if item.submission %}
+                    <i class="fas fa-check-circle text-success"></i> Submitted: {{ item.submitted_at.strftime('%d %B %Y') if item.submitted_at else '—' }}
+                    &nbsp;•&nbsp;<strong>Score:</strong>
+                    <span class="badge 
+                      {% if percent is not none %}
+                        {% if percent >= 80 %}bg-success
+                        {% elif percent >= 50 %}bg-warning text-dark
+                        {% else %}bg-danger
+                        {% endif %}
+                      {% else %}bg-secondary{% endif %}">
+                      {{ item.score if item.score is not none else 'N/A' }}{% if item.max_score %} / {{ item.max_score }}{% endif %}
+                    </span>
+                    {% if item.grade_letter %}
+                      &nbsp;•&nbsp;<strong>Grade:</strong> {{ item.grade_letter }} ({{ item.pass_fail or '—' }})
+                    {% endif %}
+                  {% else %}
+                    <span class="text-muted"><i class="fas fa-hourglass-half text-warning"></i> Not submitted</span>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="text-end">
+                <span class="badge bg-gradient">{{ a.due_date.strftime('%d %B %Y') }}</span>
+                {% if item.submission %}
+                  <div class="mt-2">
+                    <a href="{{ url_for('vclass.download_assignment', filename=item.submission.filename) }}" class="btn btn-sm btn-outline-light">Download</a>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-center text-muted">No assignments available.</p>
+      {% endif %}
+    </div>
+
+    <!-- Exams Tab -->
+    <div class="tab-pane fade" id="exams" role="tabpanel">
+      {% if exam_results %}
+        <div class="list-group futuristic-list">
+          {% for e in exam_results %}
+            {% set ex = e.exam %}
+            {% set percent = (e.score / e.max_score * 100) if e.score is not none and e.max_score else None %}
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+              <div>
+                <h6 class="fw-bold mb-0">{{ ex.title if ex else '—' }}</h6>
+                <small class="text-muted"><i class="fas fa-book me-1"></i> {{ ex.subject if ex else '—' }} | Set: {{ e.set_name or 'N/A' }}</small>
+                <div class="small mt-1">
+                  {% if e.score is not none %}
+                    <strong>Score:</strong>
+                    <span class="badge 
+                      {% if percent is not none %}
+                        {% if percent >= 80 %}bg-success
+                        {% elif percent >= 50 %}bg-warning text-dark
+                        {% else %}bg-danger
+                        {% endif %}
+                      {% else %}bg-secondary{% endif %}">
+                      {{ e.score }}{% if e.max_score %} / {{ e.max_score }}{% endif %}
+                    </span>
+                    &nbsp;•&nbsp;<span class="badge bg-secondary">Recorded</span>
+                  {% else %}
+                    <span class="text-muted">Not scored</span>
+                  {% endif %}
+                  {% if e.submitted_at %}
+                    &nbsp;•&nbsp;<i class="fas fa-clock text-info"></i> Submitted: {{ e.submitted_at.strftime('%d %B %Y') }}
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="text-end">
+                {% if e.submission %}
+                  <div class="mt-2">
+                    <a href="{{ url_for('vclass.download_assignment', filename=e.submission.filename) }}" class="btn btn-sm btn-outline-light">Download</a>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-muted">No exam submissions found.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="mt-4">
+    <p class="text-muted small mb-0">
+      Scoring (marks) is based on marks allocated (or total questions × marks per question). Teachers or admins can configure grading scales and pass thresholds in the administration settings — once configured the system will compute classical letter / pass-fail grades automatically.
+    </p>
+  </div>
+</div>
+{% endblock %}

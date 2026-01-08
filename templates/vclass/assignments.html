@@ -1,0 +1,95 @@
+{% extends "vclass/base_vclass.html" %}
+{% block title %}Assignments{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <!-- Page Title -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="mb-0">My Assignments</h3>
+  </div>
+
+  <!-- Stats Counters -->
+  <div class="row g-3 mb-4 text-center">
+    <div class="col-md-4">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <h6 class="card-title text-muted">Upcoming</h6>
+          <p class="fs-4 fw-bold text-success mb-0">
+            {{ assignments | selectattr('due', 'gt', now) | list | length }}
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <h6 class="card-title text-muted">Due Today</h6>
+          <p class="fs-4 fw-bold text-warning mb-0">
+            {{ assignments | selectattr('due', 'equalto', now) | list | length }}
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <h6 class="card-title text-muted">Overdue</h6>
+          <p class="fs-4 fw-bold text-danger mb-0">
+            {{ assignments | selectattr('due', 'lt', now) | list | length }}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assignment Table -->
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Title</th>
+          <th>Due Date</th>
+          <th>Status</th>
+          <th>Action</th> <!-- New column -->
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in assignments %}
+        <tr>
+          <td>{{ a.title }}</td>
+          <td>{{ a.due.strftime('%Y-%m-%d') }}</td>
+          <td>
+            {% if a.due > now %}
+              <span class="badge bg-success">Upcoming</span>
+            {% elif a.due == now %}
+              <span class="badge bg-warning text-dark">Due Today</span>
+            {% else %}
+              <span class="badge bg-danger">Overdue</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if a.due >= now %}
+              <a href="{{ url_for('vclass.submit_assignment', assignment_id=a.id) }}" class="btn btn-sm btn-primary">
+                Submit
+              </a>
+            {% else %}
+              <span class="text-muted">Closed</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4" class="text-center text-muted py-3">
+            No assignments available.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</div>
+{% endblock %}

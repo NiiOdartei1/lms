@@ -1,0 +1,166 @@
+{% extends 'teacher/base_teacher.html' %}
+{% block title %}Attendance{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+<style>
+  /* Custom highlight colors for break types */
+  .fp-break-midterm  { background: #fff3cd !important; }
+  .fp-break-vacation { background: #d4edda !important; }
+  .fp-break-examprep { background: #d1ecf1 !important; }
+
+  /* Form + table refinements */
+  .filter-label {
+    font-weight: 600;
+    color: #495057;
+  }
+  .form-select, .form-control {
+    border-radius: 0.5rem;
+    border: 1px solid #ced4da;
+  }
+  .form-select:focus, .form-control:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.2rem rgba(13,110,253,.25);
+  }
+
+  /* Table polish */
+  table.table {
+    border-radius: .5rem;
+    overflow: hidden;
+  }
+  table.table thead {
+    background: #f8f9fa;
+  }
+  table.table tbody tr:hover {
+    background: #fdfdfe;
+  }
+
+  /* Buttons */
+  .btn {
+    border-radius: .4rem;
+  }
+</style>
+
+<div class="container mt-5">
+  <div class="card shadow-sm border-0">
+    <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+      <h5 class="mb-0 text-primary">
+        <i class="fas fa-calendar-check me-2"></i> Record Attendance
+      </h5>
+    </div>
+    <div class="card-body">
+
+      {# ▶️ FILTER (GET) #}
+      <form method="GET" class="row g-3 mb-4" id="filterForm">
+        <div class="col-md-6">
+          <label class="filter-label"><i class="fas fa-chalkboard"></i> Select Class</label>
+          <select name="classSelect" class="form-select" onchange="filterForm.submit()">
+            <option value="">-- Choose Class --</option>
+            {% for cls in classes %}
+            <option value="{{ cls }}" {% if cls == selected_class %}selected{% endif %}>{{ cls }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-5">
+          <label class="filter-label"><i class="fas fa-calendar-day"></i> Attendance Date</label>
+          <input type="text" id="date" name="date" class="form-control"
+                 value="{{ selected_date }}">
+        </div>
+        <div class="col-md-1 d-grid">
+          <button type="submit" class="btn btn-outline-primary">
+            <i class="fas fa-filter"></i>
+          </button>
+        </div>
+      </form>
+
+      {# ▶️ ATTENDANCE (POST) #}
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="classSelect" value="{{ selected_class }}">
+        <input type="hidden" name="date" value="{{ selected_date }}">
+        <input type="hidden" id="breaks-data" value='{{ disabled_dates|tojson }}'>
+
+        {% if students %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Student Name</th>
+                <th class="text-center">Present</th>
+                <th class="text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for student in students %}
+              {% set marked = student.id in existing_records %}
+              <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ student.full_name }}</td>
+                <td class="text-center">
+                  <div class="form-check form-switch mx-auto">
+                    <input class="form-check-input" type="checkbox"
+                           name="attend_{{ student.id }}"
+                           {% if marked %}disabled{% endif %}>
+                  </div>
+                </td>
+                <td class="text-center">
+                  {% if marked %}
+                    <span class="badge bg-secondary">Already Marked</span>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mt-4">
+          <a href="{{ url_for('teacher.view_attendance') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-eye me-1"></i> View Attendance
+          </a>
+          <button type="submit" name="action" value="submit_attendance" class="btn btn-success px-4">
+            <i class="fas fa-paper-plane me-1"></i> Submit Attendance
+          </button>
+        </div>
+        {% else %}
+        <div class="alert alert-info mt-4">
+          Please select a class and date to load its students.
+        </div>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const breakData = JSON.parse(document.getElementById('breaks-data').value || '{}');
+
+  // Collect disabled dates
+  const disabledDates = [
+    date => date.getDay() === 0 || date.getDay() === 6, // weekends
+    ...Object.keys(breakData)                           // academic breaks/holidays
+  ];
+
+  flatpickr("#date", {
+    dateFormat: "Y-m-d",
+    allowInput: false,                    // disables manual typing
+    defaultDate: "{{ selected_date }}",   // keeps selected date after reload
+    disable: disabledDates,
+    onDayCreate: (dObj, dStr, fp, dayElem) => {
+      const iso = dayElem.dateObj.toISOString().slice(0, 10);
+      const type = breakData[iso];
+      if (type) {
+        dayElem.classList.add("fp-break-" + type.toLowerCase());
+        dayElem.setAttribute("title", type);
+      }
+    }
+  });
+});
+</script>
+{% endblock %}

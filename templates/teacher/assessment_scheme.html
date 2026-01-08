@@ -1,0 +1,33 @@
+{% extends 'teacher/base_teacher.html' %}
+{% block content %}
+<h3>Assessment Scheme for {{ course.name }} ({{ course.assigned_class }})</h3>
+
+<form method="POST">
+    <!-- Hidden CSRF token -->
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="mb-3">
+        <label>Quiz Weight (%)</label>
+        <input type="number" step="0.1" name="quiz_weight" class="form-control"
+               value="{{ scheme.quiz_weight if scheme else 0 }}">
+    </div>
+
+    <div class="mb-3">
+        <label>Assignment Weight (%)</label>
+        <input type="number" step="0.1" name="assignment_weight" class="form-control"
+               value="{{ scheme.assignment_weight if scheme else 0 }}">
+    </div>
+
+    <div class="mb-3">
+        <label>Exam Weight (%)</label>
+        <input type="number" step="0.1" name="exam_weight" class="form-control"
+               value="{{ scheme.exam_weight if scheme else 0 }}">
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save Scheme</button>
+</form>
+
+{% if scheme %}
+<p>Total Weight: {{ scheme.total_weight }}%</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "teacher/base_teacher.html" %}
+{% block title %}My Meetings{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>My Meetings</h3>
+  <a href="{{ url_for('teacher.add_meeting') }}" class="btn btn-success">Schedule New Meeting</a>
+</div>
+
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Course</th>
+      <th>Start</th>
+      <th>End</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for m in meetings %}
+    <tr>
+      <td>{{ m.title }}</td>
+      <td>{{ m.course.name }}</td>
+      <td>{{ m.scheduled_start }}</td>
+      <td>{{ m.scheduled_end }}</td>
+      <td>
+        <a href="{{ m.join_url }}" target="_blank" class="btn btn-success btn-sm">Join</a>
+        {% if m.host_id == current_user.user_id %}
+          <a href="{{ m.start_url }}" target="_blank" class="btn btn-primary btn-sm">Start</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

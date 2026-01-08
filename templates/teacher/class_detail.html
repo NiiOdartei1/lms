@@ -1,0 +1,41 @@
+{% extends 'teacher/base_teacher.html' %}
+{% block title %}Class Details{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-3">Class: {{ course.assigned_class }}</h2>
+    <h4>Subject: {{ course.name }}</h4>
+    <p><strong>Semester:</strong> {{ course.semester }} | <strong>Academic Year:</strong> {{ course.academic_year }}</p>
+
+    <hr>
+
+    <h5>Registered Students ({{ registrations|length }})</h5>
+
+    {% if registrations %}
+    <table class="table table-bordered table-hover mt-3">
+        <thead class="table-light">
+            <tr>
+                <th>#</th>
+                <th>Student Name</th>
+                <th>Student ID</th>
+                <th>Class</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for reg in registrations %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ reg.student.full_name }}</td>
+                <td>{{ reg.student.user_id }}</td>
+                <td>{{ reg.student.student_profile.current_class if reg.student.student_profile else '—' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No students registered for this course yet.</p>
+    {% endif %}
+
+    <a href="{{ url_for('teacher.classes') }}" class="btn btn-secondary mt-4">← Back to Classes</a>
+</div>
+{% endblock %}

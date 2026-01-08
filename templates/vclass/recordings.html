@@ -1,0 +1,12 @@
+{% extends 'vclass/base_vclass.html' %}
+
+{% block title %}Recordings{% endblock %}
+
+{% block content %}
+<h3>Class Recordings</h3>
+<ul>
+  {% for rec in recordings %}
+    <li>{{ rec.title }} (Uploaded: {{ rec.created_at }})</li>
+  {% endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,345 @@
+{% extends 'teacher/base_teacher.html' %}
+{% block title %}My Classes{% endblock %}
+
+{% block content %}
+<style>
+  /* --- Futuristic / Colorful Card + Animated Border --- */
+  .futuristic-card {
+    position: relative;
+    border: none;
+    border-radius: 0.85rem;
+    background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(250,250,255,0.75));
+    padding: 0.75rem;
+    overflow: visible;
+    z-index: 1;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    font-size: 13px; /* reduced */
+  }
+
+  .futuristic-card::after {
+    content:"";
+    position:absolute;
+    top:1px; left:1px; right:1px; bottom:1px;
+    border-radius:0.85rem;
+    background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.9));
+    z-index:-1;
+  }
+
+  .futuristic-card:hover{
+    transform: translateY(-5px);
+    box-shadow: 0 8px 22px rgba(9,10,20,0.25),
+                0 0 22px rgba(59,130,246,0.18);
+  }
+
+  /* Table styling */
+  .futuristic-table {
+    font-size: 12.5px; /* smaller table font */
+  }
+  .futuristic-table thead th{
+    background: linear-gradient(90deg,#0ea5e9,#7c3aed);
+    color:#fff;
+    border:none;
+    font-weight:500;
+    letter-spacing:0.3px;
+    font-size: 12.5px;
+    padding: .4rem .5rem;
+  }
+  .futuristic-table tbody td {
+    padding: .35rem .5rem;
+  }
+  .futuristic-table tbody tr {
+    transition: all 0.22s ease;
+    cursor: pointer;
+    background: linear-gradient(180deg, rgba(255,255,255,0.5), rgba(250,250,255,0.4));
+    border-radius: 6px;
+    font-size: 12.5px;
+  }
+  .futuristic-table tbody tr:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(2,6,23,0.08),
+                inset 0 0 14px rgba(59,130,246,0.06);
+  }
+  .futuristic-table tbody tr.selected {
+    background: linear-gradient(90deg, rgba(6,182,212,0.12), rgba(124,58,237,0.06));
+    box-shadow: inset 0 0 16px rgba(124,58,237,0.06);
+  }
+
+  .col-select { width: 46px; text-align:center; }
+
+  /* Search & action bar */
+  .action-bar {
+    display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; justify-content:space-between;
+    font-size: 12px;
+  }
+  .search-input { min-width: 220px; max-width: 380px; }
+  .chip {
+    padding: .25rem .5rem;
+    border-radius: 999px;
+    font-weight:500;
+    font-size: 12px;
+    color:#021124;
+    background: linear-gradient(90deg,#a7f3d0,#60a5fa);
+    box-shadow: 0 4px 12px rgba(99,102,241,0.08);
+  }
+
+  .selected-badge {
+    background: linear-gradient(90deg,#fb7185,#f97316);
+    color:white;
+    font-weight:500;
+    font-size: 12px;
+    padding:.25rem .5rem;
+    border-radius:999px;
+  }
+
+  @media (max-width: 768px){
+    .search-input { min-width: 120px; max-width: 160px; }
+    .futuristic-table thead th:nth-child(3),
+    .futuristic-table tbody td:nth-child(3) {
+      display: none;
+    }
+  }
+
+  body.dark-mode .futuristic-card::after {
+    background: linear-gradient(180deg, rgba(12,17,23,0.75), rgba(10,12,18,0.7));
+  }
+  body.dark-mode .futuristic-table tbody tr {
+    background: linear-gradient(180deg, rgba(12,17,23,0.6), rgba(8,10,14,0.6));
+  }
+  body.dark-mode .futuristic-table thead th {
+    background: linear-gradient(90deg,#312e81,#0369a1);
+  }
+
+  /* Buttons smaller */
+  .btn, .btn-sm, .form-control, .input-group-text {
+    font-size: 12px !important;
+    padding: .25rem .5rem;
+  }
+  h2 {
+    font-size: 1.1rem;
+  }
+  h5 {
+    font-size: 1rem;
+  }
+  p, .small, .form-text {
+    font-size: 12px;
+  }
+</style>
+
+<div class="container my-3">
+  <div class="d-flex align-items-center mb-2">
+    <h2 class="me-3">Register for Courses You Teach</h2>
+    <div class="ms-auto d-flex gap-2 align-items-center">
+      <div class="input-group search-input">
+        <span class="input-group-text bg-transparent"><i class="fas fa-search"></i></span>
+        <input id="tableSearch" class="form-control" placeholder="Search by class or course..." aria-label="Search courses">
+      </div>
+      <button id="btnSelectVisible" class="btn btn-outline-primary" title="Select all visible">
+        <i class="fas fa-check-double me-1"></i> Select Visible
+      </button>
+      <button id="btnSelectAll" class="btn btn-outline-success" title="Select all rows">
+        <i class="fas fa-check me-1"></i> Select All
+      </button>
+    </div>
+  </div>
+
+  <form method="POST" id="classesForm" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="futuristic-card shadow-sm mb-2">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <div>
+          <strong class="text-muted">Available courses</strong>
+          <div class="small text-muted">Select the classes that you will teach this term</div>
+        </div>
+
+        <div class="d-flex gap-2 align-items-center">
+          <div class="selected-badge" id="selectedCount">0 selected</div>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="clearSelection"><i class="fas fa-eraser"></i> Clear</button>
+          <button type="button" class="btn btn-sm btn-primary" id="openConfirm"><i class="fas fa-save me-1"></i> Save</button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table futuristic-table align-middle mb-0">
+          <thead>
+            <tr>
+              <th class="col-select"><input id="masterCheckbox" type="checkbox" title="Select all"></th>
+              <th>Class</th>
+              <th>Course Name</th>
+            </tr>
+          </thead>
+          <tbody id="coursesTableBody">
+            {% for c in courses %}
+            <tr data-id="{{ c.id }}" data-name="{{ c.name|e }}" data-class="{{ c.class|e }}">
+              <td class="col-select">
+                <input class="rowCheckbox" type="checkbox" name="courses" value="{{ c.id }}"
+                       {% if c.registered %}checked{% endif %} aria-label="Select {{ c.name }}">
+              </td>
+              <td>{{ c.class }}</td>
+              <td>{{ c.name }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <button type="submit" class="d-none" id="nativeSubmit">Submit</button>
+  </form>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content shadow-lg" style="border-radius: .75rem; overflow:hidden; font-size:12px;">
+      <div class="modal-header" style="background: linear-gradient(90deg,#06b6d4,#7c3aed); color:white; font-size:12px;">
+        <h5 class="modal-title" style="font-size:1rem;"><i class="fas fa-exclamation-circle me-2"></i> Confirm Selection</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">You're about to save <strong id="modalCount">0</strong> selected course(s).</p>
+        <div class="small text-muted mb-2">Selected items:</div>
+        <div id="selectedList" style="max-height:200px; overflow:auto; border-radius:.5rem; padding:.4rem; background: rgba(250,250,255,0.6); font-size:12px;"></div>
+        <div class="form-text mt-2 text-muted">You can hit "Confirm & Save" or go back to edit your selection.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Back</button>
+        <button type="button" class="btn btn-sm btn-success" id="confirmSave"><i class="fas fa-check me-1"></i> Confirm & Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // helper selectors
+  const tableBody = document.getElementById('coursesTableBody');
+  const checkboxes = () => Array.from(document.querySelectorAll('.rowCheckbox'));
+  const selectedCountEl = document.getElementById('selectedCount');
+  const masterCheckbox = document.getElementById('masterCheckbox');
+  const tableSearch = document.getElementById('tableSearch');
+  const btnSelectVisible = document.getElementById('btnSelectVisible');
+  const btnSelectAll = document.getElementById('btnSelectAll');
+  const clearSelection = document.getElementById('clearSelection');
+  const openConfirm = document.getElementById('openConfirm');
+  const nativeSubmit = document.getElementById('nativeSubmit');
+  const modalCount = document.getElementById('modalCount');
+  const selectedList = document.getElementById('selectedList');
+  const confirmSave = document.getElementById('confirmSave');
+
+  function updateSelectedUI() {
+    const checked = checkboxes().filter(cb => cb.checked);
+    const n = checked.length;
+    selectedCountEl.textContent = `${n} selected`;
+    // mark rows visually
+    document.querySelectorAll('#coursesTableBody tr').forEach(row => {
+      const cb = row.querySelector('.rowCheckbox');
+      if (cb && cb.checked) row.classList.add('selected'); else row.classList.remove('selected');
+    });
+    masterCheckbox.checked = (checkboxes().length > 0 && checked.length === checkboxes().length);
+  }
+
+  // init
+  updateSelectedUI();
+
+  // clicking a row toggles its checkbox (but not when clicking the checkbox itself)
+  tableBody.addEventListener('click', (e) => {
+    const tr = e.target.closest('tr');
+    if (!tr) return;
+    const cb = tr.querySelector('.rowCheckbox');
+    if (!cb) return;
+    if (e.target.tagName.toLowerCase() === 'input' && e.target.type === 'checkbox') {
+      // direct checkbox click — let default happen
+    } else {
+      cb.checked = !cb.checked;
+    }
+    updateSelectedUI();
+  });
+
+  // per-checkbox listener (in case of keyboard interaction)
+  document.addEventListener('change', (e) => {
+    if (e.target && e.target.classList && e.target.classList.contains('rowCheckbox')) {
+      updateSelectedUI();
+    }
+  });
+
+  // master checkbox toggles all visible
+  masterCheckbox.addEventListener('change', () => {
+    const visibleRows = Array.from(document.querySelectorAll('#coursesTableBody tr')).filter(r => r.style.display !== 'none');
+    visibleRows.forEach(row => {
+      const cb = row.querySelector('.rowCheckbox');
+      if (cb) cb.checked = masterCheckbox.checked;
+    });
+    updateSelectedUI();
+  });
+
+  // select visible button
+  btnSelectVisible.addEventListener('click', () => {
+    const visibleRows = Array.from(document.querySelectorAll('#coursesTableBody tr')).filter(r => r.style.display !== 'none');
+    visibleRows.forEach(row => row.querySelector('.rowCheckbox').checked = true);
+    updateSelectedUI();
+  });
+
+  // select all rows regardless of filter
+  btnSelectAll.addEventListener('click', () => {
+    checkboxes().forEach(cb => cb.checked = true);
+    updateSelectedUI();
+  });
+
+  // clear selection
+  clearSelection.addEventListener('click', () => {
+    checkboxes().forEach(cb => cb.checked = false);
+    updateSelectedUI();
+  });
+
+  // live search filter
+  tableSearch.addEventListener('input', () => {
+    const q = tableSearch.value.trim().toLowerCase();
+    document.querySelectorAll('#coursesTableBody tr').forEach(row => {
+      const name = (row.dataset.name || '').toLowerCase();
+      const cls = (row.dataset.class || '').toLowerCase();
+      const match = q === '' || name.includes(q) || cls.includes(q);
+      row.style.display = match ? '' : 'none';
+    });
+    // After filtering, recompute master checkbox state:
+    updateSelectedUI();
+  });
+
+  // open confirm modal -> populate list
+  openConfirm.addEventListener('click', () => {
+    const checked = checkboxes().filter(cb => cb.checked);
+    modalCount.textContent = checked.length;
+    selectedList.innerHTML = '';
+    if (checked.length === 0) {
+      selectedList.innerHTML = '<div class="text-muted">No courses selected.</div>';
+    } else {
+      checked.forEach(cb => {
+        const tr = cb.closest('tr');
+        const name = tr.dataset.name || tr.cells[2].innerText;
+        const cls = tr.dataset.class || tr.cells[1].innerText;
+        const item = document.createElement('div');
+        item.className = 'd-flex justify-content-between align-items-center py-1';
+        item.innerHTML = `<div><strong class="me-2">${cls}</strong> — ${name}</div>
+                          <div class="text-muted small">ID: ${cb.value}</div>`;
+        selectedList.appendChild(item);
+      });
+    }
+    const bsModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    bsModal.show();
+  });
+
+  // confirm & save -> submit the form
+  confirmSave.addEventListener('click', () => {
+    // close modal then submit native form for server processing
+    bootstrap.Modal.getInstance(document.getElementById('confirmModal')).hide();
+    nativeSubmit.click();
+  });
+
+  // keyboard shortcut: Ctrl+S to open confirm
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      openConfirm.click();
+    }
+  });
+</script>
+{% endblock %}

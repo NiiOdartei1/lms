@@ -1,0 +1,41 @@
+{% extends 'teacher/base_teacher.html' %}
+
+{% block title %}Exam Reports{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h3 class="mb-4">Teacher Reports</h3>
+
+    <!-- Filters -->
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label for="classSelect" class="form-label">Select Class</label>
+            <select class="form-select" id="classSelect">
+                <option value="">-- All Classes --</option>
+                {% for cls in classes %}
+                    <option value="{{ cls.id }}">{{ cls.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <label for="yearSelect" class="form-label">Select Academic Year</label>
+            <select class="form-select" id="yearSelect">
+                <option value="">-- All Years --</option>
+                {% for year in years %}
+                    <option value="{{ year.id }}">{{ year.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-4 d-flex align-items-end">
+            <button class="btn btn-primary w-100">Filter</button>
+        </div>
+    </div>
+
+    <!-- Placeholder for report table -->
+    <div id="reportTable">
+        <p>Select filters to view reports.</p>
+    </div>
+</div>
+{% endblock %}

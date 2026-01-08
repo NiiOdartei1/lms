@@ -1,0 +1,408 @@
+{% extends 'vclass/base_vclass.html' %}
+{% block title %}Virtual Class{% endblock %}
+
+{% block content %}
+<!-- External libs -->
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+<style>
+  /* Page UI tweaks */
+  .file-icon { width:48px; height:48px; display:flex; align-items:center; justify-content:center; }
+  .thumbnail { max-width:110px; max-height:70px; object-fit:cover; border-radius:6px; }
+  .small-muted { font-size:.85rem; color:#f73a01; }
+  .status-badge { font-size:.75rem; }
+  .left-summary { min-width: 240px; max-width:320px; }
+  .live-clock { font-weight: 600; font-size: .95rem; color:#17bed4; }
+  .tz-label { font-size:.75rem; color:#2b9b3a; display:block; }
+  @media (max-width: 991.98px) {
+    .left-summary { max-width:100%; margin-bottom: 1rem; }
+  }
+</style>
+
+<div class="container-fluid py-2">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="mb-0">Virtual Class Dashboard</h4>
+      <div class="small text-muted">Welcome back — quick view of your class activity</div>
+    </div>
+
+    <!-- LIVE CLOCK (Accra) -->
+    <div class="text-end">
+      <div id="live-clock" class="live-clock" aria-live="polite" title="Current date & time (Africa/Accra)">
+        <span id="live-clock-day">—</span><br />
+        <span id="live-clock-time">—</span>
+        <span class="tz-label">Africa/Accra</span>
+      </div>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="row g-3">
+    <!-- LEFT: summary / quick actions -->
+    <aside class="col-lg-3 left-summary">
+      <div class="d-grid gap-3">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="d-flex align-items-start">
+              <div class="me-3"><i class="fas fa-bolt fa-2x text-primary"></i></div>
+              <div>
+                <div class="small-muted">Active Quizzes</div>
+                <div id="card-active-quizzes" class="h5 mb-0">0</div>
+                <div class="small-muted">Ongoing / take now</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="d-flex align-items-start">
+              <div class="me-3"><i class="fas fa-calendar-check fa-2x text-warning"></i></div>
+              <div>
+                <div class="small-muted">Upcoming Events</div>
+                <div id="card-events-count" class="h5 mb-0">0</div>
+                <div class="small-muted">Lectures, deadlines, exams</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- RIGHT: main tabs -->
+    <main class="col-lg-9">
+      <ul class="nav nav-pills mb-3" id="mainTab" role="tablist">
+        <li class="nav-item me-2" role="presentation">
+          <button class="nav-link active" id="tab-quizzes" data-bs-toggle="pill" data-bs-target="#pane-quizzes" type="button" role="tab" aria-controls="pane-quizzes" aria-selected="true">
+            <i class="fas fa-question-circle me-1"></i> Quizzes
+          </button>
+        </li>
+        <li class="nav-item me-2" role="presentation">
+          <button class="nav-link" id="tab-assignments" data-bs-toggle="pill" data-bs-target="#pane-assignments" type="button" role="tab" aria-controls="pane-assignments" aria-selected="false">
+            <i class="fas fa-tasks me-1"></i> Assignments
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-calendar" data-bs-toggle="pill" data-bs-target="#pane-calendar" type="button" role="tab" aria-controls="pane-calendar" aria-selected="false">
+            <i class="fas fa-calendar-alt me-1"></i> Calendar
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content" id="mainTabContent">
+        <!-- QUZZIES -->
+        <div class="tab-pane fade show active" id="pane-quizzes" role="tabpanel" aria-labelledby="tab-quizzes">
+          <div class="row g-3">
+            <div class="col-12">
+              <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center bg-primary text-white">
+                  <div><i class="fas fa-question me-2"></i> Active & Recent Quizzes</div>
+                  <small class="small-muted">Showing active and recent</small>
+                </div>
+                <div class="card-body p-0">
+                  <ul id="quizzes-list" class="list-group list-group-flush"></ul>
+                  <div id="quizzes-empty" class="p-3 text-center text-muted d-none">No active or past quizzes.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ASSIGNMENTS -->
+        <div class="tab-pane fade" id="pane-assignments" role="tabpanel" aria-labelledby="tab-assignments">
+          <div class="card shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center bg-success text-white">
+              <div><i class="fas fa-file-signature me-2"></i> Assignments</div>
+              <small class="small-muted">Open and completed</small>
+            </div>
+            <div class="card-body">
+              <div id="assignments-list" class="row g-3"></div>
+              <div id="assignments-empty" class="text-center text-muted d-none">No assignments available.</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- CALENDAR -->
+        <div class="tab-pane fade" id="pane-calendar" role="tabpanel" aria-labelledby="tab-calendar">
+          <div class="card shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center bg-warning text-dark">
+              <div><i class="fas fa-calendar-alt me-2"></i> Academic Calendar</div>
+              <small class="small-muted">Click a day for details</small>
+            </div>
+            <div class="card-body">
+              <div id="calendar" style="min-height:520px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Data from backend -->
+<div id="data-container"
+     data-quizzes='{{ quizzes | tojson }}'
+     data-assignments='{{ assignments | tojson }}'
+     data-events='{{ events | tojson }}'
+     style="display:none;"></div>
+
+<!-- Preview Modal (image / pdf / video / other) -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="previewModalLabel">Preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="preview-body" class="d-flex justify-content-center align-items-center" style="min-height:360px"></div>
+      </div>
+      <div class="modal-footer">
+        <a id="preview-download" class="btn btn-outline-primary" target="_blank" rel="noopener">Download</a>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Event details modal -->
+<div class="modal fade" id="eventDetailsModal" tabindex="-1" aria-labelledby="eventDetailsModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="eventDetailsModalLabel">Event Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="event-details-body"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // safe HTML escaper used in multiple places
+  function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str).replace(/[&<>"']/g, function (m) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // --- Live Clock (Africa/Accra) ---
+    const clockDayEl = document.getElementById('live-clock-day');
+    const clockTimeEl = document.getElementById('live-clock-time');
+
+  function updateAccraClock() {
+    try {
+      // Format with weekday, date, and time including seconds
+      const optsDate = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Africa/Accra' };
+      const optsTime = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Africa/Accra' };
+
+      const now = new Date();
+      const dayStr = new Intl.DateTimeFormat(undefined, optsDate).format(now);
+      const timeStr = new Intl.DateTimeFormat(undefined, optsTime).format(now);
+
+      clockDayEl.textContent = dayStr;
+      clockTimeEl.textContent = timeStr;
+    } catch (err) {
+      // fallback: use local time if Intl/timeZone unsupported
+      const n = new Date();
+      clockDayEl.textContent = n.toDateString();
+      clockTimeEl.textContent = n.toLocaleTimeString();
+    }
+  }
+
+  updateAccraClock();
+  setInterval(updateAccraClock, 1000);
+
+  // --- Load data from backend ---
+  const dataEl = document.getElementById('data-container');
+  const quizzes = JSON.parse(dataEl.dataset.quizzes || '[]');
+  const assignments = JSON.parse(dataEl.dataset.assignments || '[]');
+  const events = JSON.parse(dataEl.dataset.events || '[]');
+
+  // Helpers
+  const fmtShort = (d) => {
+    const dt = new Date(d); return isNaN(dt) ? d || '' : dt.toLocaleDateString();
+  };
+
+  const fmtDateTime = (d) => {
+    const dt = new Date(d);
+    if (isNaN(dt)) return d || '';
+    return dt.toLocaleString(undefined, { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  };
+
+  // Debounce utility
+  const debounce = (fn, wait=200) => { let t; return (...args) => { clearTimeout(t); t = setTimeout(()=>fn(...args), wait); }; };
+
+    // --- Current time used everywhere (single declaration) ---
+  const now = new Date();
+
+  // Update summary cards
+  document.getElementById('card-active-quizzes').innerText = quizzes.filter(q => {
+    const s = q.start_datetime ? new Date(q.start_datetime) : null;
+    const e = q.end_datetime ? new Date(q.end_datetime) : null;
+    return s && e && now >= s && now <= e;
+  }).length;
+  document.getElementById('card-events-count').innerText = (events && events.length) ? events.length : 0;
+
+  /* ------------------ QUIZZES ------------------ */
+  const qList = document.getElementById('quizzes-list');
+  qList.innerHTML = '';
+
+  // active: now between start and end
+  const activeQuizzes = quizzes.filter(q => {
+    const s = q.start_datetime ? new Date(q.start_datetime) : null;
+    const e = q.end_datetime ? new Date(q.end_datetime) : null;
+    return s && e && now >= s && now <= e;
+  });
+
+  // past: end/due in the past
+  const pastQuizzes = quizzes.filter(q => {
+    const e = q.end_datetime ? new Date(q.end_datetime) : null;
+    return e && e < now;
+  });
+
+  // upcoming: start in the future
+  const upcomingQuizzes = quizzes.filter(q => {
+    const s = q.start_datetime ? new Date(q.start_datetime) : null;
+    return s && s > now;
+  });
+
+  // helper to render quiz list items
+  const pushQuizItem = (q, badgeTxt, badgeClass, actionHtml) => {
+    const li = document.createElement('li');
+    li.className = 'list-group-item d-flex justify-content-between align-items-start';
+    li.innerHTML = `
+      <div class="me-3">
+        <div class="fw-semibold">${escapeHtml(q.title)}</div>
+        <div class="small-muted">${escapeHtml(q.course_name || '')} · ${escapeHtml(fmtDateTime(q.start_datetime || q.due_date || ''))}</div>
+      </div>
+      <div class="text-end">
+        <div><span class="badge ${badgeClass} status-badge">${badgeTxt}</span></div>
+        ${actionHtml || ''}
+      </div>
+    `;
+    qList.appendChild(li);
+  };
+
+  // render active -> upcoming -> past
+  if (activeQuizzes.length) {
+    activeQuizzes.forEach(q => {
+      const btn = `<a class="btn btn-sm btn-primary mt-2" href="/vclass/quiz-instructions/${q.id}">Take quiz</a>`;
+      pushQuizItem(q, 'Active', 'bg-success text-white', btn);
+    });
+  }
+
+  if (upcomingQuizzes.length) {
+    upcomingQuizzes.forEach(q => {
+      pushQuizItem(q, 'Upcoming', 'bg-warning text-dark', '');
+    });
+  }
+
+  if (pastQuizzes.length) {
+    pastQuizzes.forEach(q => pushQuizItem(q, 'Past', 'bg-secondary text-white', ''));
+  }
+
+  if (!activeQuizzes.length && !upcomingQuizzes.length && !pastQuizzes.length) {
+    document.getElementById('quizzes-empty').classList.remove('d-none');
+  }
+
+
+  /* ------------------ ASSIGNMENTS ------------------ */
+  const aRoot = document.getElementById('assignments-list');
+  aRoot.innerHTML = '';
+  if (assignments.length) {
+    assignments.forEach(a => {
+      const col = document.createElement('div'); col.className = 'col-md-6';
+      col.innerHTML = `
+        <div class="card material-card">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <div class="fw-bold">${a.title}</div>
+                <div class="small-muted">${a.course_name || ''}</div>
+                ${a.instructions ? `<div class="mt-2 small-muted"><em>${a.instructions}</em></div>` : ''}
+              </div>
+              <div class="text-end">
+                <div class="small-muted">Due</div>
+                <div class="fw-semibold">${a.due_date ? fmtShort(a.due_date) : '—'}</div>
+                <div class="mt-2"><a href="/vclass/download/assignments/${encodeURIComponent(a.filename)}" class="btn btn-sm btn-outline-primary" target="_blank">Download</a></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      aRoot.appendChild(col);
+    });
+  } else {
+    document.getElementById('assignments-empty').classList.remove('d-none');
+  }
+
+  /* ------------------ CALENDAR ------------------ */
+  const calendarEl = document.getElementById('calendar');
+  const calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'dayGridMonth',
+    height: 'auto',
+    events: events || [],
+    eventDisplay: 'block',
+    dayMaxEvents: true,
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,listWeek'
+    },
+    eventDidMount: function(info) {
+      const el = info.el; const props = info.event.extendedProps || {};
+      new bootstrap.Tooltip(el, { title: `${info.event.title}${props.course ? ' — ' + props.course : ''}`, placement: 'top', trigger: 'hover', container: 'body' });
+    },
+    eventClick: function(info) {
+      info.jsEvent.preventDefault();
+      const e = info.event; const p = e.extendedProps || {};
+      const html = `
+        <h5>${e.title}</h5>
+        ${p.type ? `<p><strong>Type:</strong> ${p.type}</p>` : ''}
+        ${p.course ? `<p><strong>Course:</strong> ${p.course}</p>` : ''}
+        <p><strong>Starts:</strong> ${e.start ? new Date(e.start).toLocaleString() : '—'}</p>
+        <p><strong>Ends:</strong> ${e.end ? new Date(e.end).toLocaleString() : '—'}</p>
+        ${p.description ? `<p><strong>Note:</strong> ${p.description}</p>` : ''}
+        ${e.url ? `<p><a class="btn btn-sm btn-primary" href="${e.url}">Go to event</a></p>` : ''}
+      `;
+      document.getElementById('event-details-body').innerHTML = html;
+      new bootstrap.Modal(document.getElementById('eventDetailsModal')).show();
+    },
+    dateClick: function(info) {
+      const dateStr = info.dateStr;
+      const matches = (events || []).filter(ev => ev.start && ev.start.startsWith(dateStr));
+      const list = matches.length ? matches.map(ev => `<li class="list-group-item"><strong>${ev.title}</strong><div class="small-muted">${ev.start ? new Date(ev.start).toLocaleTimeString() : ''} — ${ev.end ? new Date(ev.end).toLocaleTimeString() : ''}</div></li>`).join('') : '<li class="list-group-item text-muted">No events</li>';
+      const md = new bootstrap.Modal(document.getElementById('eventDetailsModal'));
+      document.getElementById('event-details-body').innerHTML = `<h6>${new Date(dateStr).toDateString()}</h6><ul class="list-group">${list}</ul>`;
+      md.show();
+    }
+  });
+
+  // lazy render when user switches to calendar tab
+  document.getElementById('tab-calendar').addEventListener('shown.bs.tab', () => { calendar.render(); });
+
+  // If on calendar by default, render now
+  if (document.querySelector('#tab-calendar').classList.contains('active')) calendar.render();
+
+  // ensure preview modal gets focus
+  document.getElementById('previewModal').addEventListener('shown.bs.modal', () => {
+    document.getElementById('preview-body').focus?.();
+  });
+});
+</script>
+{% endblock %}

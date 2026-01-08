@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{% block title %}Teacher Panel{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+
+  <!-- Bootstrap & Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+  :root{
+    --sidebar-w: 200px;
+    --sidebar-collapsed-w: 68px;
+    --navbar-h: 56px;
+    --navbar-mobile-h: 52px;
+    --brand-color-1: #5b21b6;
+    --brand-color-2: #0ea5e9;
+    --sidebar-bg-1: #1e1f2a;
+    --sidebar-bg-2: #101322;
+    --muted: #cfd2dc;
+    --glass: rgba(255,255,255,0.06);
+    --drawer-width: min(260px, 78vw); /* mobile drawer width */
+  }
+
+  html,body{height:100%;}
+  body {
+    font-family: "Poppins", sans-serif;
+    background: #ffffff;
+    margin:0;
+    color:#111827;
+  }
+
+  /* NAVBAR */
+  .navbar {
+    height: var(--navbar-h);
+    min-height: var(--navbar-h);
+    padding: 0 1rem;
+    background: linear-gradient(90deg, var(--brand-color-1), var(--brand-color-2));
+    display:flex;
+    align-items:center;
+    z-index:1200;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  }
+  .navbar-brand { font-family:"Orbitron",sans-serif; color:#fff; font-weight:700; font-size:1.05rem; text-decoration:none; }
+
+  /* SIDEBAR - Desktop / Tablet */
+  aside.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: var(--sidebar-w);
+    padding-top: calc(var(--navbar-h) + 10px);
+    background: linear-gradient(180deg, var(--sidebar-bg-1), var(--sidebar-bg-2));
+    box-shadow: 4px 0 18px rgba(0,0,0,0.28);
+    transition: width .24s ease, transform .28s ease, visibility .12s;
+    z-index:1100;
+    overflow: hidden;
+    display:flex;
+    flex-direction:column;
+  }
+
+  .sidebar .profile-short {
+    padding:12px 14px;
+    display:flex;
+    gap:10px;
+    align-items:center;
+    color:var(--muted);
+  }
+  .sidebar .profile-short img { width:42px; height:42px; border-radius:8px; object-fit:cover; }
+
+  .nav-list {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 4px;     /* reduced from 8px 6px */
+  gap: 2px;             /* tighter vertical spacing */
+}
+
+.nav-list a {
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;            /* slightly smaller gap between icon and text */
+  padding: 6px 10px;    /* reduced from 10px 12px */
+  border-radius: 6px;   /* smaller radius for tighter grouping */
+  margin: 2px 6px;      /* reduced outer margin */
+  font-weight: 500;
+  font-size: 0.92rem;   /* optional: slightly smaller font for compact look */
+  text-decoration: none;
+  transition: background .14s ease, color .14s ease, transform .12s ease;
+}
+
+  .nav-list a i { width:22px; text-align:center; font-size:1.05rem; }
+  .nav-list a:hover { background: rgba(255,255,255,0.04); color:#fff; transform: translateX(3px); }
+  .nav-list .active { background: linear-gradient(90deg, rgba(14,165,233,0.12), rgba(91,33,182,0.12)); color:#fff; border-left:4px solid #06b6d4; }
+
+  .sidebar-footer { margin-top:auto; padding:10px 12px; color:var(--muted); font-size:.85rem; }
+
+  /* collapsed state (desktop/tablet user toggled) */
+  .sidebar.collapsed { width: var(--sidebar-collapsed-w); }
+  .sidebar.collapsed .nav-list a { justify-content:center; padding:10px 6px; }
+  .sidebar.collapsed .nav-link-text { display:none; }
+  .sidebar.collapsed .profile-short .info { display:none; }
+  .sidebar.collapsed .sidebar-footer { display:none; }
+
+  /* MAIN CONTENT */
+  main.main-content {
+    margin-left: var(--sidebar-w);
+    padding: 20px;
+    padding-top: calc(var(--navbar-h) + 16px);
+    transition: margin-left .24s ease, padding .12s ease;
+    min-height:100vh;
+    background: #fff;
+  }
+  main.main-content.shifted { margin-left: var(--sidebar-collapsed-w); }
+
+  /* ALERT position */
+  .alert-custom {
+    position: fixed;
+    top: calc(var(--navbar-h) + 12px);
+    left: calc(var(--sidebar-w) + 14px);
+    right: 18px;
+    z-index: 1250;
+  }
+  .sidebar.collapsed ~ .alert-custom { left: calc(var(--sidebar-collapsed-w) + 14px); }
+
+  /* MOBILE: drawer behavior - remove offcanvas conflicts */
+  #sidebarOverlay {
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:1055;
+    background: rgba(0,0,0,0.36);
+    opacity:0;
+    transition: opacity .16s ease;
+    pointer-events:none;
+  }
+
+  /* DARK MODE */
+body.dark-mode {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+body.dark-mode .navbar {
+  background: linear-gradient(90deg, #1e3a8a, #0f766e);
+}
+
+body.dark-mode aside.sidebar {
+  background: linear-gradient(180deg, #0f172a, #1e293b);
+  color: #cbd5e1;
+}
+
+body.dark-mode main.main-content {
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+body.dark-mode .nav-list a {
+  color: #94a3b8;
+}
+
+body.dark-mode .nav-list a:hover {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+
+body.dark-mode .nav-list .active {
+  background: linear-gradient(90deg, rgba(14,165,233,0.22), rgba(91,33,182,0.22));
+  color: #fff;
+  border-left: 4px solid #06b6d4;
+}
+
+body.dark-mode .btn-ghost {
+  color: #e2e8f0;
+  border-color: rgba(255,255,255,0.1);
+}
+
+
+  @media (max-width: 991.98px) {
+    :root { --navbar-h: var(--navbar-mobile-h); }
+
+    /* slightly narrower sidebar on tablet default to collapsed */
+    aside.sidebar { width: var(--sidebar-collapsed-w); padding-top: calc(var(--navbar-h) + 8px); }
+    main.main-content { margin-left: var(--sidebar-collapsed-w); padding-top: calc(var(--navbar-h) + 14px); }
+  }
+
+  @media (max-width: 767.98px) {
+    /* Use drawer (not full screen) */
+    aside.sidebar {
+      top: var(--navbar-h);
+      left: 0;
+      width: var(--drawer-width);
+      height: calc(100% - var(--navbar-h));
+      transform: translateX(-110%);
+      visibility: hidden;
+      pointer-events: none;
+      border-top-right-radius: 10px;
+      border-bottom-right-radius: 10px;
+      padding-top: 12px;
+      transition: transform .26s cubic-bezier(.2,.9,.2,1), visibility .12s;
+    }
+
+    aside.sidebar.open {
+      transform: translateX(0);
+      visibility: visible;
+      pointer-events: auto;
+      z-index:1105;
+    }
+
+    /* show overlay and make it interactive */
+    #sidebarOverlay.show {
+      display:block;
+      opacity:1;
+      pointer-events:auto;
+    }
+
+    /* don't shift main content on mobile */
+    main.main-content { margin-left: 0 !important; padding-top: calc(var(--navbar-h) + 12px); }
+
+    /* alert reposition */
+    .alert-custom { left: 12px; right: 12px; top: calc(var(--navbar-h) + 8px); }
+  }
+
+  /* Utility */
+  .btn-ghost { background: transparent; border: 1px solid rgba(255,255,255,0.06); color: #fff; }
+  .nav-link-text { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* Small visuals tweaks */
+  .sidebar .brand { display:flex; align-items:center; gap:.5rem; padding:8px 12px; color:#fff; font-weight:700; }
+  .profile-name { font-weight:600; color:#fff; }
+  .profile-role { font-size:.82rem; color:var(--muted); }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar fixed-top" role="navigation" aria-label="Top navigation">
+    <div class="container-fluid d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-2">
+        <button id="sidebarToggle" class="btn btn-sm btn-ghost d-inline-flex align-items-center justify-content-center"
+                aria-controls="sidebar" aria-expanded="false" aria-label="Toggle sidebar">
+          <i class="fas fa-bars"></i>
+        </button>
+
+        <a class="navbar-brand ms-1 d-flex align-items-center" href="{{ url_for('teacher.dashboard') }}">
+          <i class="fas fa-chalkboard-teacher me-2" style="font-size:1.05rem;"></i>
+          <span class="d-none d-sm-inline">Teacher Panel</span>
+        </a>
+      </div>
+
+      <div class="nav-actions d-flex align-items-center gap-2">
+        <button id="toggleDarkMode" class="btn btn-sm btn-ghost" title="Toggle dark mode"><i class="fas fa-moon"></i></button>
+
+        <div class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle text-white d-flex align-items-center" href="#" role="button"
+             data-bs-toggle="dropdown" aria-expanded="false">
+            <img src="{{ url_for('static', filename='uploads/profile_pictures/' ~ (current_user.profile_picture or 'default.png')) }}"
+                 alt="Profile" class="rounded-circle me-2" width="32" height="32">
+            <span class="d-none d-md-inline">{{ current_user.first_name }}</span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end shadow">
+            <li><a class="dropdown-item" href="{{ url_for('teacher.profile') }}"><i class="fas fa-user me-2"></i> My Profile</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('teacher.change_password') }}"><i class="fas fa-lock me-2"></i> Change Password</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-2"></i> Logout</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar" class="sidebar" role="navigation" aria-label="Primary">
+    <!-- PROFILE -->
+    <div class="profile-short mt-1">
+      <img src="{{ url_for('static', filename='uploads/profile_pictures/' ~ (current_user.profile_picture or 'default.png')) }}" alt="You">
+      <div class="info d-none d-sm-block">
+        <div class="profile-name">{{ current_user.first_name }} {{ current_user.last_name }}</div>
+        <div class="profile-role">{{ current_user.role }}</div>
+      </div>
+    </div>
+
+    <!-- NAVIGATION -->
+    <nav class="nav-list" aria-label="Main menu">
+      <a href="{{ url_for('teacher.dashboard') }}" class="active" role="menuitem">
+        <i class="fas fa-home"></i><span class="nav-link-text">Dashboard</span>
+      </a>
+
+      <!-- Courses & Assessment -->
+      <a href="{{ url_for('teacher.classes') }}" role="menuitem">
+        <i class="fas fa-users"></i><span class="nav-link-text">Classes</span>
+      </a>
+      <a href="{{ url_for('teacher.assessment_scheme_list') }}" role="menuitem">
+        <i class="fas fa-layer-group"></i><span class="nav-link-text">Assessment Schemes</span>
+      </a>
+      <!-- Content & Submissions -->
+      <a href="{{ url_for('teacher.manage_assignments') }}" role="menuitem">
+        <i class="fas fa-tasks"></i><span class="nav-link-text">Assignments</span>
+      </a>
+      <a href="{{ url_for('teacher.submissions_index') }}" role="menuitem">
+        <i class="fas fa-file-alt"></i><span class="nav-link-text">Submissions</span>
+      </a>
+
+      <!-- Attendance & Results -->
+      <a href="{{ url_for('teacher.attendance') }}" role="menuitem">
+        <i class="fas fa-check-square"></i><span class="nav-link-text">Attendance</span>
+      </a>
+      <a href="{{ url_for('teacher.view_results_combined') }}" role="menuitem">
+        <i class="fas fa-chart-line"></i><span class="nav-link-text">Quiz & Exam Results</span>
+      </a>
+
+      <!-- Calendar & Appointments -->
+      <a href="{{ url_for('teacher.calendar') }}" role="menuitem">
+        <i class="fas fa-calendar-check"></i><span class="nav-link-text">Academic Calendar</span>
+      </a>
+      <a href="{{ url_for('teacher.manage_slots') }}" role="menuitem">
+        <i class="fas fa-calendar-plus"></i><span class="nav-link-text">Appointments</span>
+      </a>
+
+      <!-- Communication & Meetings -->
+      <a href="{{ url_for('chat.chat_home') }}" role="menuitem">
+        <i class="fas fa-comments"></i><span class="nav-link-text">Communication</span>
+      </a>
+      <a href="{{ url_for('teacher.meetings') }}" role="menuitem">
+  <i class="fas fa-video"></i><span class="nav-link-text">Meetings</span>
+</a>
+
+      <!-- Notifications & Logout -->
+      <a href="#" role="menuitem">
+        <i class="fas fa-bell"></i><span class="nav-link-text">Notifications</span>
+      </a>
+      <a href="{{ url_for('logout') }}" role="menuitem">
+        <i class="fas fa-sign-out-alt"></i><span class="nav-link-text">Logout</span>
+      </a>
+    </nav>
+
+    <!-- FOOTER -->
+    <div class="sidebar-footer">
+      <small class="text-muted">v1.0 • LMS</small>
+    </div>
+  </aside>
+
+  <!-- MOBILE OVERLAY (used by the drawer) -->
+  <div id="sidebarOverlay" aria-hidden="true"></div>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content" id="mainContent" role="main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="alert-custom">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- SCRIPTS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+  (function () {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const toggleBtn = document.getElementById('sidebarToggle');
+    const mainContent = document.getElementById('mainContent');
+
+    const MOBILE_MAX = 767.98;
+    const TABLET_MAX = 991.98;
+
+    function isMobile() { return window.innerWidth <= MOBILE_MAX; }
+    function isTablet() { return window.innerWidth > MOBILE_MAX && window.innerWidth <= TABLET_MAX; }
+
+    // Persisted collapsed state for desktop/tablet
+    const saved = localStorage.getItem('sidebarState'); // 'collapsed' | 'expanded' or null
+
+    function applySavedState() {
+      if (isMobile()) {
+        // mobile: ensure drawer closed
+        sidebar.classList.remove('collapsed');
+        sidebar.classList.remove('open');
+        overlay.classList.remove('show');
+        mainContent.classList.remove('shifted');
+        toggleBtn.setAttribute('aria-expanded', 'false');
+        return;
+      }
+
+      // tablet: default collapsed; desktop: expanded unless saved otherwise
+      if (saved === 'collapsed' || (saved === null && isTablet())) {
+        sidebar.classList.add('collapsed');
+        mainContent.classList.add('shifted');
+        toggleBtn.setAttribute('aria-expanded', 'false');
+      } else {
+        sidebar.classList.remove('collapsed');
+        mainContent.classList.remove('shifted');
+        toggleBtn.setAttribute('aria-expanded', 'true');
+      }
+    }
+    applySavedState();
+
+    // Debounced resize handler to re-apply states across breakpoints
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => applySavedState(), 120);
+    });
+
+    // Toggle handler
+    toggleBtn.addEventListener('click', () => {
+      if (isMobile()) {
+        const willOpen = !sidebar.classList.contains('open');
+        if (willOpen) {
+          sidebar.classList.add('open');
+          overlay.classList.add('show');
+          toggleBtn.setAttribute('aria-expanded', 'true');
+          // focus first link for accessibility
+          setTimeout(() => sidebar.querySelector('a')?.focus(), 120);
+        } else {
+          sidebar.classList.remove('open');
+          overlay.classList.remove('show');
+          toggleBtn.setAttribute('aria-expanded', 'false');
+        }
+        return;
+      }
+
+      // Desktop/tablet: collapse/expand
+      sidebar.classList.toggle('collapsed');
+      mainContent.classList.toggle('shifted');
+      const collapsed = sidebar.classList.contains('collapsed');
+      localStorage.setItem('sidebarState', collapsed ? 'collapsed' : 'expanded');
+      toggleBtn.setAttribute('aria-expanded', (!collapsed).toString());
+      if (!collapsed) sidebar.querySelector('a')?.focus();
+    });
+
+    // overlay click closes drawer
+    overlay.addEventListener('click', () => {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('show');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+    });
+
+    // close on Escape
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (sidebar.classList.contains('open')) {
+          sidebar.classList.remove('open');
+          overlay.classList.remove('show');
+          toggleBtn.setAttribute('aria-expanded', 'false');
+        }
+      }
+      // dev shortcut: Ctrl/Cmd + B toggles sidebar
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        toggleBtn.click();
+      }
+    });
+
+    // close drawer when a link is clicked (mobile)
+    sidebar.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => {
+        if (isMobile()) {
+          sidebar.classList.remove('open');
+          overlay.classList.remove('show');
+          toggleBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
+    });
+
+    // Accessibility: trap focus when drawer open (basic)
+    overlay.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab' && sidebar.classList.contains('open')) {
+        // keep focus in sidebar - simple approach
+        const focusables = sidebar.querySelectorAll('a,button,input,select,textarea');
+        if (!focusables.length) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    });
+
+  })();
+  </script>
+  <script>
+(function () {
+  const toggleDarkBtn = document.getElementById('toggleDarkMode');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const savedTheme = localStorage.getItem('theme');
+
+  // Apply saved or system preference
+  if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+    document.body.classList.add('dark-mode');
+    toggleDarkBtn.innerHTML = '<i class="fas fa-sun"></i>';
+  }
+
+  toggleDarkBtn.addEventListener('click', () => {
+    const dark = document.body.classList.toggle('dark-mode');
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
+    toggleDarkBtn.innerHTML = dark
+      ? '<i class="fas fa-sun"></i>'
+      : '<i class="fas fa-moon"></i>';
+  });
+})();
+</script>
+</body>
+</html>

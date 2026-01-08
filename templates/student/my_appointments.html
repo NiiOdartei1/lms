@@ -1,0 +1,29 @@
+{% extends 'student/base_student.html' %}
+{% block title %}My Appointments{% endblock %}
+
+{% block content %}
+<h4>My Appointments</h4>
+
+<table class="table table-bordered">
+  <thead>
+    <tr>
+      <th>Teacher</th>
+      <th>Date</th>
+      <th>Time</th>
+      <th>Status</th>
+      <th>Note</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for booking in bookings %}
+    <tr>
+      <td>{{ booking.slot.teacher.user.full_name }}</td>
+      <td>{{ booking.slot.date }}</td>
+      <td>{{ booking.slot.start_time.strftime('%H:%M') }} - {{ booking.slot.end_time.strftime('%H:%M') }}</td>
+      <td>{{ booking.status }}</td>
+      <td>{{ booking.note }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

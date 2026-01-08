@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>{% block title %}Student Portal{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+
+  <!-- Bootstrap (CDN) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Icons -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- FullCalendar (optional pages will include it too) -->
+  <link href="{{ url_for('static', filename='css/fullcalendar-main.min.css') }}" rel="stylesheet">
+
+  <style>
+    /* =========================
+       Design tokens & defaults
+       Mobile-first: styles apply to phones, then scale up
+       ========================= */
+    :root{
+      --sidebar-width: 220px;
+      --sidebar-collapsed: 70px;
+      --label-width: 120px;
+      --primary-900: #022b3a;
+      --accent-600: #115e67;
+      --muted: #6c757d;
+      --card-bg: #fff;
+      --bg: #f4f6f8;
+      --text: #212529;
+    }
+
+    html,body{
+      height:100%;
+      background:var(--bg);
+      color:var(--text);
+      font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+
+    /* =========================
+       Top Navbar
+       ========================= */
+    .navbar {
+      background: var(--primary-900);
+      height:56px;
+    }
+    .navbar .navbar-brand { color:#fff; display:flex; align-items:center; gap:10px; font-weight:700; }
+    .navbar .profile-img {
+      width:34px; height:34px; border-radius:50%; object-fit:cover; border:2px solid #fff;
+    }
+    .toggle-btn { color: #fff; background:none; border:none; font-size:1.2rem; }
+
+    /* =========================
+       Sidebar (desktop) / Offcanvas (mobile)
+       ========================= */
+    .sidebar {
+      background: linear-gradient(180deg,var(--primary-900), #054f5a);
+      color:#f1f7f8;
+      position: fixed;
+      top:56px;
+      left:0;
+      bottom:0;
+      width: var(--sidebar-width);
+      padding-top: 12px;
+      overflow-y: auto;
+      transition: width .24s ease, transform .24s ease;
+      z-index:1020;
+    }
+    .sidebar.collapsed { width: var(--sidebar-collapsed); }
+    .sidebar a {
+      color: rgba(255,255,255,0.92);
+      padding: 10px 16px;
+      display:flex;
+      gap:12px;
+      align-items:center;
+      text-decoration:none;
+      font-weight:600;
+      border-radius:8px;
+      margin:4px 10px;
+    }
+    .sidebar a i { width:20px; text-align:center; }
+    .sidebar a:hover, .sidebar a.active {
+      background: rgba(255,255,255,0.06);
+      color: #fff;
+    }
+    .sidebar .small-note { color: rgba(255,255,255,0.75); font-size:12px; margin:10px 16px; }
+
+    /* Offcanvas fallback (smaller screens) */
+    .offcanvas-backdrop { z-index:1040; }
+
+    /* =========================
+       Main content area
+       ========================= */
+    .main-content {
+      margin-top:56px;
+      margin-left: 0;
+      padding: 18px;
+      transition: margin-left .24s ease;
+    }
+    @media (min-width: 992px) {
+      .main-content { margin-left: var(--sidebar-width); }
+      .sidebar { transform: translateX(0); }
+    }
+    .main-content.collapsed { margin-left: var(--sidebar-collapsed); }
+
+    /* Alerts (positioned under navbar and beside sidebar on large screens) */
+    .app-alert {
+      position: fixed;
+      top: 56px;
+      left: 16px;
+      right: 16px;
+      z-index: 1050;
+      max-width: calc(100% - 32px);
+      border-radius: 0.375rem;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    }
+    @media (min-width: 992px) {
+      .app-alert { left: calc(var(--sidebar-width) + 16px); max-width: calc(100% - var(--sidebar-width) - 32px); }
+      .app-alert.sidebar-collapsed { left: calc(var(--sidebar-collapsed) + 16px); max-width: calc(100% - var(--sidebar-collapsed) - 32px); }
+    }
+
+    /* =========================
+       Cards and visual elements
+       ========================= */
+    .card {
+      background: var(--card-bg);
+      border-radius: .6rem;
+      box-shadow: 0 6px 20px rgba(16,24,40,0.04);
+    }
+
+    /* =========================
+       Responsive helpers for the portal (many target widths)
+       We'll include media queries for common mobile widths:
+       320, 360, 375, 390, 412, 414, 428, 480, 576, 768, 992, 1200
+       ========================= */
+
+    /* tiny phones (iPhone SE portrait ~320) */
+    @media (max-width: 359px) {
+      :root { --label-width: 96px; }
+      .navbar .brand-text { font-size: 14px; }
+      .sidebar a { padding: 10px 12px; font-size: 14px; }
+      .main-content { padding: 12px; }
+    }
+
+    /* 360px (many android small phones) */
+    @media (min-width: 360px) and (max-width: 374px) {
+      :root { --label-width: 98px; }
+      .navbar .brand-text { font-size: 14px; }
+    }
+
+    /* 375px (iPhone X/11/12 portrait) */
+    @media (min-width: 375px) and (max-width: 389px) {
+      :root { --label-width: 100px; }
+    }
+
+    /* 390px (some Galaxy S models) */
+    @media (min-width: 390px) and (max-width: 411px) {
+      :root { --label-width: 104px; }
+    }
+
+    /* 412px (Pixel 2 XL / some Android) */
+    @media (min-width: 412px) and (max-width: 425px) {
+      :root { --label-width: 110px; }
+    }
+
+    /* 414px (iPhone 12/13 Pro Max portrait) */
+    @media (min-width: 414px) and (max-width: 427px) {
+      :root { --label-width: 110px; }
+    }
+
+    /* 428px and up small phones */
+    @media (min-width: 428px) and (max-width: 479px) {
+      :root { --label-width: 115px; }
+    }
+
+    /* small tablets & large phones */
+    @media (min-width: 480px) and (max-width: 575px) {
+      :root { --label-width: 120px; }
+      .navbar .brand-text { font-size: 16px; }
+    }
+
+    /* small desktop/tablet */
+    @media (min-width: 576px) and (max-width: 767px) {
+      :root { --sidebar-width: 200px; --label-width: 120px; }
+      .sidebar { padding-top: 56px; }
+      .main-content { padding: 18px; }
+    }
+
+    /* Hide fixed sidebar on small screens */
+    @media (max-width: 767px) {
+      .sidebar { display: none; }
+    }
+
+    /* medium devices (tablets) */
+    @media (min-width: 768px) and (max-width: 991px) {
+      :root { --sidebar-width: 220px; --label-width: 120px; }
+      .sidebar { position: fixed; top:56px; height: calc(100% - 56px); }
+      .main-content { margin-left: var(--sidebar-width); }
+    }
+
+    /* large devices (desktops) */
+    @media (min-width: 992px) {
+      :root { --sidebar-width: 220px; --label-width: 120px; }
+      .sidebar { top:56px; height: calc(100% - 56px); }
+      .main-content { margin-left: var(--sidebar-width); }
+    }
+
+    /* very large screens */
+    @media (min-width: 1200px) {
+      .main-content { padding: 28px 40px; }
+    }
+
+    /* Dark mode overrides */
+    body.dark-mode {
+      background: #0f1720;
+      color: #e6eef6;
+    }
+    .navbar.dark-mode { background: #07121a; }
+    .sidebar.dark-mode { background: linear-gradient(180deg,#071e25,#072a2f); }
+    .card.dark-mode { background: #0f1720; color: #e6eef6; box-shadow: none; border: 1px solid rgba(255,255,255,0.04); }
+    .app-alert.dark-mode { background: #112026; color:#cff0ff; }
+
+    /* Make tables, calendars and long content scroll on small screens */
+    .scroll-x { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+
+    /* small tweaks for touch targets */
+    a, button, .btn { touch-action: manipulation; -webkit-tap-highlight-color: rgba(0,0,0,0.05); }
+
+    /* ensure offcanvas nav items are large enough on mobile */
+    .offcanvas .nav-link { padding: 14px 18px; font-weight:700; color: #0b3a3f; }
+
+  </style>
+</head>
+<body>
+  <!-- NAVBAR -->
+  <nav class="navbar navbar-expand-lg fixed-top shadow-sm">
+    <div class="container-fluid">
+      <!-- On small screens we'll open the offcanvas sidebar -->
+      <button class="toggle-btn me-2 d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar" aria-label="Open menu">
+        <i class="fas fa-bars"></i>
+      </button>
+
+      <!-- On large screens toggle collapse -->
+      <button class="toggle-btn me-2 d-none d-lg-inline" id="sidebarToggle" aria-label="Toggle sidebar">
+        <i class="fas fa-bars"></i>
+      </button>
+
+      <a class="navbar-brand" href="#">
+        <img src="https://i.postimg.cc/jjQLhsqZ/logo.jpg" alt="Logo" style="height:28px;">
+        <span class="brand-text text-white ms-2">Student Portal</span>
+      </a>
+
+      <div class="d-flex align-items-center ms-auto">
+        <div class="dropdown">
+          <a class="d-flex align-items-center text-white text-decoration-none dropdown-toggle" href="#" role="button" id="profileMenu" data-bs-toggle="dropdown" aria-expanded="false">
+            <img src="{{ current_user.profile_picture_url }}" alt="Profile" class="profile-img me-2">
+            <span class="d-none d-md-inline">{{ current_user.first_name }}</span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="profileMenu">
+            <li><a class="dropdown-item" href="{{ url_for('student.profile') }}"><i class="fas fa-user me-2"></i>My Profile</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('student.change_password') }}"><i class="fas fa-lock me-2"></i>Change Password</a></li>
+            <li><button class="dropdown-item d-flex align-items-center" id="toggleDarkMode"><i class="fas fa-moon me-2"></i>Toggle Dark</button></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile Offcanvas Sidebar -->
+<div class="offcanvas offcanvas-start d-lg-none" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="mobileSidebarLabel">Menu</h5>
+    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body p-0">
+    <div class="small-note px-3 mb-2">Welcome, {{ current_user.first_name }}</div>
+    <nav class="nav flex-column pb-4" id="mobileNav">
+      <a href="{{ url_for('student.dashboard') }}" class="nav-link"><i class="fas fa-home me-2"></i>Dashboard</a>
+      <a href="{{ url_for('student.register_courses') }}" class="nav-link"><i class="fas fa-book me-2"></i>Courses</a>
+      <a href="{{ url_for('exam.welcome') }}" class="nav-link"><i class="fas fa-file-alt me-2"></i>Exams</a>
+      <a href="{{ url_for('student.exam_timetable_page') }}" class="nav-link"><i class="fas fa-calendar-check me-2"></i>Exam Timetable</a>
+      <a href="{{ url_for('student.my_results') }}" class="nav-link"><i class="fas fa-graduation-cap me-2"></i>Results</a>
+      <a href="{{ url_for('student.teacher_assessment') }}" class="nav-link"><i class="fas fa-chalkboard-teacher me-2"></i>Teacher Assessment</a>
+      <a href="{{ url_for('student.transcript') }}" class="nav-link"><i class="fas fa-file-signature me-2"></i>Transcript</a>
+      <a href="{{ url_for('student.view_timetable') }}" class="nav-link"><i class="fas fa-calendar-alt me-2"></i>Timetable</a>
+      <a href="{{ url_for('student.book_appointment') }}" class="nav-link"><i class="fas fa-calendar-plus me-2"></i>Appointments</a>
+      <a href="{{ url_for('chat.chat_home') }}" class="nav-link"><i class="fas fa-comments me-2"></i>Chat</a>
+      <a href="{{ url_for('student.student_notifications') }}" class="nav-link"><i class="fas fa-info-circle me-2"></i>Notifications
+        {% if unread_count > 0 %} <span class="badge bg-danger ms-2">{{ unread_count }}</span> {% endif %}
+      </a>
+      <a href="{{ url_for('student.pay_fees', year='2025/2026', semester='First') }}" class="nav-link"><i class="fas fa-money-check-alt me-2"></i>View Fees</a>
+      <a href="{{ url_for('vclass.switch_to_vclass') }}" class="nav-link"><i class="fas fa-laptop-code me-2"></i>Virtual Class</a>
+
+      <!-- Dark mode toggle -->
+      <button id="mobileToggleDarkMode" class="nav-link btn btn-link text-start mt-3"><i class="fas fa-moon me-2"></i>Dark Mode</button>
+    </nav>
+  </div>
+</div>
+
+<script>
+  // ====== Highlight Active Link ======
+  const currentUrl = window.location.pathname;
+  document.querySelectorAll('#mobileNav .nav-link').forEach(link => {
+    if(link.href && link.href.endsWith(currentUrl)) {
+      link.classList.add('active');
+    }
+  });
+
+  // ====== Mobile Dark Mode Toggle ======
+  const mobileDarkToggle = document.getElementById('mobileToggleDarkMode');
+  mobileDarkToggle.addEventListener('click', () => {
+    if(document.body.classList.contains('dark-mode')) {
+      disableDarkMode();
+    } else {
+      enableDarkMode();
+    }
+  });
+
+  function enableDarkMode() {
+    document.body.classList.add('dark-mode');
+    document.querySelectorAll('.navbar, .sidebar, .offcanvas, .main-content, .card, .alert, .dropdown-menu').forEach(el => el.classList.add('dark-mode'));
+    localStorage.setItem('darkMode', 'enabled');
+  }
+
+  function disableDarkMode() {
+    document.body.classList.remove('dark-mode');
+    document.querySelectorAll('.navbar, .sidebar, .offcanvas, .main-content, .card, .alert, .dropdown-menu').forEach(el => el.classList.remove('dark-mode'));
+    localStorage.setItem('darkMode', 'disabled');
+  }
+
+  // ====== Preserve dark mode state ======
+  if(localStorage.getItem('darkMode') === 'enabled') enableDarkMode();
+</script>
+
+
+  <!-- Desktop Sidebar -->
+  <aside class="sidebar d-none d-lg-block" id="sidebar" role="navigation" aria-label="Main navigation">
+    <div class="small-note px-3 mb-2">Welcome, {{ current_user.first_name }}</div>
+    <nav class="nav flex-column pb-4">
+      <a href="{{ url_for('student.dashboard') }}" class="active"><i class="fas fa-home"></i><span class="ms-2">Dashboard</span></a>
+      <a href="{{ url_for('student.register_courses') }}"><i class="fas fa-book"></i><span class="ms-2">Courses</span></a>
+      <a href="{{ url_for('exam.welcome') }}"><i class="fas fa-file-alt"></i><span class="ms-2">Exams</span></a>
+      <a href="{{ url_for('student.exam_timetable_page') }}"><i class="fas fa-calendar-check"></i><span class="ms-2">Exam Timetable</span></a>
+      <a href="{{ url_for('student.my_results') }}"><i class="fas fa-graduation-cap"></i><span class="ms-2">Results</span></a>
+      <a href="{{ url_for('student.transcript') }}"><i class="fas fa-file-signature"></i><span class="ms-2">Transcript</span></a>
+      <a href="{{ url_for('student.view_timetable') }}"><i class="fas fa-calendar-alt"></i><span class="ms-2">Timetable</span></a>
+      <a href="{{ url_for('student.book_appointment') }}"><i class="fas fa-calendar-plus"></i><span class="ms-2">Appointments</span></a>
+      <a href="{{ url_for('chat.chat_home') }}"><i class="fas fa-comments"></i><span class="ms-2">Chat</span></a>
+      <a href="{{ url_for('student.student_notifications') }}"><i class="fas fa-info-circle"></i><span class="ms-2">Notifications
+        {% if unread_count > 0 %} <span class="badge bg-danger ms-2">{{ unread_count }}</span> {% endif %}
+      </span></a>
+      <a href="{{ url_for('student.pay_fees', year='2025/2026', semester='First') }}"><i class="fas fa-money-check-alt"></i><span class="ms-2">View Fees</span></a>
+      <a href="{{ url_for('vclass.switch_to_vclass') }}"><i class="fas fa-laptop-code"></i><span class="ms-2">Virtual Class</span></a>
+    </nav>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content" id="mainContent" role="main">
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="app-alert" id="alertBox">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} mb-0 d-flex justify-content-between align-items-center">
+              <div>{{ message }}</div>
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <div class="container-fluid p-0">
+      {% block content %}
+      <!-- Page-specific content will be injected here -->
+      {% endblock %}
+    </div>
+  </main>
+
+  <!-- Bootstrap JS + dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // Sidebar toggle (desktop)
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.getElementById('mainContent');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const alertBox = document.getElementById('alertBox');
+
+    // restore state
+    if (localStorage.getItem('sidebarState') === 'collapsed') {
+      document.documentElement.classList.add('sidebar-collapsed');
+      if (sidebar) sidebar.classList.add('collapsed');
+      if (mainContent) mainContent.classList.add('collapsed');
+      if (alertBox) alertBox.classList.add('sidebar-collapsed');
+    }
+
+    if (sidebarToggle) {
+      sidebarToggle.addEventListener('click', () => {
+        if (sidebar) sidebar.classList.toggle('collapsed');
+        if (mainContent) mainContent.classList.toggle('collapsed');
+        if (alertBox) alertBox.classList.toggle('sidebar-collapsed');
+        const collapsed = sidebar && sidebar.classList.contains('collapsed');
+        localStorage.setItem('sidebarState', collapsed ? 'collapsed' : 'expanded');
+      });
+    }
+
+    // Dark mode toggle
+    const toggleDarkMode = document.getElementById('toggleDarkMode');
+    const body = document.body;
+    const navbar = document.querySelector('.navbar');
+
+    function enableDarkMode() {
+      body.classList.add('dark-mode');
+      navbar.classList.add('dark-mode');
+      document.querySelectorAll('.sidebar, .card, .app-alert, .dropdown-menu').forEach(el => el.classList.add('dark-mode'));
+      localStorage.setItem('darkMode', 'enabled');
+    }
+    function disableDarkMode() {
+      body.classList.remove('dark-mode');
+      navbar.classList.remove('dark-mode');
+      document.querySelectorAll('.sidebar, .card, .app-alert, .dropdown-menu').forEach(el => el.classList.remove('dark-mode'));
+      localStorage.setItem('darkMode', 'disabled');
+    }
+    if (localStorage.getItem('darkMode') === 'enabled') enableDarkMode();
+    if (toggleDarkMode) toggleDarkMode.addEventListener('click', () => {
+      if (body.classList.contains('dark-mode')) disableDarkMode(); else enableDarkMode();
+    });
+
+    // Improve touch scroll for menus on iOS
+    document.addEventListener('touchstart', () => {}, {passive:true});
+
+    // Accessibility: close offcanvas after clicking a link on small screens
+    document.querySelectorAll('.offcanvas .nav-link').forEach(a => {
+      a.addEventListener('click', () => {
+        const off = bootstrap.Offcanvas.getInstance(document.getElementById('mobileSidebar'));
+        if (off) off.hide();
+      });
+    });
+
+    // optional: reduce motion preference
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('reduced-motion');
+    }
+  </script>
+</body>
+</html>

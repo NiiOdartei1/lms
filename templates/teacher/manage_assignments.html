@@ -1,0 +1,461 @@
+{% extends 'teacher/base_teacher.html' if current_user.role == 'teacher' else 'admin/layout.html' %}
+{% block content %}
+<!-- Manage Assignments - Extra Compact UI -->
+<div class="container mt-1 compact-ui compact-xsmall">
+  <div class="card mb-1 advanced-card">
+    <div class="card-body d-flex flex-column flex-md-row align-items-md-center gap-1 py-1">
+      <div class="d-flex align-items-center gap-1 me-auto">
+        <h5 class="mb-0 fw-semibold fs-7">Manage Assignments</h5>
+        <span class="badge bg-gradient-primary-subtle tiny-badge">Total: <span id="totalCount">{{ assignments|length }}</span></span>
+      </div>
+
+      <div class="d-flex gap-1">
+        <a href="{{ url_for('teacher.add_assignment' if current_user.role == 'teacher' else 'admin.add_assignment') }}"
+           class="btn btn-primary btn-icon" title="Add assignment" aria-label="Add assignment">
+          <i class="fas fa-plus-circle"></i>
+        </a>
+
+        <button id="exportCsv" class="btn btn-outline-light btn-icon" title="Export CSV" aria-label="Export CSV">
+          <i class="fas fa-file-csv"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="card mb-1 advanced-card">
+    <div class="card-body py-1">
+      <form id="filters" class="row g-1 align-items-center">
+        <div class="col-12 col-md-5 mb-1">
+          <div class="input-group input-group-xs">
+            <span class="input-group-text"><i class="fas fa-search"></i></span>
+            <input id="searchBox" type="search" class="form-control form-control-xs" placeholder="Search title, course, class">
+          </div>
+        </div>
+
+        <div class="col-6 col-md-2 mb-1">
+          <select id="filterCourse" class="form-select form-select-xs" aria-label="Filter by course">
+            <option value="">All Courses</option>
+            {% for c in assignments|map(attribute='course_name')|unique %}
+              <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-6 col-md-2 mb-1">
+          <select id="filterClass" class="form-select form-select-xs" aria-label="Filter by class">
+            <option value="">All Classes</option>
+            {% for cl in assignments|map(attribute='assigned_class')|unique %}
+              <option value="{{ cl }}">{{ cl }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-6 col-md-1 mb-1">
+          <input id="fromDate" class="form-control form-control-xs" type="date" title="From">
+        </div>
+
+        <div class="col-6 col-md-1 mb-1">
+          <input id="toDate" class="form-control form-control-xs" type="date" title="To">
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card advanced-card">
+    <div class="card-body p-0">
+      <div class="table-responsive futuristic-table">
+        <table id="assignmentsTable" class="table table-borderless mb-0 xsmall">
+          <thead>
+            <tr class="text-muted xsmall">
+              <th class="sortable" data-key="title">Title <i class="fas fa-sort ms-1"></i></th>
+              <th class="sortable" data-key="course_name">Course</th>
+              <th class="sortable" data-key="assigned_class">Class</th>
+              <th class="sortable" data-key="due_date">Due</th>
+              <th>Max</th>
+              <th>File</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            {% for a in assignments %}
+            <tr class="table-row" data-title="{{ a.title|e }}" data-course="{{ a.course_name|e }}"
+                data-class="{{ a.assigned_class|e }}" data-due="{{ a.due_date.isoformat() }}"
+                data-description="{{ a.description|e }}" data-instructions="{{ a.instructions|e }}"
+                data-filename="{{ a.filename or '' }}" data-original="{{ a.original_name or '' }}"
+                data-maxscore="{{ a.max_score or '' }}" data-id="{{ a.id }}">
+              <td class="fw-semibold align-middle">{{ a.title }}</td>
+              <td class="align-middle small">{{ a.course_name }}</td>
+              <td class="align-middle small">{{ a.assigned_class }}</td>
+              <td class="align-middle small">
+                <span class="dueDateText">{{ a.due_date.strftime('%Y-%m-%d') }}</span>
+                <div class="mt-1"><span class="badge status-badge tiny-badge">—</span></div>
+              </td>
+              <td class="align-middle small">{{ a.max_score }}</td>
+              <td class="align-middle small">
+                {% if a.filename %}
+                  <a href="{{ url_for('static', filename='uploads/' ~ a.filename) }}" target="_blank" class="xsmall">
+                    <i class="fas fa-file-alt"></i>&nbsp;{{ a.original_name or a.filename }}
+                  </a>
+                {% else %}
+                  <span class="text-muted xsmall">—</span>
+                {% endif %}
+              </td>
+              <td class="align-middle">
+                <div class="btn-group" role="group" aria-label="actions">
+                  <a href="{{ url_for('teacher.edit_assignment' if current_user.role == 'teacher' else 'admin.edit_assignment', assignment_id=a.id) }}"
+                     class="btn btn-sm-icon" title="Edit" aria-label="Edit assignment"><i class="fas fa-edit"></i></a>
+
+                  <button type="button" class="btn btn-sm-icon previewBtn" title="Preview" aria-label="Preview assignment"
+                          data-bs-toggle="modal" data-bs-target="#previewModal"><i class="fas fa-eye"></i></button>
+
+                  {% if current_user.role == 'admin' %}
+                  <button type="button" class="btn btn-sm-icon deleteBtn" title="Delete" aria-label="Delete assignment" data-id="{{ a.id }}">
+                    <i class="fas fa-trash-alt"></i>
+                  </button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination controls -->
+      <div class="p-1 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-1">
+          <label class="xsmall text-muted mb-0">Rows</label>
+          <select id="rowsPerPage" class="form-select form-select-xs d-inline-block" style="width:70px;">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="25">25</option>
+          </select>
+        </div>
+
+        <div class="d-flex gap-1 align-items-center">
+          <button id="prevPage" class="btn btn-outline-light btn-icon-sm" title="Previous page" aria-label="Previous page"><i class="fas fa-chevron-left"></i></button>
+          <span class="xsmall text-muted">Page <span id="currentPage">1</span> / <span id="totalPages">1</span></span>
+          <button id="nextPage" class="btn btn-outline-light btn-icon-sm" title="Next page" aria-label="Next page"><i class="fas fa-chevron-right"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content advanced-card p-0">
+      <div class="modal-header border-0 py-1 px-2">
+        <h6 class="modal-title mb-0 xsmall" id="previewTitle">Preview</h6>
+        <button type="button" class="btn-close btn-xs" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body xsmall">
+        <p class="mb-0"><strong>Course:</strong> <span id="previewCourse"></span></p>
+        <p class="mb-0"><strong>Class:</strong> <span id="previewClass"></span></p>
+        <p class="mb-0"><strong>Due:</strong> <span id="previewDue"></span> <span id="previewStatus" class="ms-2 badge tiny-badge"></span></p>
+        <hr class="my-1">
+        <div class="mb-1"><strong class="xsmall">Description</strong>
+          <p id="previewDescription" class="text-muted xsmall mb-1"></p>
+        </div>
+        <div><strong class="xsmall">Instructions</strong>
+          <div id="previewInstructions" class="text-muted xsmall"></div>
+        </div>
+        <div class="mt-1" id="previewFileWrap"></div>
+      </div>
+      <div class="modal-footer border-0 py-1 px-2">
+        <button type="button" class="btn btn-outline-secondary btn-xs" data-bs-dismiss="modal">Close</button>
+        <a id="downloadFile" class="btn btn-primary btn-xs" href="#" target="_blank" title="Download file"><i class="fas fa-download"></i></a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal (admin) -->
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content advanced-card p-1">
+      <div class="modal-body text-center xsmall">
+        <i class="fas fa-exclamation-triangle fa-sm text-warning mb-1"></i>
+        <h6 class="mb-1">Delete?</h6>
+        <p class="xsmall text-muted mb-1">This cannot be undone.</p>
+        <div class="d-flex justify-content-center gap-1 mt-1">
+          <button id="confirmDelete" class="btn btn-danger btn-xs">Yes</button>
+          <button class="btn btn-outline-secondary btn-xs" data-bs-dismiss="modal">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CSRF token -->
+<script>
+  const ROLE = "{{ current_user.role }}";
+  const CSRF_TOKEN = "{{ csrf_token() }}";
+  const DELETE_URL = "{{ url_for('admin.delete_assignment', assignment_id=0)[:-1] }}"; // we'll append id
+  const EDIT_URL_BASE = "{{ url_for('teacher.edit_assignment', assignment_id=0)[:-1] }}";
+  const STATIC_UPLOAD_BASE = "{{ url_for('static', filename='uploads/') }}";
+</script>
+
+<!-- Extra compact styles -->
+<style>
+  :root{
+    --ui-font-size: 11px;
+    --card-radius: 6px;
+    --btn-gap: .18rem;
+  }
+
+  .compact-ui, .compact-xsmall { font-size: var(--ui-font-size); }
+  .compact-xsmall .card { border-radius: var(--card-radius); }
+  .compact-xsmall .card-body { padding: .25rem .5rem; }
+  .compact-xsmall .advanced-card { background-clip: padding-box; }
+
+  /* sizing utilities */
+  .xsmall { font-size: .78rem; }
+  .xs { font-size: .72rem; }
+  .fs-7 { font-size: .86rem !important; }
+
+  /* badges */
+  .tiny-badge { font-size: .65rem; padding: .15rem .35rem; border-radius: 6px; }
+
+  /* buttons - sizes */
+  .btn-icon { width: 32px; height: 32px; padding: 0; display:inline-flex; align-items:center; justify-content:center; font-size:14px; gap: var(--btn-gap); border-radius:6px; }
+  .btn-icon-sm { width: 28px; height: 28px; padding:0; font-size:13px; }
+  .btn-icon-sm i, .btn-icon i { line-height:1; }
+  .btn-sm-icon { width:28px; height:28px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:5px; font-size:12px; }
+
+  .btn-xs { padding:.18rem .38rem; font-size:.72rem; border-radius:6px; }
+  .btn-sm { padding: .18rem .36rem; font-size: .78rem; }
+
+  /* input sizes */
+  .input-group-xs .input-group-text { padding: .18rem .35rem; font-size:.78rem; }
+  .form-control-xs, .form-select-xs { padding: .18rem .35rem; font-size: .78rem; height:30px; }
+
+  /* table & rows */
+  .futuristic-table table { min-width: 640px; font-size: .82rem; }
+  .table-row { transition: transform .09s ease, box-shadow .12s ease; border-radius:4px; }
+  .table-row:hover { transform: translateY(-1.5px); background: rgba(14,165,233,0.02); box-shadow: 0 6px 14px rgba(0,0,0,0.04); }
+
+  .status-badge { font-weight:600; font-size: .62rem; padding: .14rem .3rem; }
+
+  /* icons in links */
+  a.xsmall i { font-size:12px; }
+
+  /* modal tiny close */
+  .btn-close.btn-xs { width:26px; height:26px; }
+
+  @media (max-width:820px){
+    .futuristic-table table { min-width:520px; }
+    .advanced-card::before { display:none; }
+  }
+</style>
+
+<!-- NOTE: JS unchanged (UI classes only). -->
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Cached elements
+    const rows = Array.from(document.querySelectorAll('#tableBody tr'));
+    const searchBox = document.getElementById('searchBox');
+    const filterCourse = document.getElementById('filterCourse');
+    const filterClass = document.getElementById('filterClass');
+    const fromDate = document.getElementById('fromDate');
+    const toDate = document.getElementById('toDate');
+    const rowsPerPageEl = document.getElementById('rowsPerPage');
+    const prevPageBtn = document.getElementById('prevPage');
+    const nextPageBtn = document.getElementById('nextPage');
+    const currentPageEl = document.getElementById('currentPage');
+    const totalPagesEl = document.getElementById('totalPages');
+    const totalCountEl = document.getElementById('totalCount');
+    const tableBody = document.getElementById('tableBody');
+    const exportCsvBtn = document.getElementById('exportCsv');
+
+    let filtered = rows.slice();
+    let sortKey = null, sortDir = 1;
+    let currentPage = 1;
+    let rowsPerPage = parseInt(rowsPerPageEl.value, 10);
+
+    // compute status badges based on due date (client-side)
+    const computeStatusBadges = () => {
+      const today = new Date();
+      rows.forEach(r => {
+        const due = new Date(r.dataset.due);
+        const badge = r.querySelector('.status-badge');
+        if (!badge) return;
+        const diff = (Date.UTC(due.getFullYear(), due.getMonth(), due.getDate()) - Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())) / (1000*60*60*24);
+        badge.className = 'badge status-badge';
+        if (diff < 0) { badge.textContent = 'Overdue'; badge.classList.add('overdue'); }
+        else if (diff <= 3) { badge.textContent = 'Due Soon'; badge.classList.add('duesoon'); }
+        else { badge.textContent = 'Upcoming'; badge.classList.add('upcoming'); }
+      });
+    };
+    computeStatusBadges();
+
+    // filtering function
+    function applyFilters() {
+      const q = searchBox.value.trim().toLowerCase();
+      const course = filterCourse.value;
+      const cls = filterClass.value;
+      const from = fromDate.value ? new Date(fromDate.value) : null;
+      const to = toDate.value ? new Date(toDate.value) : null;
+
+      filtered = rows.filter(r => {
+        const title = (r.dataset.title||'').toLowerCase();
+        const courseName = (r.dataset.course||'');
+        const className = (r.dataset.class||'');
+        const due = r.dataset.due ? new Date(r.dataset.due) : null;
+
+        if (q && !(title.includes(q) || courseName.toLowerCase().includes(q) || className.toLowerCase().includes(q))) return false;
+        if (course && course !== courseName) return false;
+        if (cls && cls !== className) return false;
+        if (from && due && due < from) return false;
+        if (to && due && due > to) return false;
+        return true;
+      });
+
+      if (sortKey) applySort(); else render();
+    }
+
+    // render page
+    function render() {
+      // pagination
+      rowsPerPage = parseInt(rowsPerPageEl.value, 10);
+      const totalPages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
+      if (currentPage > totalPages) currentPage = totalPages;
+      const start = (currentPage - 1) * rowsPerPage;
+      const end = start + rowsPerPage;
+
+      tableBody.innerHTML = '';
+      filtered.slice(start, end).forEach(r => tableBody.appendChild(r));
+      currentPageEl.textContent = currentPage;
+      totalPagesEl.textContent = totalPages;
+      totalCountEl.textContent = filtered.length;
+    }
+
+    // sorting by header
+    document.querySelectorAll('th.sortable').forEach(h => {
+      h.style.cursor = 'pointer';
+      h.addEventListener('click', () => {
+        const key = h.dataset.key;
+        if (sortKey === key) sortDir = -sortDir; else { sortKey = key; sortDir = 1; }
+        applySort();
+      });
+    });
+
+    function applySort() {
+      filtered.sort((a,b) => {
+        let va = a.dataset[sortKey] || '';
+        let vb = b.dataset[sortKey] || '';
+        // try parse date or numeric
+        const dateA = Date.parse(va), dateB = Date.parse(vb);
+        if (!isNaN(dateA) && !isNaN(dateB)) return (dateA - dateB) * sortDir;
+        const numA = parseFloat(va), numB = parseFloat(vb);
+        if (!isNaN(numA) && !isNaN(numB)) return (numA - numB) * sortDir;
+        return va.toLowerCase().localeCompare(vb.toLowerCase()) * sortDir;
+      });
+      currentPage = 1;
+      render();
+    }
+
+    // pagination controls
+    prevPageBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage--; render(); }});
+    nextPageBtn.addEventListener('click', () => { const tp = Math.max(1, Math.ceil(filtered.length / rowsPerPage)); if (currentPage < tp) { currentPage++; render(); }});
+    rowsPerPageEl.addEventListener('change', () => { currentPage = 1; render(); });
+
+    // filters events
+    [searchBox, filterCourse, filterClass, fromDate, toDate].forEach(el => el.addEventListener('input', () => { currentPage = 1; applyFilters(); }));
+
+    // preview modal bindings (unchanged)
+    document.querySelectorAll('.previewBtn').forEach(btn => {
+      btn.addEventListener('click', (ev) => {
+        const tr = btn.closest('tr');
+        if (!tr) return;
+        document.getElementById('previewTitle').textContent = tr.dataset.title;
+        document.getElementById('previewCourse').textContent = tr.dataset.course;
+        document.getElementById('previewClass').textContent = tr.dataset.class;
+        document.getElementById('previewDue').textContent = tr.querySelector('.dueDateText').textContent;
+        const statusBadge = document.getElementById('previewStatus');
+        statusBadge.className = 'ms-2 badge';
+        const badgeText = tr.querySelector('.status-badge').textContent;
+        statusBadge.textContent = badgeText;
+        if (badgeText === 'Overdue') statusBadge.classList.add('overdue'); else if (badgeText === 'Due Soon') statusBadge.classList.add('duesoon'); else statusBadge.classList.add('upcoming');
+
+        document.getElementById('previewDescription').textContent = tr.dataset.description || '—';
+        document.getElementById('previewInstructions').textContent = tr.dataset.instructions || '—';
+
+        const fileWrap = document.getElementById('previewFileWrap');
+        const downloadBtn = document.getElementById('downloadFile');
+        if (tr.dataset.filename) {
+          const href = STATIC_UPLOAD_BASE + tr.dataset.filename;
+          fileWrap.innerHTML = `<strong>File:</strong> <a href="${href}" target="_blank">${tr.dataset.original || tr.dataset.filename}</a>`;
+          downloadBtn.href = href;
+          downloadBtn.style.display = 'inline-block';
+        } else {
+          fileWrap.innerHTML = `<small class="text-muted">No file attached</small>`;
+          downloadBtn.style.display = 'none';
+        }
+      });
+    });
+
+    // CSV export (unchanged)
+    exportCsvBtn.addEventListener('click', () => {
+      const visibleRows = filtered;
+      if (visibleRows.length === 0) return alert('No rows to export.');
+      const cols = ['Title','Course','Class','Due Date','Max Score','File'];
+      const csv = [cols.join(',')].concat(visibleRows.map(r => {
+        const file = r.dataset.original || r.dataset.filename || '';
+        return `"${r.dataset.title.replace(/"/g,'""')}","${r.dataset.course.replace(/"/g,'""')}","${r.dataset.class.replace(/"/g,'""')}",` +
+               `"${r.dataset.due}","${r.dataset.maxscore}","${file.replace(/"/g,'""')}"`;
+      })).join('\n');
+
+      const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `assignments_export_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(link); link.click(); link.remove();
+    });
+
+    // admin delete workflow (unchanged)
+    let deleteTargetId = null;
+    document.querySelectorAll('.deleteBtn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        deleteTargetId = btn.dataset.id;
+        const confirmModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+        confirmModal.show();
+      });
+    });
+
+    document.getElementById('confirmDelete').addEventListener('click', async () => {
+      if (!deleteTargetId) return;
+      const endpoint = DELETE_URL + deleteTargetId;
+      try {
+        const resp = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+          body: JSON.stringify({ assignment_id: deleteTargetId })
+        });
+        if (resp.ok) {
+          const tr = document.querySelector(`#tableBody tr[data-id="${deleteTargetId}"]`);
+          if (tr) tr.remove();
+          const idx = rows.findIndex(r => r.dataset.id === deleteTargetId);
+          if (idx >= 0) rows.splice(idx,1);
+          applyFilters();
+        } else {
+          const txt = await resp.text();
+          alert('Delete failed: ' + txt);
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error while deleting.');
+      } finally {
+        deleteTargetId = null;
+        bootstrap.Modal.getInstance(document.getElementById('confirmDeleteModal')).hide();
+      }
+    });
+
+    // initialize view
+    applyFilters();
+  }); // DOMContentLoaded
+</script>
+{% endblock %}

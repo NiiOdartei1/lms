@@ -1,0 +1,198 @@
+{% extends 'student/base_student.html' %}
+{% block title %}My Timetable{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h4 class="mb-3">🗓️ My Timetable — {{ student_class }}</h4>
+
+  <div class="d-flex justify-content-end mb-3">
+    <a href="{{ url_for('student.download_timetable') }}" class="btn btn-primary">📥 Download Timetable (PDF)</a>
+  </div>
+
+  {% if not day_blocks %}
+    <div class="alert alert-info">No timetable available.</div>
+  {% else %}
+
+  <style>
+    :root {
+      --label-width: 120px;
+      --row-height: 64px;
+      --grid-color: #e6e6e6;
+      --grid-thick: #c0c0c0;
+      --break-color: #ffd966;
+    }
+
+    /* header grid uses proportional column widths */
+    .time-header {
+      display: grid;
+      grid-template-columns: {{ col_template }};
+      margin-left: var(--label-width);
+      border-bottom: 2px solid var(--grid-color);
+      background: #f8f9fa;
+    }
+    .time-header div {
+      text-align: center;
+      font-size: 12px;
+      padding: 6px 4px;
+      /* left border removed; we will draw separators in timeline */
+      font-weight:600;
+      box-sizing: border-box;
+    }
+
+    .tt-wrapper { display:flex; flex-direction:column; gap:10px; }
+
+    .day-row {
+      display:flex;
+      align-items:stretch;
+      height: var(--row-height);
+      border:1px solid #ddd;
+      background:#fff;
+      border-radius:8px;
+      overflow:hidden;
+    }
+
+    .day-label {
+      width: var(--label-width);
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+      padding-right:10px;
+      font-weight:700;
+      border-right:2px solid var(--grid-color);
+      background:#fafafa;
+    }
+
+    .timeline {
+      position:relative;
+      flex:1;
+      /* background subtle so header separators show */
+      background: linear-gradient(to right, transparent, transparent);
+    }
+
+    /* vertical separator lines placed absolutely */
+    .timeline .vline {
+      position:absolute;
+      top:0;
+      bottom:0;
+      width:1px;
+      background:var(--grid-color);
+      z-index:2;
+      transform: translateX(-0.5px);
+    }
+    .timeline .vline.thick {
+      width:2px;
+      background:var(--grid-thick);
+      transform: translateX(-1px);
+    }
+
+    .event {
+      position:absolute;
+      top:8px;
+      height: calc(100% - 16px);
+      border-radius:6px;
+      padding:6px 8px;
+      color:#fff;
+      font-weight:700;
+      font-size:13px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      box-shadow:0 2px 6px rgba(0,0,0,0.12);
+      box-sizing:border-box;
+      z-index:3;
+    }
+
+    .event.class { background: linear-gradient(90deg,#6ad07a,#28a745); }
+    .event.break {
+      background: linear-gradient(180deg, var(--break-color), #fff3c2);
+      color:#222;
+      border: 1px solid rgba(0,0,0,0.06);
+    }
+
+    /* small label on hover */
+    .event[data-title]:hover::after {
+      content: attr(data-title);
+      position: absolute;
+      left: 0;
+      top: -28px;
+      background: rgba(0,0,0,0.8);
+      color: #fff;
+      padding:4px 8px;
+      border-radius:4px;
+      font-size:12px;
+      white-space:nowrap;
+      z-index:50;
+    }
+
+    /* responsiveness */
+    @media (max-width: 900px) {
+      :root { --label-width: 96px; --row-height: 54px; }
+      .time-header div { font-size:11px; padding:4px 2px; }
+      .event { font-size:12px; padding:4px 6px; }
+    }
+  </style>
+
+  <!-- header: columns have proportional widths -->
+  <div class="time-header" role="presentation">
+    {% for t in time_ticks %}
+      <div>{{ t.label }}</div>
+    {% endfor %}
+  </div>
+
+  <!-- body -->
+  <div class="tt-wrapper">
+    {% for day, blocks in day_blocks.items() %}
+      <div class="day-row" data-day="{{ day }}">
+        <div class="day-label">{{ day }}</div>
+
+        <div class="timeline" aria-hidden="false">
+          {# vertical separators #}
+          {% for v in vlines %}
+            <div class="vline {% if v.is_thick %}thick{% endif %}" style="left: {{ v.left_pct }}%;"></div>
+          {% endfor %}
+
+          {# events #}
+          {% for ev in blocks %}
+            {% if ev.is_break %}
+              <div class="event break"
+                   data-title="{{ ev.title }} • {{ ev.start_str }} - {{ ev.end_str }}"
+                   style="left: {{ ev.left_pct }}%; width: {{ ev.width_pct }}%;">
+                {{ ev.title }}
+              </div>
+            {% else %}
+              <div class="event class"
+                   data-title="{{ ev.title }} • {{ ev.start_str }} - {{ ev.end_str }}"
+                   style="left: {{ ev.left_pct }}%; width: {{ ev.width_pct }}%;">
+                {{ ev.title }}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="mt-2 text-muted small">
+    Notes: header columns reflect exact time-slot widths (break slots are narrower). Thin lines = 30-min minor divisions; thick lines = full hour boundaries.
+  </div>
+
+  {% endif %}
+</div>
+
+<script>
+  // Highlight current hour/slot visually
+  (function highlightCurrentSlot(){
+    const now = new Date();
+    const minutes = now.getHours()*60 + now.getMinutes();
+    // find the slot index by checking time_ticks data from DOM (we don't pass JS objects; parse labels if needed)
+    // We'll highlight the nearest full-hour column by adding an overlay on the timeline
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const today = days[now.getDay()];
+    const timeline = document.querySelector(`.day-row[data-day="${today}"] .timeline`);
+    if (!timeline) return;
+
+    // find the left position equal to minutes as percent using MIN_START and total_minutes from server is not available in JS.
+    // Instead, we can find the first vline to the right and highlight that column. Simpler: skip exact overlay here (optional).
+  })();
+</script>
+{% endblock %}

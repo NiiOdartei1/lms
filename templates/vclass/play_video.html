@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Watch Video - {{ material.original_name }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --bg-dark: #0f0f0f;
+      --bg-cinema: #000;
+      --text-light: #fff;
+      --text-muted: #aaa;
+      --accent: #ff4444;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-light);
+    }
+
+    .header {
+      padding: 1rem 2rem;
+      font-size: 1.1rem;
+      background: #0f0f0f;
+      font-weight: 500;
+      border-bottom: 1px solid #222;
+    }
+
+    .main-container {
+      display: flex;
+      flex-direction: row;
+      height: calc(100vh - 56px);
+    }
+
+    .video-section {
+      flex: 3;
+      display: flex;
+      flex-direction: column;
+      background-color: black;
+    }
+
+    .video-wrapper {
+      width: 100%;
+      flex-grow: 1;
+      background-color: black;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: all 0.3s ease;
+    }
+
+    .video-wrapper video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: black;
+    }
+
+    .video-wrapper.cinema {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      width: 100vw;
+      z-index: 1000;
+      background-color: var(--bg-cinema);
+    }
+
+    .video-wrapper.mini-player {
+      position: fixed;
+      width: 300px;
+      height: 170px;
+      bottom: 20px;
+      right: 20px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .control-bar {
+      background: #181818;
+      padding: 0.8rem 1.2rem;
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      border-top: 1px solid #222;
+    }
+
+    .control-bar button {
+      background: rgba(30,30,30,0.9);
+      color: white;
+      border: none;
+      padding: 0.6rem 1rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: background 0.2s ease;
+    }
+
+    .control-bar button:hover {
+      background: var(--accent);
+    }
+
+    .sidebar {
+      flex: 1;
+      padding: 1.2rem;
+      overflow-y: auto;
+      background-color: #181818;
+    }
+
+    .sidebar h4 {
+      margin-bottom: 1rem;
+      font-size: 1rem;
+      color: var(--text-light);
+    }
+
+    .related-video {
+      display: flex;
+      gap: 0.8rem;
+      margin-bottom: 1.2rem;
+      text-decoration: none;
+      color: var(--text-muted);
+      transition: background 0.2s ease;
+      padding: 0.5rem;
+      border-radius: 6px;
+    }
+
+    .related-video:hover {
+      background: #222;
+      color: var(--text-light);
+    }
+
+    .related-video video {
+      width: 120px;
+      height: 68px;
+      object-fit: cover;
+      border-radius: 4px;
+      background-color: black;
+    }
+
+    @media (max-width: 768px) {
+      .main-container {
+        flex-direction: column;
+        height: auto;
+      }
+
+      .sidebar {
+        width: 100%;
+        padding: 1rem;
+      }
+
+      .video-wrapper.mini-player {
+        width: 90%;
+        height: auto;
+        bottom: 10px;
+        right: 5%;
+      }
+
+      .control-bar {
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    Watching: {{ material.original_name }}
+  </div>
+
+  <div class="main-container">
+    <!-- Main Video Section -->
+    <div class="video-section">
+      <div class="video-wrapper" id="videoWrapper">
+        <video id="videoPlayer" controls autoplay>
+          <source src="{{ url_for('vclass.stream_material_video', filename=material.filename) }}" type="video/{{ material.file_type }}">
+          Your browser does not support the video tag.
+        </video>
+      </div>
+
+      <!-- Control Bar Below Video -->
+      <div class="control-bar">
+        <button onclick="toggleCinema()">🎬 Cinema</button>
+        <button onclick="toggleFullscreen()">⛶ Fullscreen</button>
+        <button onclick="toggleMini()">🗕 Mini</button>
+      </div>
+    </div>
+
+    <!-- Sidebar with Related Videos -->
+    <div class="sidebar">
+      <h4>Related Videos</h4>
+      {% for vid in related_videos %}
+        <a class="related-video" href="{{ url_for('vclass.play_video', filename=vid.filename) }}">
+          <video muted>
+            <source src="{{ url_for('vclass.stream_material_video', filename=vid.filename) }}" type="video/{{ vid.file_type }}">
+          </video>
+        <strong>{{ vid.original_name[:40] }}{% if vid.original_name|length > 40 %}...{% endif %}</strong><br>
+        <small>{{ vid.upload_date.strftime('%d %b, %Y') }}</small>
+      </div>
+    </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <script>
+    const wrapper = document.getElementById('videoWrapper');
+    const video = document.getElementById('videoPlayer');
+
+    function toggleCinema() {
+      wrapper.classList.toggle('cinema');
+      wrapper.classList.remove('mini-player');
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        wrapper.requestFullscreen().catch(err => console.error(err));
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    function toggleMini() {
+      wrapper.classList.toggle('mini-player');
+      wrapper.classList.remove('cinema');
+    }
+
+    video.addEventListener('click', () => {
+      if (wrapper.classList.contains('mini-player')) {
+        wrapper.classList.remove('mini-player');
+      }
+    });
+  </script>
+
+</body>
+</html>

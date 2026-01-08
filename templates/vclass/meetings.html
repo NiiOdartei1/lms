@@ -1,0 +1,134 @@
+{% extends "vclass/base_vclass.html" %}
+{% block title %}Live Classes{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">Live Classes</h4>
+    <span class="text-muted small">Auto-updates when class goes live</span>
+  </div>
+
+  {% if meetings %}
+  <div class="row g-4">
+
+    {% for m in meetings %}
+    {% set is_live = m.scheduled_start <= now <= m.scheduled_end %}
+    {% set is_upcoming = now < m.scheduled_start %}
+
+    {% set colors = ['primary','success','warning','info','danger','secondary'] %}
+    {% set course_color = colors[loop.index0 % colors|length] %}
+
+    <div class="col-md-6 col-lg-4">
+      <div class="card shadow-sm border-0 h-100 meeting-card"
+           data-start="{{ m.scheduled_start.isoformat() }}"
+           data-end="{{ m.scheduled_end.isoformat() }}"
+           data-live="{{ '1' if is_live else '0' }}">
+
+        <!-- Course header using bootstrap bg-* classes -->
+        <div class="card-header text-white bg-{{ course_color }}">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">{{ m.course.name }}</span>
+            {% if is_live %}
+              <span class="badge bg-danger">LIVE</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="card-body">
+
+          <!-- Teacher avatar + title using Bootstrap bg colors -->
+          {% set avatar_color = colors[(loop.index0 + 2) % colors|length] %}
+          <div class="d-flex align-items-center mb-3">
+            <div class="rounded-circle d-flex align-items-center justify-content-center me-3 bg-{{ avatar_color }} text-white fw-bold"
+                 style="width:42px; height:42px;">
+              {{ m.teacher.full_name[:1] if m.teacher else 'T' }}
+            </div>
+            <div>
+              <div class="fw-semibold">{{ m.title }}</div>
+              <small class="text-muted">
+                {{ m.teacher.full_name if m.teacher else "Instructor" }}
+              </small>
+            </div>
+          </div>
+
+          <!-- Time -->
+          <div class="small text-muted mb-2">
+            🕒 {{ m.scheduled_start.strftime('%d %b %Y %H:%M') }} –
+            {{ m.scheduled_end.strftime('%H:%M') }}
+          </div>
+
+          <!-- Countdown -->
+          {% if is_upcoming %}
+            <div class="countdown text-{{ course_color }} fw-semibold"
+                 data-start="{{ m.scheduled_start.isoformat() }}">
+              Starting soon…
+            </div>
+          {% elif is_live %}
+            <div class="text-{{ course_color }} fw-semibold">
+              Class in progress
+            </div>
+          {% else %}
+            <div class="text-muted">
+              Session ended
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- Action -->
+        <div class="card-footer bg-white border-0">
+          {% if is_live %}
+            <a href="{{ m.join_url }}" target="_blank"
+               class="btn btn-{{ course_color }} w-100">
+              Join Live Class
+            </a>
+          {% elif is_upcoming %}
+            <button class="btn btn-outline-{{ course_color }} w-100" disabled>
+              Not Started
+            </button>
+          {% else %}
+            <button class="btn btn-outline-secondary w-100" disabled>
+              Ended
+            </button>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+    {% endfor %}
+
+  </div>
+  {% else %}
+    <div class="alert alert-info">
+      No live or upcoming classes scheduled.
+    </div>
+  {% endif %}
+
+</div>
+
+<!-- Countdown + Auto Refresh -->
+<script>
+function updateCountdowns() {
+  const now = new Date();
+
+  document.querySelectorAll('.countdown').forEach(el => {
+    const start = new Date(el.dataset.start);
+    const diff = start - now;
+
+    if (diff <= 0) {
+      location.reload(); // auto-refresh when live
+      return;
+    }
+
+    const h = Math.floor(diff / 36e5);
+    const m = Math.floor((diff % 36e5) / 6e4);
+    const s = Math.floor((diff % 6e4) / 1000);
+
+    el.textContent = `Starts in ${h}h ${m}m ${s}s`;
+  });
+}
+
+setInterval(updateCountdowns, 1000);
+updateCountdowns();
+</script>
+{% endblock %}

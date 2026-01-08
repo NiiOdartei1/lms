@@ -1,0 +1,172 @@
+{% extends 'student/base_student.html' %}
+{% block title %}Course Registration{% endblock %}
+
+{% block content %}
+<div class="container my-1">
+  <!-- Page Title -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0"><i class="fas fa-book-open text-primary me-2"></i> Course Registration</h4>
+    {% if registration_deadline %}
+      <span class="badge bg-danger p-2">
+        <i class="fas fa-clock me-1"></i> Deadline: {{ registration_deadline.strftime('%d %b %Y, %H:%M') }}
+      </span>
+    {% endif %}
+  </div>
+
+  <!-- Step 1: Select Semester & Academic Year -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          {{ form.semester.label(class="form-label small fw-semibold text-muted") }}
+          {{ form.semester(class="form-select form-select-sm") }}
+        </div>
+        <div class="col-md-4">
+          {{ form.academic_year.label(class="form-label small fw-semibold text-muted") }}
+          {{ form.academic_year(class="form-select form-select-sm") }}
+        </div>
+      </div>
+
+      {% if deadline_passed %}
+        <div class="alert alert-warning mt-3 small">
+          <i class="fas fa-exclamation-triangle me-1"></i>
+          Course registration is <strong>closed</strong>. Deadline has passed.
+        </div>
+      {% endif %}
+
+      {% if not show_courses %}
+        <form method="POST" class="mt-3">
+          {{ form.hidden_tag() }}
+          <input type="hidden" name="step" value="select_semester">
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="fas fa-arrow-right me-1"></i> Proceed to Course Selection
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if show_courses %}
+    <!-- Toast Notification -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100">
+      {% if registered_courses %}
+        <div id="registration-toast" class="toast align-items-center text-white bg-success border-0 shadow-sm" role="alert">
+          <div class="d-flex">
+            <div class="toast-body small">
+              <i class="fas fa-check-circle me-1"></i> Courses already registered for this semester.
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Step 2: Course Selection -->
+    <form method="POST">
+      {{ form.hidden_tag() }}
+      <input type="hidden" name="step" value="register_courses">
+      <input type="hidden" name="semester" value="{{ form.semester.data }}">
+      <input type="hidden" name="academic_year" value="{{ form.academic_year.data }}">
+
+      <!-- Mandatory Courses -->
+      <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-light small fw-bold text-muted">
+          <i class="fas fa-lock me-1"></i> Mandatory Courses
+        </div>
+        <ul class="list-group list-group-flush">
+          {% for c in mandatory_courses %}
+            <li class="list-group-item small d-flex justify-content-between align-items-center">
+              {{ c.code }} – {{ c.name }}
+              <span class="badge bg-secondary">Mandatory</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <!-- Optional Courses -->
+      {% if optional_courses %}
+        <div class="card shadow-sm border-0 mb-3">
+          <div class="card-header bg-light small fw-bold text-muted">
+            <i class="fas fa-check-square me-1"></i> Select Optional Courses
+          </div>
+          <div class="card-body">
+            {% for c in optional_courses %}
+              <div class="form-check form-check-sm mb-2">
+                <input class="form-check-input"
+                       type="checkbox"
+                       name="courses[]"
+                       value="{{ c.id }}"
+                       id="course-{{ c.id }}"
+                       {% if c.id in form.courses.data %}checked{% endif %}
+                       {% if registered_courses or deadline_passed %}disabled{% endif %}>
+                <label class="form-check-label small" for="course-{{ c.id }}">
+                  {{ c.code }} – {{ c.name }}
+                </label>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Action Buttons -->
+      <div class="d-flex gap-2">
+        {% if registered_courses %}
+          <button formaction="{{ url_for('student.reset_registration') }}"
+                  class="btn btn-warning btn-sm"
+                  type="submit"
+                  {% if deadline_passed %}disabled{% endif %}>
+            <i class="fas fa-redo me-1"></i> Reset Registration
+          </button>
+        {% else %}
+          {% if not deadline_passed %}
+            {{ form.submit(class="btn btn-primary btn-sm") }}
+          {% else %}
+            <button class="btn btn-secondary btn-sm" disabled>
+              <i class="fas fa-lock me-1"></i> Registration Closed
+            </button>
+          {% endif %}
+        {% endif %}
+      </div>
+    </form>
+
+    <!-- Already Registered Courses -->
+    {% if registered_courses %}
+      <div class="card shadow-sm border-0 mt-4">
+        <div class="card-header bg-light small fw-bold text-muted">
+          <i class="fas fa-list me-1"></i> Registered Courses
+        </div>
+        <ul class="list-group list-group-flush">
+          {% for r in registered_courses %}
+            <li class="list-group-item small d-flex justify-content-between align-items-center">
+              {{ r.course.code }} – {{ r.course.name }}
+              <span class="badge {{ 'bg-secondary' if r.course.is_mandatory else 'bg-success' }}">
+                {{ 'Mandatory' if r.course.is_mandatory else 'Optional' }}
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+        <div class="card-body">
+          <a href="{{ url_for('student.download_registered_courses_pdf',
+                              semester=form.semester.data,
+                              academic_year=form.academic_year.data) }}"
+             class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-file-pdf me-1"></i> Download Registered Courses (PDF)
+          </a>
+        </div>
+      </div>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const toastEl = document.getElementById('registration-toast');
+    if (toastEl) {
+      const toast = new bootstrap.Toast(toastEl, { delay: 4000 });
+      toast.show();
+    }
+  });
+</script>
+{% endblock %}

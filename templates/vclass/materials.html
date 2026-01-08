@@ -1,0 +1,157 @@
+{% extends 'vclass/base_vclass.html' %}
+{% block title %}Materials — {{ course_name }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+<style>
+  .file-row { transition: background .08s ease; }
+  .file-row:hover { background: #fbfbfb; }
+  .thumbnail { width:120px; height:70px; object-fit:cover; border-radius:6px; }
+</style>
+
+<div class="container py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="mb-0">{{ course_name }}</h4>
+      <div class="small text-muted">Materials for this course</div>
+    </div>
+    <div>
+      <a href="{{ url_for('vclass.materials_overview') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-arrow-left me-1"></i> Back to courses
+      </a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <!-- Search + filter (optional) -->
+      <div class="row mb-3 g-2">
+        <div class="col-md-6"><input id="materialSearch" class="form-control" placeholder="Search files"></div>
+        <div class="col-md-3"><select id="filter-type" class="form-select"><option value="">All types</option><option val="pdf">PDF</option><option val="image">Image</option><option val="video">Video</option><option val="doc">Doc</option></select></div>
+        <div class="col-md-3 text-end"><button id="resetBtn" class="btn btn-sm btn-outline-secondary">Reset</button></div>
+      </div>
+
+      <div id="materials-list">
+        <!-- rows inserted by JS -->
+      </div>
+
+      <div id="no-materials" class="text-center text-muted d-none mt-3">No materials found.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Preview Modal (same as before) -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="previewModalLabel">Preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body"><div id="preview-body" style="min-height:360px" class="d-flex align-items-center justify-content-center"></div></div>
+      <div class="modal-footer">
+        <a id="preview-download" class="btn btn-outline-primary" target="_blank">Download</a>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- data -->
+<div id="data-container" data-materials='{{ materials | tojson }}' style="display:none"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const materials = JSON.parse(document.getElementById('data-container').dataset.materials || '[]');
+  const list = document.getElementById('materials-list');
+  const noMaterials = document.getElementById('no-materials');
+
+  function fileIcon(m) {
+    const ext = (m.file_type || '').toLowerCase();
+    if (['jpg','jpeg','png','gif','bmp','svg','webp'].includes(ext)) return `<img src="/vclass/preview/materials/${encodeURIComponent(m.filename)}" class="thumbnail">`;
+    if (ext === 'pdf') return '<i class="fas fa-file-pdf fa-2x text-danger"></i>';
+    if (['doc','docx'].includes(ext)) return '<i class="fas fa-file-word fa-2x text-primary"></i>';
+    if (['ppt','pptx'].includes(ext)) return '<i class="fas fa-file-powerpoint fa-2x text-warning"></i>';
+    if (['mp4','webm','ogg'].includes(ext)) return '<i class="fas fa-video fa-2x text-dark"></i>';
+    return '<i class="fas fa-file fa-2x text-muted"></i>';
+  }
+
+  function rowHtml(m) {
+    return `
+      <div class="d-flex align-items-center gap-3 py-2 file-row border-bottom">
+        <div>${fileIcon(m)}</div>
+        <div class="flex-grow-1">
+          <div class="fw-semibold">${(m.original_name||'').replace(/</g,'&lt;')}</div>
+          <div class="small text-muted">${m.course_name || ''} • ${m.uploaded_at ? new Date(m.uploaded_at).toLocaleDateString() : ''}</div>
+        </div>
+        <div class="text-end">
+          <button class="btn btn-sm btn-outline-secondary preview-btn" data-file="${encodeURIComponent(m.filename)}" data-type="${m.file_type}">Preview</button>
+          <a class="btn btn-sm btn-primary ms-2" href="/vclass/download/materials/${encodeURIComponent(m.filename)}" target="_blank">Download</a>
+        </div>
+      </div>
+    `;
+  }
+
+  function render(items) {
+    list.innerHTML = '';
+    if (!items.length) {
+      noMaterials.classList.remove('d-none');
+      return;
+    }
+    noMaterials.classList.add('d-none');
+    items.forEach(m => list.insertAdjacentHTML('beforeend', rowHtml(m)));
+  }
+
+  render(materials);
+
+  // preview handlers
+  document.addEventListener('click', (e) => {
+    if (!e.target.classList.contains('preview-btn')) return;
+    const filename = decodeURIComponent(e.target.dataset.file);
+    const type = (e.target.dataset.type || '').toLowerCase();
+    // videos: redirect to player
+    if (['mp4','webm','ogg'].includes(type)) {
+      window.location.href = `/vclass/material/video/${filename}`;
+      return;
+    }
+
+    const previewUrl = `/vclass/preview/materials/${filename}`;
+    const previewBody = document.getElementById('preview-body');
+    document.getElementById('previewModalLabel').innerText = filename;
+    document.getElementById('preview-download').href = `/vclass/download/materials/${filename}`;
+    previewBody.innerHTML = '<div class="text-muted">Loading preview…</div>';
+
+    if (type === 'pdf') {
+      previewBody.innerHTML = `<iframe src="${previewUrl}" width="100%" height="600" style="border:0"></iframe>`;
+    } else if (['jpg','jpeg','png','gif','bmp','svg','webp'].includes(type)) {
+      previewBody.innerHTML = `<img src="${previewUrl}" style="max-width:100%; max-height:70vh; border-radius:8px">`;
+    } else {
+      previewBody.innerHTML = `<div class="text-center text-muted">Preview not available. <a href="${previewUrl}" target="_blank">Open</a> or download.</div>`;
+    }
+
+    new bootstrap.Modal(document.getElementById('previewModal')).show();
+  });
+
+  // simple local filtering
+  const search = document.getElementById('materialSearch');
+  const filterType = document.getElementById('filter-type');
+  const resetBtn = document.getElementById('resetBtn');
+
+  function applyFilters() {
+    const q = (search.value || '').trim().toLowerCase();
+    const t = filterType.value;
+    const filtered = materials.filter(m => {
+      const ext = (m.file_type || '').toLowerCase();
+      const matchesType = !t || (t==='video' && ['mp4','webm','ogg'].includes(ext)) || (t==='pdf' && ext==='pdf') || (t==='image' && ['jpg','jpeg','png','gif','bmp','svg','webp'].includes(ext));
+      const matchesQuery = !q || ((m.original_name||'').toLowerCase().includes(q));
+      return matchesType && matchesQuery;
+    });
+    render(filtered);
+  }
+
+  search.addEventListener('input', applyFilters);
+  filterType.addEventListener('change', applyFilters);
+  resetBtn.addEventListener('click', () => { search.value=''; filterType.value=''; render(materials); });
+});
+</script>
+{% endblock %}

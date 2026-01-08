@@ -1,0 +1,39 @@
+{% extends "student/base_student.html" %}
+{% block content %}
+
+<div class="container mt-4">
+  <h3 class="fw-bold">
+    Results – {{ academic_year }} ({{ semester }})
+  </h3>
+
+  <table class="table table-bordered mt-3">
+    <thead class="table-dark">
+      <tr>
+        <th>Course</th>
+        <th>Score</th>
+        <th>Grade</th>
+        <th>Credit Hours</th>
+        <th>Points</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in results %}
+      <tr>
+        <td>{{ r.course.name }}</td>
+        <td>{{ r.score }}</td>
+        <td class="fw-bold">{{ r.grade }}</td>
+        <td>{{ r.credit_hours }}</td>
+        <td>{{ r.points }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" class="text-center text-muted">
+          No results available
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

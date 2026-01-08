@@ -1,0 +1,750 @@
+{% extends 'vclass/base_vclass.html' %}
+{% block title %}Take Quiz – {{ quiz_json.title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 v-quiz">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 id="quiz-title" class="mb-0">{{ quiz_json.title }}</h4>
+
+    <div class="text-end">
+      <div id="timer-wrapper" role="timer" aria-atomic="true" aria-live="polite" class="small text-muted">
+        <div><strong>Time Left:</strong></div>
+        <div id="timer" class="fw-bold fs-5 text-danger" aria-label="Time remaining">--:--</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mb-3 gx-3">
+    <div class="col-lg-8">
+      <div class="progress mb-2" id="progress-bar" role="progressbar"
+           aria-valuemin="0" aria-valuemax="{{ quiz_json.questions|length }}" aria-valuenow="0"
+           style="height:28px; background:#e9f7ee;">
+        <div id="progress-inner" class="progress-bar" style="width:0%; display:flex; align-items:center; justify-content:center; background:var(--v-accent);">
+          <span id="progress-text">0/{{ quiz_json.questions|length }} (0%)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4 text-lg-end">
+      <div class="d-inline-block me-3">
+        <div class="small text-muted">Total</div>
+        <div id="summary-total" class="fw-bold">{{ quiz_json.questions|length }}</div>
+      </div>
+      <div class="d-inline-block me-3">
+        <div class="small text-muted">Answered</div>
+        <div id="summary-answered" class="fw-bold">0</div>
+      </div>
+      <div class="d-inline-block">
+        <div class="small text-muted">Unanswered</div>
+        <div id="summary-unanswered" class="fw-bold">{{ quiz_json.questions|length }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-9">
+      <!-- keep one server-rendered csrf_token hidden so non-JS fallbacks work -->
+      <form id="quiz-form" method="POST" action="{{ url_for('vclass.submit_quiz', quiz_id=quiz_json.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div id="questions-container" class="mb-4" aria-live="polite"></div>
+
+        <nav class="mt-2" aria-label="Quiz Navigation">
+          <ul class="pagination justify-content-center" id="pagination"></ul>
+        </nav>
+
+        <div id="submit-container" class="text-end mt-3">
+          <button type="submit" class="btn btn-success" id="submit-btn">Submit Quiz</button>
+        </div>
+      </form>
+    </div>
+
+    <aside class="col-lg-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h6 class="card-title mb-2">Question Palette</h6>
+          <div class="small text-muted mb-2">Click a number to jump to that question. Green = answered.</div>
+          <div id="question-palette" class="d-grid gap-2" style="grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));"></div>
+
+          <div class="mt-3 small text-muted">
+            Legend:
+            <span class="badge bg-success me-1">Answered</span>
+            <span class="badge bg-light border text-dark me-1">Unanswered</span>
+            <span class="badge" style="background:var(--v-accent); color:#fff;">Current</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script id="quiz-data" type="application/json">{{ quiz_json | tojson }}</script>
+
+<script>
+(() => {
+  'use strict';
+
+  // -----------------------
+  // Safe parse of quiz JSON
+  // -----------------------
+  let quiz;
+  try {
+    quiz = JSON.parse(document.getElementById('quiz-data').textContent || '{}');
+  } catch (err) {
+    console.error('Invalid quiz JSON', err);
+    // If quiz data isn't present we stop early to avoid runtime errors
+    return;
+  }
+
+  // -----------------------
+  // Config / state
+  // -----------------------
+  const quizId = quiz && quiz.id;
+  const duration = ((quiz && quiz.duration_minutes) || 0) * 60; // seconds
+  const perPage = 5;
+  const questions = Array.isArray(quiz.questions) ? quiz.questions : [];
+  const totalQuestions = questions.length; // ✅ this is per quiz
+  const totalPages = Math.max(1, Math.ceil(totalQuestions / perPage));
+  let currentPage = 1;
+  const answers = {}; // keyed by question id -> string | number | array
+  const LS_KEY = `vclass_quiz_answers_${quizId}`;
+  if (summaryTotal) summaryTotal.textContent = totalQuestions;
+  if (summaryUnanswered) summaryUnanswered.textContent = totalQuestions - answeredCount;
+
+  // -----------------------
+  // DOM references
+  // -----------------------
+  const timerEl = document.getElementById('timer');
+  const questionsContainer = document.getElementById('questions-container');
+  const paginationEl = document.getElementById('pagination');
+  const progressInner = document.getElementById('progress-inner');
+  const progressText = document.getElementById('progress-text');
+  const summaryAnswered = document.getElementById('summary-answered');
+  const summaryUnanswered = document.getElementById('summary-unanswered');
+  const paletteEl = document.getElementById('question-palette');
+  const form = document.getElementById('quiz-form');
+
+  // Fail fast if essential DOM missing
+  if (!form || !questionsContainer || !paginationEl || !paletteEl) {
+    console.warn('Quiz: essential DOM elements missing - aborting UI init.');
+    return;
+  }
+
+  // -----------------------
+  // CSRF helpers
+  // -----------------------
+  function getCsrfToken() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    if (meta && meta.content) return meta.content;
+    const hidden = document.querySelector('input[name="csrf_token"]');
+    if (hidden) return hidden.value;
+    return '';
+  }
+
+  async function csrfFetch(url, opts = {}) {
+    opts = Object.assign({}, opts);
+    opts.headers = Object.assign({}, opts.headers || {});
+
+    // set JSON content-type for non-FormData bodies
+    if (opts.body && !(opts.body instanceof FormData) && !opts.headers['Content-Type']) {
+      opts.headers['Content-Type'] = 'application/json';
+    }
+
+    const token = getCsrfToken();
+    if (token) {
+      // include common CSRF header names that Flask-WTF recognizes
+      opts.headers['X-CSRFToken'] = token;
+      opts.headers['X-CSRF-Token'] = token;
+    }
+
+    opts.credentials = opts.credentials || 'include';
+    try {
+      return await fetch(url, opts);
+    } catch (err) {
+      // bubble up to callers who handle network errors
+      throw err;
+    }
+  }
+
+  // -----------------------
+  // Utility: debounce
+  // -----------------------
+  function debounce(fn, wait = 300) {
+    let timer = null;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), wait);
+    };
+  }
+
+  // -----------------------
+  // Autosave (debounced)
+  // -----------------------
+  const autosaveNetwork = debounce(async (qid, value) => {
+    try {
+      const payload = { quiz_id: quizId, question_id: qid, selected_option_id: null, answer_text: null };
+
+      if (Array.isArray(value)) {
+        payload.answer_text = JSON.stringify(value);
+      } else if (typeof value === 'number' || (!isNaN(value) && String(value).trim() !== '')) {
+        // store numeric option id when possible
+        payload.selected_option_id = (typeof value === 'number') ? value : (isNaN(Number(value)) ? null : Number(value));
+        if (payload.selected_option_id === null) payload.answer_text = String(value);
+      } else {
+        payload.answer_text = value != null ? String(value) : null;
+      }
+
+      await csrfFetch('{{ url_for("vclass.autosave_answer") }}', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    } catch (err) {
+      console.warn('Autosave failed (network):', err);
+    }
+  }, 300);
+
+  // -----------------------
+  // Local persistence
+  // -----------------------
+  function persistLocal() {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(answers));
+    } catch (e) {
+      // ignore localStorage errors silently (e.g. quota)
+    }
+  }
+
+  function saveAnswer(qid, val) {
+    answers[qid] = val;
+    persistLocal();
+    autosaveNetwork(qid, val);
+    updateProgress();
+    updatePalette();
+  }
+
+  // -----------------------
+  // Initialization flow
+  // -----------------------
+  (async function initFlow() {
+    // 1) Has user already submitted? If yes redirect to dashboard.
+    try {
+      const submittedRes = await csrfFetch('{{ url_for("vclass.has_submitted", quiz_id=quiz_json.id) }}', { method: 'GET' });
+      if (submittedRes.ok) {
+        const j = await submittedRes.json();
+        if (j && j.submitted) {
+          window.location.href = "{{ url_for('vclass.dashboard') }}";
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('has-submitted check failed', e);
+    }
+
+    // 2) Restore saved answers (server first, fallback to localStorage)
+    try {
+      const res = await csrfFetch('{{ url_for("vclass.get_saved_answers", quiz_id=quiz_json.id) }}', { method: 'GET' });
+      if (res.ok) {
+        const serverAnswers = await res.json();
+        if (serverAnswers && Object.keys(serverAnswers).length) {
+          Object.assign(answers, serverAnswers);
+        } else {
+          const ls = localStorage.getItem(LS_KEY);
+          if (ls) Object.assign(answers, JSON.parse(ls) || {});
+        }
+      } else {
+        const ls = localStorage.getItem(LS_KEY);
+        if (ls) Object.assign(answers, JSON.parse(ls) || {});
+      }
+    } catch (e) {
+      console.warn('Failed to fetch saved answers', e);
+      const ls = localStorage.getItem(LS_KEY);
+      if (ls) Object.assign(answers, JSON.parse(ls) || {});
+    }
+
+    // 3) Get or create start time
+    // Server may have injected a session-provided start time (first 19 chars to avoid timezone mess)
+    const serverStartStr = "{{ session.get('quiz_' ~ quiz_json.id ~ '_start_time','')[:19] }}";
+    let serverStartTime = null;
+    try {
+      if (serverStartStr && serverStartStr.trim() !== '') {
+        serverStartTime = new Date(serverStartStr + 'Z'); // append Z to treat as UTC
+        if (isNaN(serverStartTime.getTime())) serverStartTime = null;
+      }
+    } catch (e) {
+      serverStartTime = null;
+    }
+
+    if (!serverStartTime) {
+      // Ask server to start timer (server will set session and we reload to get consistent template values)
+      try {
+        const startRes = await csrfFetch('{{ url_for("vclass.start_quiz_timer", quiz_id=quiz_json.id) }}', {
+          method: 'POST',
+          body: JSON.stringify({})
+        });
+        if (startRes.ok) {
+          return window.location.reload();
+        } else {
+          console.warn('start_quiz_timer returned non-ok; continuing without server-start reload');
+        }
+      } catch (e) {
+        console.warn('Failed to start timer', e);
+      }
+    }
+
+    initUI(serverStartTime);
+  })();
+
+  // -----------------------
+  // UI init and renderers
+  // -----------------------
+  function initUI(serverStartTime) {
+    renderPalette();
+    renderQuestions(currentPage);
+    renderPagination();
+    updateProgress();
+
+    // If server provided start time, start countdown
+    if (serverStartTime instanceof Date && !isNaN(serverStartTime.getTime())) {
+      startCountdown(serverStartTime);
+    } else {
+      // fallback: check again for embedded session start string (rare)
+      try {
+        const altStartStr = "{{ session.get('quiz_' ~ quiz_json.id ~ '_start_time','')[:19] }}";
+        if (altStartStr && altStartStr.trim() !== '') {
+          const alt = new Date(altStartStr + 'Z');
+          if (!isNaN(alt.getTime())) startCountdown(alt);
+        }
+      } catch (e) { /* ignore */ }
+    }
+  }
+
+  // -----------------------
+  // Palette (question jump grid)
+  // -----------------------
+  function renderPalette() {
+    paletteEl.innerHTML = '';
+    for (let i = 0; i < totalQuestions; i++) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-sm border palette-btn unanswered';
+      btn.style.minHeight = '40px';
+      btn.style.minWidth = '42px';
+      btn.setAttribute('data-idx', i);
+      btn.setAttribute('aria-label', `Question ${i + 1}`);
+      btn.textContent = String(i + 1);
+
+      btn.addEventListener('click', () => {
+        const page = Math.floor(i / perPage) + 1;
+        renderQuestions(page);
+        // focus first input on new page
+        setTimeout(() => {
+          const first = questionsContainer.querySelector('input, textarea');
+          if (first) first.focus();
+        }, 40);
+      });
+
+      paletteEl.appendChild(btn);
+    }
+    updatePalette();
+  }
+
+  function updatePalette() {
+    const btns = Array.from(paletteEl.querySelectorAll('button'));
+    const curStart = (currentPage - 1) * perPage;
+    const curEnd = curStart + perPage - 1;
+
+    btns.forEach((btn, idx) => {
+      const q = questions[idx];
+      btn.classList.remove('current');
+      const ans = q && answers[q.id];
+      const answered = ans !== undefined && ans !== null && (Array.isArray(ans) ? ans.some(x => String(x).trim() !== '') : String(ans).trim() !== '');
+      btn.classList.toggle('answered', answered);
+      btn.classList.toggle('unanswered', !answered);
+      btn.setAttribute('aria-pressed', answered ? 'true' : 'false');
+      if (idx >= curStart && idx <= curEnd) btn.classList.add('current');
+    });
+
+    const answeredCount = Object.keys(answers).filter(k => {
+      const v = answers[k];
+      return v !== undefined && v !== null && (Array.isArray(v) ? v.some(x => String(x).trim() !== '') : String(v).trim() !== '');
+    }).length;
+
+    if (summaryAnswered) summaryAnswered.textContent = String(answeredCount);
+    if (summaryUnanswered) summaryUnanswered.textContent = String(Math.max(0, totalQuestions - answeredCount));
+    const progressBar = document.getElementById('progress-bar');
+    if (progressBar) progressBar.setAttribute('aria-valuenow', String(answeredCount));
+  }
+
+  // -----------------------
+  // Render questions for a page
+  // -----------------------
+  function renderQuestions(page) {
+  currentPage = Math.min(Math.max(1, page), totalPages);
+  questionsContainer.innerHTML = '';
+
+  const start = (currentPage - 1) * perPage;
+  const end = Math.min(start + perPage, totalQuestions);
+
+  for (let i = start; i < end; i++) {
+    const q = questions[i];
+    if (!q) continue;
+    const block = document.createElement('div');
+    block.className = 'mb-3 p-3 border rounded';
+
+    // Question header
+    const header = document.createElement('div');
+    header.className = 'mb-2';
+    header.innerHTML = `<strong>Question ${i + 1}:</strong>`;
+    block.appendChild(header);
+
+    // Question text
+    if (q.question_text) {
+      const qText = document.createElement('div');
+      qText.className = 'mb-2';
+      qText.innerHTML = q.question_text;
+      block.appendChild(qText);
+    }
+
+    const qType = (q.question_type || '').toLowerCase();
+
+    // ------------------------
+    // Multiple Choice (single)
+    // ------------------------
+    if ((qType === 'mcq' || qType === 'multiple_choice' || qType === 'multiple-choice') && Array.isArray(q.options)) {
+      q.options.forEach(opt => {
+        const wrap = document.createElement('div');
+        wrap.className = 'form-check';
+
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = `answers[${q.id}]`;
+        radio.id = `q${q.id}_o${opt.id}`;
+        radio.value = opt.id;
+        radio.className = 'form-check-input';
+        radio.setAttribute('data-qid', q.id);
+
+        // NEVER prefill for new attempt
+        radio.checked = false;
+
+        radio.addEventListener('change', () => {
+          const parsed = (typeof opt.id === 'number' || (!isNaN(opt.id) && String(opt.id).trim() !== '')) 
+                         ? (isNaN(opt.id) ? opt.id : parseInt(opt.id, 10)) 
+                         : opt.id;
+          saveAnswer(q.id, parsed);
+        });
+
+        const label = document.createElement('label');
+        label.htmlFor = radio.id;
+        label.className = 'form-check-label';
+        label.innerHTML = opt.text || '';
+
+        wrap.appendChild(radio);
+        wrap.appendChild(label);
+        block.appendChild(wrap);
+      });
+    }
+
+    // ------------------------
+    // Fill-in-the-blank / multi-blank
+    // ------------------------
+    else if (['fill_blank', 'multi_blank', 'fill_in', 'fill-in', 'fill_in_blank', 'multi-blank'].includes(qType)) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'mb-3';
+
+      const numBlanks = (String(q.question_text || '').match(/_{3,}|_____/g) || []).length || 1;
+
+      for (let idx = 0; idx < numBlanks; idx++) {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'form-control my-2';
+        input.name = `answers[${q.id}][]`;
+        input.setAttribute('data-qid', q.id);
+        input.setAttribute('data-idx', idx);
+        input.placeholder = `Answer for blank ${idx + 1}`;
+        input.value = ''; // always empty
+
+        input.addEventListener('input', (e) => {
+          const i = parseInt(e.target.getAttribute('data-idx'), 10);
+          if (!Array.isArray(answers[q.id])) answers[q.id] = [];
+          answers[q.id][i] = e.target.value;
+          saveAnswer(q.id, answers[q.id]);
+        });
+
+        wrapper.appendChild(input);
+      }
+
+      block.appendChild(wrapper);
+    }
+
+    // ------------------------
+    // Short / manual answer
+    // ------------------------
+    else if (qType === 'manual' || qType === 'short_answer' || qType === 'text') {
+      const ta = document.createElement('textarea');
+      ta.className = 'form-control';
+      ta.name = `answers[${q.id}]`;
+      ta.rows = (q.expected_length && q.expected_length > 100) ? 4 : 2;
+      ta.placeholder = 'Type your answer here...';
+      ta.value = ''; // always empty
+
+      ta.addEventListener('input', (e) => {
+        saveAnswer(q.id, e.target.value);
+      });
+
+      block.appendChild(ta);
+    }
+
+    // ------------------------
+    // Unsupported type fallback
+    // ------------------------
+    else {
+      const unsupported = document.createElement('div');
+      unsupported.className = 'text-muted';
+      unsupported.textContent = 'Unsupported question type.';
+      block.appendChild(unsupported);
+    }
+
+    questionsContainer.appendChild(block);
+  }
+
+  renderPagination();
+  updatePalette();
+}
+
+  // -----------------------
+  // Pagination
+  // -----------------------
+  function renderPagination() {
+    paginationEl.innerHTML = '';
+
+    function makeLi(pageNum, text, disabled = false, active = false) {
+      const li = document.createElement('li');
+      li.className = 'page-item' + (disabled ? ' disabled' : '') + (active ? ' active' : '');
+      const pageStartIdx = (pageNum - 1) * perPage;
+      const q = questions[pageStartIdx];
+      if (q && answers[q.id] !== undefined && answers[q.id] !== null) li.classList.add('bg-success', 'text-white');
+
+      const a = document.createElement('a');
+      a.className = 'page-link';
+      a.href = '#';
+      a.textContent = text || String(pageNum);
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (!disabled) renderQuestions(pageNum);
+      });
+      li.appendChild(a);
+      return li;
+    }
+
+    paginationEl.appendChild(makeLi(currentPage - 1, '« Prev', currentPage === 1));
+    for (let p = 1; p <= totalPages; p++) paginationEl.appendChild(makeLi(p, null, false, p === currentPage));
+    paginationEl.appendChild(makeLi(currentPage + 1, 'Next »', currentPage === totalPages));
+  }
+
+  // -----------------------
+  // Progress bar update
+  // -----------------------
+  function updateProgress() {
+    const quizQuestionIds = questions.map(q => q.id);
+    const answeredCount = quizQuestionIds.filter(qid => {
+      const v = answers[qid];
+      if (v === undefined || v === null) return false;
+      if (Array.isArray(v)) return v.some(x => String(x).trim() !== '');
+      return String(v).trim() !== '';
+    }).length;
+
+    const totalQuestions = quizQuestionIds.length;
+    const percent = totalQuestions ? Math.round((answeredCount / totalQuestions) * 100) : 0;
+
+    if (progressInner) progressInner.style.width = percent + '%';
+    if (progressText) progressText.textContent = `${answeredCount}/${totalQuestions} (${percent}%)`;
+
+    const progressBar = document.getElementById('progress-bar');
+    if (progressBar) progressBar.setAttribute('aria-valuenow', String(answeredCount));
+
+    if (summaryAnswered) summaryAnswered.textContent = String(answeredCount);
+    if (summaryUnanswered) summaryUnanswered.textContent = String(Math.max(0, totalQuestions - answeredCount));
+  }
+
+  // -----------------------
+  // Form helpers & CSRF preservation
+  // -----------------------
+  function removeAutogenInputs() {
+    document.querySelectorAll('input[data-autogen="true"]').forEach(n => n.remove());
+  }
+
+  function injectAnswersIntoForm() {
+    removeAutogenInputs();
+
+    Object.entries(answers).forEach(([qid, val]) => {
+      if (Array.isArray(val)) {
+        val.forEach(v => {
+          const hidden = document.createElement('input');
+          hidden.type = 'hidden';
+          hidden.name = `answers[${qid}][]`;
+          hidden.value = v == null ? '' : String(v);
+          hidden.setAttribute('data-autogen', 'true');
+          form.appendChild(hidden);
+        });
+      } else {
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = `answers[${qid}]`;
+        hidden.value = val == null ? '' : String(val);
+        hidden.setAttribute('data-autogen', 'true');
+        form.appendChild(hidden);
+      }
+    });
+  }
+
+  function ensureCsrfInput() {
+    const metaToken = getCsrfToken();
+    // prefer server-rendered hidden input if present; otherwise create one
+    let existing = form.querySelector('input[name="csrf_token"]');
+    if (existing) {
+      if (metaToken && existing.value !== metaToken) existing.value = metaToken;
+    } else {
+      const csrf = document.createElement('input');
+      csrf.type = 'hidden';
+      csrf.name = 'csrf_token';
+      csrf.value = metaToken || '';
+      // mark as not autogen so removeAutogenInputs won't remove it
+      form.appendChild(csrf);
+    }
+  }
+
+  function disableInteractiveControlsExceptHidden() {
+    const all = form.querySelectorAll('input, textarea, button, select');
+    all.forEach(el => {
+      const tag = el.tagName.toLowerCase();
+      if (tag === 'input') {
+        const t = (el.getAttribute('type') || '').toLowerCase();
+        if (t === 'hidden') return; // keep hidden inputs enabled
+      }
+      if (tag === 'textarea') {
+        try { el.readOnly = true; } catch (e) {}
+        return;
+      }
+      try { el.disabled = true; } catch (e) {}
+    });
+  }
+
+  // -----------------------
+  // Form submit
+  // -----------------------
+  form.addEventListener('submit', (e) => {
+    injectAnswersIntoForm();
+    ensureCsrfInput();
+
+    const unanswered = totalQuestions - Object.keys(answers).filter(k => {
+      const v = answers[k];
+      return v !== undefined && v !== null && (Array.isArray(v) ? v.some(x => String(x).trim() !== '') : String(v).trim() !== '');
+    }).length;
+
+    if (unanswered > 0) {
+      if (!confirm(`You have ${unanswered} unanswered question(s). Submit anyway?`)) {
+        e.preventDefault();
+        return;
+      }
+    }
+    // otherwise allow normal form submission (server expects form-encoded POST + CSRF token)
+  });
+
+  // -----------------------
+  // Timer / auto-submit
+  // -----------------------
+  function startCountdown(startTime) {
+    if (!(startTime instanceof Date) || isNaN(startTime.getTime())) {
+      console.error('Invalid startTime provided to startCountdown', startTime);
+      return;
+    }
+
+    let ticking = true;
+
+    (function tick() {
+      if (!ticking) return;
+      const now = new Date();
+      const elapsed = Math.floor((now - startTime) / 1000);
+      const left = duration - elapsed;
+
+      if (left <= 0) {
+        if (timerEl) timerEl.textContent = '00:00';
+        try {
+          injectAnswersIntoForm();
+          ensureCsrfInput();
+          disableInteractiveControlsExceptHidden();
+
+          setTimeout(() => {
+            const csrfVal = getCsrfToken();
+            if (!csrfVal) {
+              console.error('CSRF token missing at auto-submit time; aborting auto-submit');
+              alert('Unable to auto-submit: CSRF token is missing. Please manually submit your quiz.');
+              return;
+            }
+            form.submit();
+          }, 250);
+        } catch (err) {
+          console.error('Auto-submit failed:', err);
+          alert('Auto-submit failed. Please manually submit your quiz.');
+        }
+        ticking = false;
+        return;
+      }
+
+      if (timerEl) timerEl.textContent = formatTime(left);
+      setTimeout(tick, 1000);
+    })();
+  }
+
+  function formatTime(sec) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (h > 0) return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  // -----------------------
+  // Expose debug helpers (optional)
+  // -----------------------
+  window.vclass_quiz = {
+    answers,
+    saveAnswer,
+    injectAnswersIntoForm,
+    ensureCsrfInput,
+    persistLocal
+  };
+
+})();
+</script>
+
+<style>
+#question-palette .palette-btn {
+  border-radius: 6px;
+  min-width: 42px;
+  min-height: 42px;
+  font-weight: 700;
+  padding: 6px 8px;
+  transition: background .18s ease, transform .12s ease, box-shadow .12s ease;
+}
+#question-palette .palette-btn.unanswered {
+  background-color: #f8f9fa;
+  color: #212529;
+  border-color: rgba(0,0,0,0.06);
+}
+#question-palette .palette-btn.answered {
+  background-color: #198754;
+  color: #fff;
+  border-color: #198754;
+}
+#question-palette .palette-btn.current {
+  background-color: var(--v-accent, #0d6efd);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(13,110,253,0.12);
+  transform: translateY(-2px);
+}
+#question-palette .palette-btn:focus,
+#question-palette .palette-btn:hover { outline: none; filter: brightness(0.96); }
+.progress-bar { transition: width .4s ease; }
+.blank-input { min-width: 140px; }
+</style>
+{% endblock %}

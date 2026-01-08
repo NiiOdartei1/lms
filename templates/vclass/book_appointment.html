@@ -1,0 +1,48 @@
+{% extends 'vclass/base_vclass.html' %}
+{% block title %}Book Appointment{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <h4 class="mb-4 text-primary">📅 Book an Appointment</h4>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <form method="POST" class="card shadow-sm p-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="mb-3">
+      <label for="slot_id" class="form-label">Select an Available Slot</label>
+      <select name="slot_id" class="form-select" required>
+        <option value="">-- Choose a Slot --</option>
+        {% for slot in slots %}
+          <option value="{{ slot.id }}">
+            {{ slot.date.strftime('%A, %d %B %Y') }} | 
+            {{ slot.start_time.strftime('%I:%M %p') }} - {{ slot.end_time.strftime('%I:%M %p') }} 
+            ({{ slot.teacher_name }})
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label for="note" class="form-label">Optional Note</label>
+      <textarea name="note" class="form-control" rows="3" placeholder="Mention any specific reason or detail (optional)..."></textarea>
+    </div>
+
+    <div class="d-grid gap-2">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-calendar-check-fill me-1"></i> Book Appointment
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
