@@ -1,0 +1,45 @@
+{% extends "admin/layout.html" %}
+{% block title %}Edit Timetable Entry{% endblock %}
+
+{% block content %}
+<h2>Edit Timetable Entry</h2>
+
+<form method="POST" class="row g-3">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="col-md-4">
+    <label for="course_id" class="form-label">Course</label>
+    <select name="course_id" class="form-select" required>
+      {% for course in courses %}
+        <option value="{{ course.id }}" {% if course.id == entry.course_id %}selected{% endif %}>
+          {{ course.name }} ({{ course.code }})
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="col-md-2">
+    <label for="day" class="form-label">Day</label>
+    <select name="day" class="form-select" required>
+      {% for day in days %}
+        <option value="{{ day }}" {% if day == entry.day_of_week %}selected{% endif %}>{{ day }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="col-md-3">
+    <label for="start_time" class="form-label">Start Time</label>
+    <input type="time" name="start_time" class="form-control" value="{{ entry.start_time.strftime('%H:%M') }}" required>
+  </div>
+
+  <div class="col-md-3">
+    <label for="end_time" class="form-label">End Time</label>
+    <input type="time" name="end_time" class="form-control" value="{{ entry.end_time.strftime('%H:%M') }}" required>
+  </div>
+
+  <div class="col-12">
+    <button type="submit" class="btn btn-success">Update Entry</button>
+    <a href="{{ url_for('admin.manage_timetable') }}" class="btn btn-secondary">Cancel</a>
+  </div>
+</form>
+{% endblock %}

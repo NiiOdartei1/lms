@@ -1,0 +1,23 @@
+{% extends "parent/base_parent.html" %}
+{% block title %}Notification{% endblock %}
+
+{% block content %}
+<div class="container mt-1">
+  <h3 class="mb-2">{{ recipient.notification.title }}</h3>
+  <p class="text-muted mb-1">
+    <strong>Sent on:</strong> {{ recipient.notification.created_at.strftime('%d %b %Y, %I:%M %p') }}
+    {% if recipient.notification.sender %}
+      &middot; <em>From {{ recipient.notification.sender.full_name or recipient.notification.sender.username }}</em>
+    {% endif %}
+  </p>
+  <hr>
+  <div>{{ recipient.notification.message | replace('\n', '<br>') | safe }}</div>
+
+  <div class="mt-1">
+    <a href="{{ url_for('parent.parent_notifications') }}" class="btn btn-secondary">Back to Notifications</a>
+    {% if not recipient.is_read %}
+      <span class="ms-3 badge bg-warning">New</span>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

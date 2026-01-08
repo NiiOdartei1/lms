@@ -1,0 +1,38 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Upcoming Events | Admin Panel{% endblock %}
+{% block content %}
+<h2 class="mb-4">Upcoming Events</h2>
+<a href="{{ url_for('admin.add_event') }}" class="btn btn-primary mb-3">
+  <i class="fas fa-calendar-plus"></i> Add Event
+</a>
+
+<table class="table table-hover">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Date</th>
+      <th>Location</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for event in events %}
+    <tr>
+      <td>{{ event.title }}</td>
+      <td>{{ event.date.strftime('%Y-%m-%d') }}</td>
+      <td>{{ event.location }}</td>
+      <td>
+        <a href="{{ url_for('admin.edit_event', event_id=event.id) }}" class="btn btn-sm btn-warning">
+          <i class="fas fa-edit"></i> Edit
+        </a>
+        <a href="{{ url_for('admin.delete_event', event_id=event.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete this event?')">
+          <i class="fas fa-trash-alt"></i> Delete
+        </a>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4" class="text-center text-muted">No events scheduled.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

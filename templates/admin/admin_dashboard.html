@@ -1,0 +1,186 @@
+{% extends "admin/layout.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-2 mb-5">
+
+  <h2 class="mt-4 mb-4 text-primary fw-bold motion-slide-down">Admin Dashboard</h2>
+
+  <!-- 3D Gift Box Cards -->
+  <div class="row mb-4 g-3 perspective">
+    {% set charts = [
+      {'id':'studentsChart','title':'Total Students','icon':'fa-user-graduate','count':student_count,'colors':['#6a11cb','#2575fc']},
+      {'id':'teachersChart','title':'Total Teachers','icon':'fa-chalkboard-teacher','count':teacher_count,'colors':['#00b09b','#96c93d']},
+      {'id':'parentsChart','title':'Total Parents','icon':'fa-user-friends','count':parent_count,'colors':['#ff6a00','#ee0979']},
+      {'id':'adminsChart','title':'Admins','icon':'fa-user-shield','count':admin_count,'colors':['#343a40','#6c757d']}
+    ] %}
+    {% for chart in charts %}
+    <!-- note: data-animation-delay & data-colors used instead of inline style with Jinja -->
+    <div class="col-md-3 gift-card" data-animation-delay="{{ loop.index0 * 0.3 }}">
+      <div class="card shadow-lg border-0 text-white futuristic-card" data-colors="{{ chart.colors[0] }},{{ chart.colors[1] }}">
+        <div class="card-body">
+          <div class="d-flex align-items-center mb-2">
+            <i class="fas {{ chart.icon }} fa-2x me-3"></i>
+            <div>
+              <h6 class="card-title text-uppercase mb-1">{{ chart.title }}</h6>
+              <p class="fs-4 mb-0 counter" data-target="{{ chart.count }}">0</p>
+            </div>
+          </div>
+          <canvas id="{{ chart.id }}" height="80"></canvas>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- System Analytics -->
+  <div class="card shadow-lg border-0 mb-4 futuristic-card motion-fade" style="--animation-delay:1.2s;">
+    <div class="card-header text-white" style="background: linear-gradient(90deg, #1f4037, #99f2c8);">
+      <i class="fas fa-chart-line me-2"></i> System Analytics
+    </div>
+    <div class="card-body">
+      <canvas id="trendsChart" height="120"></canvas>
+    </div>
+  </div>
+
+  <!-- Recent Users Table -->
+  <div class="card shadow-sm border-0 futuristic-card motion-fade" style="--animation-delay:1.5s;">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #ff416c, #ff4b2b);">
+      <i class="fas fa-users me-2"></i> Recent Users
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>User ID</th>
+            <th>Name</th>
+            <th>Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in users %}
+          <tr>
+            <td>{{ user.user_id }}</td>
+            <td>{{ user.name or user.username }}</td>
+            <td>
+              {% set role_colors = {'student':'primary','teacher':'success','parent':'warning','admin':'dark'} %}
+              <span class="badge bg-{{ role_colors.get(user.role, 'secondary') }} text-capitalize">{{ user.role }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Apply data attributes to CSS variables / inline styles to avoid Jinja inside style attributes
+  document.querySelectorAll('.gift-card').forEach(el => {
+    const delay = el.dataset.animationDelay || '0';
+    // ensure numeric value and add 's'
+    el.style.setProperty('--animation-delay', (isNaN(delay) ? '0' : delay) + 's');
+  });
+
+  document.querySelectorAll('.futuristic-card[data-colors]').forEach(card => {
+    const raw = card.dataset.colors || '';
+    const parts = raw.split(',');
+    if(parts.length >= 2) {
+      card.style.background = `linear-gradient(135deg, ${parts[0].trim()}, ${parts[1].trim()})`;
+    }
+  });
+
+  // Counter Animation
+  document.querySelectorAll('.counter').forEach(counter => {
+    const target = +counter.dataset.target;
+    let count = 0;
+    const increment = target / 100;
+    const update = () => {
+      count += increment;
+      counter.innerText = count < target ? Math.ceil(count) : target;
+      if(count < target) requestAnimationFrame(update);
+    };
+    requestAnimationFrame(update);
+  });
+
+  // Bar Charts
+  const charts = [
+    {id:'studentsChart', data:[12,19,14,21,18,24], colors:['#6a11cb','#2575fc']},
+    {id:'teachersChart', data:[5,7,6,8,9,10], colors:['#00b09b','#96c93d']},
+    {id:'parentsChart', data:[20,18,22,25,24,27], colors:['#ff6a00','#ee0979']},
+    {id:'adminsChart', data:[2,2,3,2,3,4], colors:['#343a40','#6c757d']}
+  ];
+  charts.forEach(cfg => {
+    const el = document.getElementById(cfg.id);
+    if (!el) return;
+    const ctx = el.getContext('2d');
+    new Chart(ctx, {
+      type:'bar',
+      data:{ labels:['Jan','Feb','Mar','Apr','May','Jun'], datasets:[{ data:cfg.data, backgroundColor:cfg.colors, borderRadius:6, barPercentage:0.6 }] },
+      options:{ responsive:true, plugins:{ legend:{ display:false } }, animation:{ duration:1400 } }
+    });
+  });
+
+  // Line Chart
+  const trendsCtxEl = document.getElementById('trendsChart');
+  if(trendsCtxEl) {
+    const trendsCtx = trendsCtxEl.getContext('2d');
+    new Chart(trendsCtx, {
+      type:'line',
+      data:{
+        labels:['Jan','Feb','Mar','Apr','May','Jun'],
+        datasets:[
+          { label:'Students', data:[12,19,14,21,18,24], borderColor:'#6a11cb', tension:0.4, fill:true, backgroundColor:'rgba(106,17,203,0.4)', pointRadius:6 },
+          { label:'Teachers', data:[5,7,6,8,9,10], borderColor:'#00b09b', tension:0.4, fill:true, backgroundColor:'rgba(0,176,155,0.4)', pointRadius:6 },
+          { label:'Parents', data:[20,18,22,25,24,27], borderColor:'#ff6a00', tension:0.4, fill:true, backgroundColor:'rgba(255,106,0,0.4)', pointRadius:6 }
+        ]
+      },
+      options:{ responsive:true, plugins:{ legend:{ position:'top' } }, animation:{ duration:1600 } }
+    });
+  }
+});
+</script>
+
+<style>
+/* 3D Perspective Gift Cards */
+.perspective { perspective: 1200px; }
+.gift-card {
+  transform-style: preserve-3d;
+  transform: rotateX(-90deg) scale(0.8);
+  opacity:0;
+  animation: unpack 0.8s forwards;
+  animation-delay: var(--animation-delay, 0s);
+}
+
+/* Unpack Animation */
+@keyframes unpack {
+  0% { transform: rotateX(-90deg) scale(0.8); opacity:0; }
+  60% { transform: rotateX(20deg) scale(1.05); opacity:1; }
+  100% { transform: rotateX(0deg) scale(1); opacity:1; }
+}
+
+/* Card Styling */
+.futuristic-card {
+  border-radius:14px;
+  box-shadow:0 14px 28px rgba(0,0,0,0.35);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.futuristic-card:hover { transform: translateY(-10px) scale(1.03) rotateX(3deg); box-shadow:0 24px 48px rgba(0,0,0,0.45); }
+.card-title { font-weight:700; letter-spacing:0.5px; text-shadow:0 2px 10px rgba(255,255,255,0.4); }
+
+.table-hover tbody tr:hover { background: rgba(255,255,255,0.05); transition: all 0.25s ease; }
+
+/* Motion Animations for Other Elements */
+@keyframes slideUp { 0% { opacity:0; transform: translateY(30px); } 100% { opacity:1; transform: translateY(0); } }
+@keyframes slideDown { 0% { opacity:0; transform: translateY(-30px); } 100% { opacity:1; transform: translateY(0); } }
+@keyframes fadeIn { 0% { opacity:0; } 100% { opacity:1; } }
+
+.motion-slide-up { animation: slideUp 0.8s forwards; animation-delay: var(--animation-delay,0s); }
+.motion-slide-down { animation: slideDown 0.8s forwards; animation-delay: var(--animation-delay,0s); }
+.motion-fade { animation: fadeIn 1s forwards; animation-delay: var(--animation-delay,0s); }
+</style>
+{% endblock %}

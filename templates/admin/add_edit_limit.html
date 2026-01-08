@@ -1,0 +1,16 @@
+{% extends 'admin/layout.html' %}
+{% block content %}
+<div class="container mt-3">
+  <h3>{{ limit and 'Edit' or 'Add' }} Course Limits</h3>
+  <form method="POST">
+    {{ form.hidden_tag() }}
+    <div class="mb-3">{{ form.class_level.label }} {{ form.class_level(class="form-select") }}</div>
+    <div class="mb-3">{{ form.semester.label }} {{ form.semester(class="form-select") }}</div>
+    <div class="mb-3">{{ form.academic_year.label }} {{ form.academic_year(class="form-control") }}</div>
+    <div class="mb-3">{{ form.mandatory_limit.label }} {{ form.mandatory_limit(class="form-control") }}</div>
+    <div class="mb-3">{{ form.optional_limit.label }} {{ form.optional_limit(class="form-control") }}</div>
+    <button class="btn btn-success">{{ form.submit.label }}</button>
+    <a href="{{ url_for('admin.manage_limits') }}" class="btn btn-secondary ms-2">Cancel</a>
+  </form>
+</div>
+{% endblock %}

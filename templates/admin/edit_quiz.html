@@ -1,0 +1,301 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Edit Quiz | Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h2 class="mb-4">Edit Quiz</h2>
+
+  <div class="card mb-4">
+    <div class="card-header bg-primary text-white">Quiz Information</div>
+    <div class="card-body">
+      <form method="POST" enctype="multipart/form-data">
+        {{ form.hidden_tag() }}
+
+        <div class="mb-3">
+          {{ form.course_name.label(class="form-label") }}
+
+          <select name="course_name" id="course_name" class="form-select">
+            <option
+              value="{{ quiz.course_name }}"
+              data-id="{{ selected_course_id }}"
+              selected>
+              {{ quiz.course_name }}
+            </option>
+          </select>
+
+          <input type="hidden" name="course_id" id="course_id" value="{{ selected_course_id }}">
+        </div>
+
+        <div class="mb-3">
+          {{ form.title.label(class="form-label") }}
+          {{ form.title(class="form-control") }}
+        </div>
+
+        <div class="mb-3">
+          {{ form.assigned_class.label(class="form-label") }}
+          {{ form.assigned_class(class="form-select") }}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="start_datetime">Start Date &amp; Time</label>
+          {{ form.start_datetime(class="form-control", id="start_datetime", type="datetime-local") }}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="end_datetime">End Date &amp; Time</label>
+          {{ form.end_datetime(class="form-control", id="end_datetime", type="datetime-local") }}
+        </div>
+
+        <div class="mb-3">
+          {{ form.duration.label(class="form-label") }}
+          {{ form.duration(class="form-select") }}
+        </div>
+
+        <div class="mb-3">
+          {{ form.attempts_allowed.label(class="form-label") }}
+          {{ form.attempts_allowed(class="form-control", min="1", type="number") }}
+        </div>
+
+        <div class="mb-3">
+          <label for="content_file" class="form-label">Upload File</label>
+          <input type="file" class="form-control" name="content_file" id="content_file" accept=".pdf,.doc,.docx,.txt">
+        </div>
+
+        <!-- Quiz Questions -->
+        <div class="card mb-4">
+          <div class="card-header bg-secondary text-white">Quiz Questions</div>
+          <div class="card-body">
+            <div id="questions-container"></div>
+            <button type="button" class="btn btn-outline-primary" onclick="addQuestion()">+ Add Question</button>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+          {{ form.submit(class="btn btn-success") }}
+          <a href="{{ url_for('admin.manage_quizzes') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- add this near the top of your template, outside the <script> that contains your logic -->
+<script id="quiz-questions-data" type="application/json">
+  {{ quiz_questions | tojson }}
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // ---- Course sync helpers (keeps course_id hidden input up-to-date) ----
+  function syncCourseId() {
+    const select = document.getElementById('course_name');
+    const hidden = document.getElementById('course_id');
+    if (!select || !hidden) return;
+    const opt = select.options[select.selectedIndex];
+    hidden.value = opt?.dataset?.id || '';
+  }
+
+  const classSelect = document.getElementById('assigned_class');
+  const courseSelect = document.getElementById('course_name');
+  const courseIdInput = document.getElementById('course_id');
+
+  if (courseSelect) {
+    // ensure hidden is set for edit mode
+    syncCourseId();
+    courseSelect.addEventListener('change', syncCourseId);
+  }
+
+  if (classSelect && courseSelect) {
+    classSelect.addEventListener('change', () => {
+      const cls = classSelect.value;
+      courseSelect.innerHTML = '<option>Loading...</option>';
+      courseSelect.disabled = true;
+      if (courseIdInput) courseIdInput.value = '';
+
+      fetch(`/admin/get_courses/${encodeURIComponent(cls)}`)
+        .then(r => r.json())
+        .then(data => {
+          courseSelect.innerHTML = '';
+          courseSelect.disabled = false;
+          if (!data.length) {
+            courseSelect.innerHTML = '<option value="">No courses available</option>';
+            if (courseIdInput) courseIdInput.value = '';
+            return;
+          }
+          data.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.name;
+            opt.textContent = c.name;
+            opt.dataset.id = c.id;
+            courseSelect.appendChild(opt);
+          });
+          // select first by default and sync hidden id
+          courseSelect.selectedIndex = 0;
+          syncCourseId();
+        })
+        .catch(() => {
+          courseSelect.innerHTML = '<option value="">Error loading courses</option>';
+          courseSelect.disabled = false;
+        });
+    });
+  }
+
+  // ---- Quiz questions rendering logic (consolidated) ----
+  // Server-provided payload (safe Jinja insertion)
+  const quizQuestionsEl = document.getElementById('quiz-questions-data');
+  const quizQuestions = (quizQuestionsEl && quizQuestionsEl.textContent)
+    ? JSON.parse(quizQuestionsEl.textContent)
+    : [];
+
+  let questionCount = quizQuestions.length || 0;
+  const optionCounters = {};
+  const labelStyles = {
+    abc: ['a', 'b', 'c', 'd', 'e', 'f'],
+    roman: ['i', 'ii', 'iii', 'iv', 'v', 'vi']
+  };
+
+  function addQuestionFromData(data, qIndex) {
+    const container = document.getElementById('questions-container');
+    if (!container) return;
+    const labelStyle = data.label_style || 'abc';
+
+    const cardHtml = `
+      <div class="card mb-3 shadow-sm border border-info" id="question-${qIndex}">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">Question ${qIndex + 1}</h6>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeQuestion(${qIndex})">
+              🗑 Remove Question
+            </button>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="question-text-${qIndex}">Question</label>
+            <textarea
+              id="question-text-${qIndex}"
+              name="questions[${qIndex}][text]"
+              class="form-control"
+              required
+            >${(data.text || '').replace(/<\/?script>/g, '')}</textarea>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="label-style-${qIndex}">Option Label Style</label>
+            <select
+              id="label-style-${qIndex}"
+              class="form-select option-style-select"
+              name="questions[${qIndex}][label_style]"
+              onchange="updateOptionLabels(${qIndex})"
+            >
+              <option value="abc" ${labelStyle === 'abc' ? 'selected' : ''}>a, b, c, d</option>
+              <option value="roman" ${labelStyle === 'roman' ? 'selected' : ''}>i, ii, iii, iv</option>
+            </select>
+          </div>
+
+          <div class="option-container" id="options-${qIndex}"></div>
+
+          <div class="mt-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary me-1" onclick="addOption(${qIndex})">
+              + Add Option
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeOption(${qIndex})">
+              − Remove Option
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    container.insertAdjacentHTML('beforeend', cardHtml);
+    // initialize option counter for this question
+    optionCounters[qIndex] = 0;
+
+    // render existing options (if any)
+    if (Array.isArray(data.options)) {
+      data.options.forEach(opt => {
+        addOption(qIndex, opt.text || '', !!opt.is_correct);
+      });
+    }
+  }
+
+  window.addOption = function addOption(qIndex, optText = '', isCorrect = false) {
+    const currentCount = optionCounters[qIndex] ?? 0;
+    const oIndex = currentCount;
+    optionCounters[qIndex] = currentCount + 1;
+
+    const styleSelect = document.getElementById(`label-style-${qIndex}`);
+    const style = styleSelect ? styleSelect.value : 'abc';
+    const label = labelStyles[style][oIndex] || `opt${oIndex + 1}`;
+    const checked = isCorrect ? 'checked' : '';
+
+    // escape double quotes in optText to avoid breaking the value attribute
+    const safeText = String(optText || '').replace(/"/g, '&quot;');
+
+    const optionHtml = `
+      <div class="input-group mb-2" id="question-${qIndex}-option-${oIndex}">
+        <span class="input-group-text">${label}</span>
+        <input type="text" class="form-control" name="questions[${qIndex}][options][${oIndex}][text]" value="${safeText}" required />
+        <span class="input-group-text">
+          <input type="checkbox" name="questions[${qIndex}][options][${oIndex}][is_correct]" ${checked} />
+          <span class="ms-1">✔</span>
+        </span>
+      </div>
+    `;
+
+    const optionsContainer = document.getElementById(`options-${qIndex}`);
+    if (optionsContainer) optionsContainer.insertAdjacentHTML('beforeend', optionHtml);
+  };
+
+  window.removeOption = function removeOption(qIndex) {
+    const count = optionCounters[qIndex] ?? 0;
+    if (count > 0) {
+      const oIndex = count - 1;
+      optionCounters[qIndex] = oIndex;
+      const optDiv = document.getElementById(`question-${qIndex}-option-${oIndex}`);
+      if (optDiv) optDiv.remove();
+    }
+  };
+
+  window.updateOptionLabels = function updateOptionLabels(qIndex) {
+    const styleSelect = document.getElementById(`label-style-${qIndex}`);
+    const style = styleSelect ? styleSelect.value : 'abc';
+    const container = document.getElementById(`options-${qIndex}`);
+    if (!container) return;
+    const optionGroups = container.querySelectorAll('.input-group');
+    optionGroups.forEach((group, idx) => {
+      const labelSpan = group.querySelector('.input-group-text');
+      if (labelSpan) labelSpan.textContent = labelStyles[style][idx] || `opt${idx + 1}`;
+    });
+  };
+
+  window.addQuestion = function addQuestion() {
+    const newQ = { text: '', label_style: 'abc', options: [] };
+    addQuestionFromData(newQ, questionCount);
+    const newCard = document.getElementById(`question-${questionCount}`);
+    if (newCard) newCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    questionCount++;
+  };
+
+  window.removeQuestion = function removeQuestion(qIndex) {
+    const questionDiv = document.getElementById(`question-${qIndex}`);
+    if (questionDiv) {
+      questionDiv.remove();
+      delete optionCounters[qIndex];
+    }
+  };
+
+  // ---- Render existing questions (if any) ----
+  if (quizQuestions && quizQuestions.length) {
+    quizQuestions.forEach((q, i) => {
+      addQuestionFromData(q, i);
+    });
+  } else {
+    // if none, create an initial empty question slot for convenience
+    if (questionCount === 0) {
+      addQuestion();
+    }
+  }
+});
+</script>
+
+{% endblock %}

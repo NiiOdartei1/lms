@@ -1,0 +1,409 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Manage Exams{% endblock %}
+
+{% block head_extra %}
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-1 compact-exams" style="max-width:1180px;">
+
+  <!-- Header -->
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+    <div>
+      <h4 class="mb-0 fw-semibold" style="font-size:1.05rem;">📝 Manage Exams</h4>
+      <div class="small text-muted">Create, view and manage scheduled exams</div>
+    </div>
+
+    <div class="d-flex gap-2 align-items-center">
+      <a href="{{ url_for('admin.add_exam') }}" class="btn btn-sm btn-primary">
+        <i class="fas fa-plus me-1"></i> Add Exam
+      </a>
+
+      <div class="form-check form-switch ms-1">
+        <input class="form-check-input" type="checkbox" id="compactToggle">
+        <label class="form-check-label small" for="compactToggle">Compact</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flash -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mb-2">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show py-1 small" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- Stats cards -->
+  <div class="row gx-2 gy-2 mb-3 small">
+    <div class="col-6 col-sm-3">
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-2 text-center">
+          <div class="text-muted small">Total</div>
+          <div class="fw-bold" style="font-size:1.05rem;">{{ exams|length }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6 col-sm-3">
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-2 text-center">
+          <div class="text-muted small">Active</div>
+          <div class="fw-bold" style="font-size:1.05rem;">
+            {{ exams|selectattr("start_datetime","le",now)|selectattr("end_datetime","ge",now)|list|length }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6 col-sm-3">
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-2 text-center">
+          <div class="text-muted small">Upcoming</div>
+          <div class="fw-bold" style="font-size:1.05rem;">
+            {{ exams|selectattr("start_datetime","gt",now)|list|length }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6 col-sm-3">
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-2 text-center">
+          <div class="text-muted small">Completed</div>
+          <div class="fw-bold" style="font-size:1.05rem;">
+            {{ exams|selectattr("end_datetime","lt",now)|list|length }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controls: filters + search -->
+  <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+    <div class="input-group input-group-sm" style="min-width:240px;">
+      <span class="input-group-text">🔍</span>
+      <input id="examSearch" class="form-control form-control-sm" placeholder="Search title, subject, class..." aria-label="Search exams">
+    </div>
+
+    <!-- Build unique class and subject lists -->
+    {% set _classes = [] %}
+    {% set _subjects = [] %}
+    {% for exam in exams %}
+      {% if exam.assigned_class not in _classes %}{% set _ = _classes.append(exam.assigned_class) %}{% endif %}
+      {% if exam.subject not in _subjects %}{% set _ = _subjects.append(exam.subject) %}{% endif %}
+    {% endfor %}
+
+    <select id="classFilter" class="form-select form-select-sm" style="width:auto;">
+      <option value="">All classes</option>
+      {% for cls in _classes %}
+      <option value="{{ cls }}">{{ cls }}</option>
+      {% endfor %}
+    </select>
+
+    <select id="statusFilter" class="form-select form-select-sm" style="width:auto;">
+      <option value="">All statuses</option>
+      <option value="upcoming">Upcoming</option>
+      <option value="active">Active</option>
+      <option value="completed">Completed</option>
+    </select>
+
+    <select id="rowsPerPage" class="form-select form-select-sm ms-auto" style="width:auto;">
+      <option value="10">10 / page</option>
+      <option value="25">25 / page</option>
+      <option value="50">50 / page</option>
+    </select>
+  </div>
+
+  <!-- Table -->
+  <div class="table-responsive border rounded shadow-sm">
+    <table id="examTable" class="table table-hover table-sm mb-0 compact-table" aria-label="Exams table">
+      <thead class="table-light small">
+        <tr>
+          <th class="sortable" data-key="title" tabindex="0">Title <span class="sort-ind"></span></th>
+          <th class="sortable" data-key="subject" tabindex="0">Subject <span class="sort-ind"></span></th>
+          <th class="sortable" data-key="class" tabindex="0">Class <span class="sort-ind"></span></th>
+          <th class="sortable" data-key="start" tabindex="0">Start <span class="sort-ind"></span></th>
+          <th class="sortable" data-key="end" tabindex="0">End <span class="sort-ind"></span></th>
+          <th>Status</th>
+          <th class="text-center">Actions</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% for exam in exams %}
+        <tr data-id="{{ exam.id }}"
+            data-title="{{ exam.title | e }}"
+            data-subject="{{ exam.subject | e }}"
+            data-class="{{ exam.assigned_class | e }}"
+            data-start="{{ exam.start_datetime.isoformat() }}"
+            data-end="{{ exam.end_datetime.isoformat() }}">
+          <td>
+            <a href="{{ url_for('admin.exam_sets', exam_id=exam.id) }}" class="text-decoration-none small fw-semibold">
+              {{ exam.title }}
+            </a>
+          </td>
+          <td class="small">{{ exam.subject }}</td>
+          <td class="small">{{ exam.assigned_class }}</td>
+          <td class="small">{{ exam.start_datetime.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td class="small">{{ exam.end_datetime.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td class="small">
+            {% if exam.start_datetime > now %}
+              <span class="badge bg-info text-dark">Upcoming</span>
+            {% elif exam.start_datetime <= now <= exam.end_datetime %}
+              <span class="badge bg-success">Active</span>
+            {% else %}
+              <span class="badge bg-secondary">Completed</span>
+            {% endif %}
+          </td>
+          <td class="text-center">
+            <div class="btn-group btn-group-sm" role="group" aria-label="Exam actions">
+              <a href="{{ url_for('admin.edit_exam', exam_id=exam.id) }}" class="btn btn-outline-warning" title="Edit">
+                <i class="fas fa-edit"></i>
+              </a>
+              <button class="btn btn-outline-danger delete-btn" data-url="{{ url_for('admin.delete_exam', exam_id=exam.id) }}" data-title="{{ exam.title | e }}" title="Delete">
+                <i class="fas fa-trash"></i>
+              </button>
+              <a href="{{ url_for('admin.exam_sets', exam_id=exam.id) }}" class="btn btn-outline-info" title="Exam Sets">
+                <i class="fas fa-list"></i>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center small text-muted">No exams found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination controls -->
+  <div class="d-flex justify-content-between align-items-center small mt-2">
+    <div class="text-muted pages-info">Showing <span id="startIdx">0</span>-<span id="endIdx">0</span> of <strong id="totalCount">{{ exams|length }}</strong></div>
+    <div>
+      <button class="btn btn-sm btn-outline-secondary me-1" id="prevPage" disabled>&laquo; Prev</button>
+      <button class="btn btn-sm btn-outline-secondary" id="nextPage" disabled>Next &raquo;</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirmation modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content small">
+      <div class="modal-header">
+        <h6 class="modal-title">Confirm delete</h6>
+        <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">Delete exam: <strong id="deleteExamTitle"></strong> ?</p>
+      </div>
+      <div class="modal-footer">
+        <button id="confirmDeleteBtn" type="button" class="btn btn-sm btn-danger">Delete</button>
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+/* compact styling */
+.compact-exams { font-size: 0.88rem; }
+.compact-exams h4 { font-size: 1.05rem; }
+.compact-exams .card-body { padding: .55rem; }
+.compact-table th, .compact-table td { padding: .45rem .6rem; vertical-align: middle; font-size: .87rem; }
+.table thead th.sortable { cursor: pointer; user-select: none; }
+.sort-ind::after { display:inline-block; margin-left:.35rem; width:0; height:0; content:''; vertical-align:middle; }
+th.sort-asc .sort-ind::after { border-left:.35rem solid transparent; border-right:.35rem solid transparent; border-bottom:.45rem solid #333; }
+th.sort-desc .sort-ind::after { border-left:.35rem solid transparent; border-right:.35rem solid transparent; border-top:.45rem solid #333; }
+.btn-group .btn { padding: .28rem .48rem; }
+.small .form-control-sm, .form-select-sm { font-size: .86rem; padding: .32rem .4rem; }
+.badge { font-size: .78rem; padding: .32rem .5rem; }
+@media (max-width:768px){
+  .compact-exams { padding: .5rem; }
+  .compact-table td { font-size: .82rem; }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // helpers
+  const debounce = (fn, wait=220) => { let t; return (...a)=> { clearTimeout(t); t = setTimeout(()=>fn(...a), wait); }; };
+  const qs = s => document.querySelector(s);
+  const qsa = s => Array.from(document.querySelectorAll(s));
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+  // elements
+  const table = qs('#examTable');
+  const tbody = table.tBodies[0];
+  const rows = Array.from(tbody.rows);
+  const searchInput = qs('#examSearch');
+  const classFilter = qs('#classFilter');
+  const statusFilter = qs('#statusFilter');
+  const rowsPerPage = qs('#rowsPerPage');
+  const prevBtn = qs('#prevPage');
+  const nextBtn = qs('#nextPage');
+  const startIdxEl = qs('#startIdx');
+  const endIdxEl = qs('#endIdx');
+  const totalCountEl = qs('#totalCount');
+  const compactToggle = qs('#compactToggle');
+
+  // Recompute row status from data attrs and server 'now' baseline (we'll use data-start/data-end)
+  function computeStatus(row) {
+    const now = new Date("{{ now.isoformat() }}"); // server baseline
+    const start = new Date(row.dataset.start);
+    const end = new Date(row.dataset.end);
+    if (start > now) return 'upcoming';
+    if (start <= now && now <= end) return 'active';
+    return 'completed';
+  }
+
+  // Sorting
+  qsa('th.sortable').forEach((th, idx) => {
+    th.addEventListener('click', () => {
+      const colIndex = Array.from(th.parentElement.children).indexOf(th);
+      const isAsc = th.classList.toggle('sort-asc');
+      th.classList.remove('sort-desc');
+      if (!isAsc) th.classList.add('sort-desc');
+      // remove other headers' sort classes
+      qsa('th.sortable').forEach(h => { if (h !== th) h.classList.remove('sort-asc','sort-desc'); });
+
+      // collect visible rows to sort
+      const trows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
+      trows.sort((a,b) => {
+        const aText = a.cells[colIndex].innerText.trim();
+        const bText = b.cells[colIndex].innerText.trim();
+        const aNum = parseFloat(aText.replace(/[^0-9.-]/g,'')), bNum = parseFloat(bText.replace(/[^0-9.-]/g,''));
+        if (!isNaN(aNum) && !isNaN(bNum)) return isAsc ? aNum - bNum : bNum - aNum;
+        return isAsc ? aText.localeCompare(bText) : bText.localeCompare(aText);
+      });
+      trows.forEach(r => tbody.appendChild(r));
+      // refresh pagination after sort
+      renderPage();
+    });
+    th.addEventListener('keypress', (e) => { if (e.key === 'Enter') th.click(); });
+  });
+
+  // Filter + search logic
+  function filterRows() {
+    const q = (searchInput.value || '').trim().toLowerCase();
+    const cls = classFilter.value;
+    const statusSel = statusFilter.value;
+    rows.forEach(r => {
+      const title = (r.dataset.title || '').toLowerCase();
+      const subject = (r.dataset.subject || '').toLowerCase();
+      const clsVal = (r.dataset.class || '').toLowerCase();
+      const combined = title + ' ' + subject + ' ' + clsVal + ' ' + r.innerText.toLowerCase();
+      const matchesQ = q === '' || combined.includes(q);
+      const matchesClass = !cls || clsVal === cls.toLowerCase();
+      const s = computeStatus(r);
+      const matchesStatus = !statusSel || statusSel === s;
+      r.style.display = (matchesQ && matchesClass && matchesStatus) ? '' : 'none';
+    });
+    renderPage(true); // reset page to 1
+  }
+
+  const debouncedFilter = debounce(filterRows, 200);
+  searchInput.addEventListener('input', debouncedFilter);
+  classFilter.addEventListener('change', filterRows);
+  statusFilter.addEventListener('change', filterRows);
+
+  // Pagination
+  let currentPage = 1;
+  function renderPage(reset=false) {
+    const perPage = Number(rowsPerPage.value);
+    const visible = Array.from(tbody.rows).filter(r => r.style.display !== 'none');
+    const total = visible.length;
+    if (reset) currentPage = 1;
+    const start = (currentPage - 1) * perPage;
+    const end = Math.min(start + perPage, total);
+    visible.forEach((r,i) => r.style.display = (i >= start && i < end) ? '' : 'none');
+    startIdxEl.innerText = total === 0 ? 0 : start + 1;
+    endIdxEl.innerText = end;
+    prevBtn.disabled = currentPage === 1;
+    nextBtn.disabled = end >= total;
+    totalCountEl.innerText = total;
+  }
+
+  rowsPerPage.addEventListener('change', () => { currentPage = 1; renderPage(); });
+  prevBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderPage(); }});
+  nextBtn.addEventListener('click', () => {
+    const perPage = Number(rowsPerPage.value);
+    const visible = Array.from(tbody.rows).filter(r => r.style.display !== 'none');
+    if (currentPage * perPage < visible.length) { currentPage++; renderPage(); }
+  });
+
+  // initialize filters/options text values case-insensitive: convert classFilter options to lowercase dataset
+  // (no extra work necessary here)
+
+  // initial render
+  filterRows();
+  renderPage();
+
+  // Compact mode persistence
+  if (localStorage.getItem('examsCompact') === '1') {
+    document.body.classList.add('compact-mode');
+    compactToggle.checked = true;
+  }
+  compactToggle.addEventListener('change', () => {
+    const active = compactToggle.checked;
+    if (active) document.body.classList.add('compact-mode');
+    else document.body.classList.remove('compact-mode');
+    localStorage.setItem('examsCompact', active ? '1' : '0');
+  });
+
+  // Delete flow using modal
+  let deleteTargetRow = null;
+  const deleteModalEl = document.getElementById('deleteConfirmModal');
+  const deleteModal = new bootstrap.Modal(deleteModalEl);
+  const deleteTitleEl = document.getElementById('deleteExamTitle');
+  const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+
+  qsa('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      deleteTargetRow = btn.closest('tr');
+      deleteTitleEl.innerText = btn.dataset.title || deleteTargetRow.dataset.title || '—';
+      deleteModal.show();
+    });
+  });
+
+  confirmDeleteBtn.addEventListener('click', () => {
+    if (!deleteTargetRow) { deleteModal.hide(); return; }
+    const url = deleteTargetRow.querySelector('.delete-btn')?.dataset.url;
+    if (!url) { alert('No delete url'); deleteModal.hide(); return; }
+    // send POST (server previously used POST) with CSRF token
+    fetch(url, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ _confirm: true })
+    }).then(r => {
+      if (r.ok) {
+        deleteTargetRow.remove();
+        deleteModal.hide();
+        // update pagination and totals
+        filterRows();
+        renderPage();
+      } else {
+        r.text().then(t => alert('Delete failed: ' + t));
+      }
+    }).catch(() => alert('Network error'));
+  });
+
+  // Accessible keyboard: Enter on search triggers filter
+  searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') filterRows(); });
+
+  // Make sure dynamic newly-hidden/visible rows are reflected (e.g., after filters)
+  // re-run renderPage after any DOM changes are likely (already invoked in filterRows)
+});
+</script>
+{% endblock %}

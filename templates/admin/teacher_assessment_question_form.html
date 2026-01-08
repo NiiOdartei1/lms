@@ -1,0 +1,67 @@
+{% extends "admin/layout.html" %}
+{% block title %}Assessment Question{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <div class="card shadow-sm">
+    <div class="card-header fw-bold">
+      <i class="bi bi-pencil-square"></i>
+      {{ 'Edit' if q else 'Add' }} Assessment Question
+    </div>
+
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="card-body">
+
+        <div class="mb-3">
+          <label class="form-label">Question</label>
+          <textarea name="question"
+                    class="form-control"
+                    rows="2"
+                    required>{{ q.question if q else '' }}</textarea>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Category</label>
+          <select name="category" class="form-select" required>
+            <option value="">-- Select Category --</option>
+            <option value="teacher_behavior"
+              {% if q and q.category == 'teacher_behavior' %}selected{% endif %}>
+              Teacher → Student Relationship
+            </option>
+            <option value="student_response"
+              {% if q and q.category == 'student_response' %}selected{% endif %}>
+              Student Response
+            </option>
+          </select>
+        </div>
+
+        {% if q %}
+        <div class="form-check">
+          <input type="checkbox"
+                 name="is_active"
+                 class="form-check-input"
+                 id="is_active"
+                 {% if q.is_active %}checked{% endif %}>
+          <label class="form-check-label" for="is_active">
+            Active
+          </label>
+        </div>
+        {% endif %}
+
+      </div>
+
+      <div class="card-footer text-end">
+        <a href="{{ url_for('admin.teacher_assessment_questions') }}"
+           class="btn btn-secondary btn-sm">
+          Cancel
+        </a>
+        <button class="btn btn-primary btn-sm">
+          Save
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

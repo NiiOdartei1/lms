@@ -1,0 +1,75 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Exam Sets | {{ exam.title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Exam Sets: {{ exam.title }}</h2>
+    <div>
+      <a href="{{ url_for('admin.create_exam_set', exam_id=exam.id) }}" class="btn btn-primary">+ Create New Set</a>
+      <a href="{{ url_for('admin.create_exam_question', exam_id=exam.id) }}" class="btn btn-outline-primary ms-2">+ Add Question to Pool</a>
+    </div>
+  </div>
+
+  <div class="row">
+  <!-- Sets -->
+  <div class="col-md-4"> <!-- reduced from 6 to 4 -->
+    <h5>Sets</h5>
+    {% if sets %}
+      {% for s in sets %}
+      <div class="card mb-2">
+        <div class="card-body d-flex justify-content-between align-items-center">
+          <div>
+            <strong>{{ s.name }}</strong>
+            {% if s.max_score %}<div class="small text-muted">Max: {{ s.max_score }}</div>{% endif %}
+          </div>
+          <div>
+            <a href="{{ url_for('admin.edit_exam_set', exam_id=exam.id, set_id=s.id) }}" class="btn btn-sm btn-primary">Manage Questions</a>
+            <a href="{{ url_for('admin.edit_exam_set', exam_id=exam.id, set_id=s.id) }}" class="btn btn-sm btn-outline-secondary ms-1">Rename</a>
+            <form action="{{ url_for('admin.delete_exam_set', exam_id=exam.id, set_id=s.id) }}" method="POST" class="d-inline ms-1">
+              <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete set?')">Delete</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="alert alert-info">No sets yet. Create one for this exam.</div>
+    {% endif %}
+  </div>
+
+  <!-- Pool -->
+  <div class="col-md-8">
+    <h5>Question Pool</h5>
+    {% if pool_questions %}
+      {% for q in pool_questions %}
+        <div class="card mb-2">
+          <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+              <p class="mb-1">{{ q.question_text[:160] }}{% if q.question_text|length > 160 %}...{% endif %}</p>
+              <small class="text-muted">Type: {{ q.question_type }} | Marks: {{ q.marks }}</small>
+            </div>
+            <div>
+              <!-- Edit button -->
+              <a href="{{ url_for('admin.edit_exam_question', exam_id=exam.id, question_id=q.id) }}"
+                class="btn btn-sm btn-outline-primary">Edit</a>
+
+              <form action="{{ url_for('admin.delete_exam_question', exam_id=exam.id, question_id=q.id) }}"
+                    method="POST" class="d-inline ms-1">
+                <button type="submit" class="btn btn-sm btn-outline-danger"
+                        onclick="return confirm('Delete this question?')">
+                  Delete
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+      {% else %}
+      <div class="alert alert-secondary">
+        No questions in the pool. Click “Add Question to Pool” to create questions.
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

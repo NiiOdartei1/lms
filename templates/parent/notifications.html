@@ -1,0 +1,64 @@
+{% extends "parent/base_parent.html" %}
+{% block title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="container mt-0">
+  <h3>My Notifications</h3>
+  <ul class="list-group" id="notification-list">
+    {% for recipient in notifications %}
+      {% set n = recipient.notification %}
+      <li class="list-group-item d-flex justify-content-between align-items-start {% if not recipient.is_read %}list-group-item-warning{% endif %}" id="notif-{{ recipient.id }}">
+        <div class="me-3">
+          <div class="fw-bold">{{ n.title }}</div>
+          <div class="small text-muted">
+            {{ n.created_at.strftime('%d %b %Y, %I:%M %p') }}
+            &middot;
+            {{ (n.message[:120] ~ ('...' if n.message|length > 120 else '')) }}
+          </div>
+        </div>
+        <div class="btn-group btn-group-sm" role="group" aria-label="Actions">
+          <a href="{{ url_for('parent.view_parent_notification', recipient_id=recipient.id) }}" class="btn btn-outline-primary">View</a>
+          {% if not recipient.is_read %}
+            <button class="btn btn-outline-success mark-read-btn" data-id="{{ recipient.id }}" title="Mark as read">✓</button>
+          {% else %}
+            <span class="badge bg-success align-self-center">Read</span>
+          {% endif %}
+        </div>
+      </li>
+    {% else %}
+      <li class="list-group-item">No notifications.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  document.querySelectorAll(".mark-read-btn").forEach(btn => {
+    btn.addEventListener("click", function(e) {
+      e.preventDefault();
+      const recipientId = this.getAttribute("data-id");
+      fetch(`/parent/notifications/mark_read/${recipientId}`, {
+        method: "POST",
+        headers: {
+          "X-CSRFToken": "{{ csrf_token() }}",
+          "Accept": "application/json"
+        }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          const li = document.getElementById(`notif-${recipientId}`);
+          if (li) {
+            li.classList.remove("list-group-item-warning");
+            const btnGroup = li.querySelector('.btn-group');
+            if (btnGroup) btnGroup.innerHTML = '<span class="badge bg-success align-self-center">Read</span>';
+          }
+        }
+      }).catch(err => console.error("Mark read error:", err));
+    });
+  });
+});
+</script>
+{% endblock %}

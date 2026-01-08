@@ -1,0 +1,183 @@
+{% extends "admin/layout.html" %}
+{% block title %}Manage Timetable{% endblock %}
+
+{% block content %}
+<div class="container mt-1">
+  <!-- Page Header -->
+  <div class="card shadow-lg border-0 mb-4">
+    <div class="card-header text-white" style="background: linear-gradient(90deg, #4e73df, #36b9cc);">
+      <h3 class="mb-0"><i class="fas fa-calendar-alt"></i> Manage Student Timetable</h3>
+    </div>
+    <div class="card-body">
+      <!-- Flash Messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <!-- Timetable Form -->
+      <form method="POST" class="row g-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="col-md-3">
+          <label for="assigned_class" class="form-label fw-bold"><i class="fas fa-users"></i> Class</label>
+          <select id="assigned_class" class="form-select" name="assigned_class" required>
+            {% for cls in class_list %}
+              <option value="{{ cls }}">{{ cls }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label for="course_id" class="form-label fw-bold"><i class="fas fa-book"></i> Course</label>
+          <select id="course_id" class="form-select" name="course_id" required>
+            {% for course in courses %}
+              <option value="{{ course.id }}">{{ course.name }} ({{ course.code }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-2">
+          <label for="day" class="form-label fw-bold"><i class="fas fa-calendar-day"></i> Day</label>
+          <select id="day" class="form-select" name="day" required>
+            {% for day in ['Monday','Tuesday','Wednesday','Thursday','Friday'] %}
+              <option value="{{ day }}">{{ day }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-2">
+          <label for="start_time" class="form-label fw-bold"><i class="fas fa-clock"></i> Start</label>
+          <input id="start_time" type="time" name="start_time" class="form-control" required>
+        </div>
+
+        <div class="col-md-2">
+          <label for="end_time" class="form-label fw-bold"><i class="fas fa-clock"></i> End</label>
+          <input id="end_time" type="time" name="end_time" class="form-control" required>
+        </div>
+
+        <div class="col-12 text-end mt-3">
+          <button type="submit" class="btn btn-success">
+            <i class="fas fa-plus-circle"></i> Add Entry
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Timetable Table -->
+  <div class="card shadow-sm border-0">
+    <div class="card-header text-white" style="background: linear-gradient(90deg, #1cc88a, #20c997);">
+      <div class="d-flex justify-content-between align-items-center">
+        <h4 class="mb-0"><i class="fas fa-table"></i> Existing Timetable</h4>
+        <div class="d-flex gap-2">
+          <input type="text" id="searchBox" class="form-control form-control-sm" placeholder="🔍 Search...">
+          <select id="filterDay" class="form-select form-select-sm">
+            <option value="">All Days</option>
+            <option>Monday</option>
+            <option>Tuesday</option>
+            <option>Wednesday</option>
+            <option>Thursday</option>
+            <option>Friday</option>
+          </select>
+          <select id="filterClass" class="form-select form-select-sm">
+            <option value="">All Classes</option>
+            {% for cls in class_list %}
+              <option>{{ cls }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <table class="table table-striped table-hover align-middle" id="timetableTable">
+        <thead class="table-dark">
+          <tr>
+            <th>Class</th>
+            <th>Course</th>
+            <th>Day</th>
+            <th>Start</th>
+            <th>End</th>
+            <th style="width: 180px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in timetable %}
+          <tr>
+            <td><span class="badge bg-primary">{{ entry.assigned_class }}</span></td>
+            <td>{{ entry.course.name }}</td>
+            <td>
+              <span class="badge 
+                {% if entry.day_of_week == 'Monday' %}bg-info
+                {% elif entry.day_of_week == 'Tuesday' %}bg-success
+                {% elif entry.day_of_week == 'Wednesday' %}bg-warning text-dark
+                {% elif entry.day_of_week == 'Thursday' %}bg-danger
+                {% else %}bg-secondary{% endif %}">
+                {{ entry.day_of_week }}
+              </span>
+            </td>
+            <td><i class="fas fa-clock text-success"></i> {{ entry.start_time.strftime('%H:%M') }}</td>
+            <td><i class="fas fa-clock text-danger"></i> {{ entry.end_time.strftime('%H:%M') }}</td>
+            <td>
+              <a href="{{ url_for('admin.edit_timetable_entry', entry_id=entry.id) }}" 
+                 class="btn btn-sm btn-warning" title="Edit"><i class="fas fa-edit"></i></a>
+              <form action="{{ url_for('admin.delete_timetable_entry', entry_id=entry.id) }}" 
+                    method="POST" class="d-inline" 
+                    onsubmit="return confirm('Are you sure you want to delete this entry?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-sm btn-danger" title="Delete"><i class="fas fa-trash-alt"></i></button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center text-muted">
+              <i class="fas fa-info-circle"></i> No timetable entries found.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Filtering Script -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const searchBox = document.getElementById("searchBox");
+  const filterDay = document.getElementById("filterDay");
+  const filterClass = document.getElementById("filterClass");
+  const rows = document.querySelectorAll("#timetableTable tbody tr");
+
+  function filterTable() {
+    const search = searchBox.value.toLowerCase();
+    const day = filterDay.value;
+    const cls = filterClass.value;
+
+    rows.forEach(row => {
+      const classText = row.cells[0].innerText.toLowerCase();
+      const courseText = row.cells[1].innerText.toLowerCase();
+      const dayText = row.cells[2].innerText;
+
+      let match = true;
+      if (search && !(classText.includes(search) || courseText.includes(search))) match = false;
+      if (day && dayText !== day) match = false;
+      if (cls && row.cells[0].innerText !== cls) match = false;
+
+      row.style.display = match ? "" : "none";
+    });
+  }
+
+  searchBox.addEventListener("keyup", filterTable);
+  filterDay.addEventListener("change", filterTable);
+  filterClass.addEventListener("change", filterTable);
+});
+</script>
+{% endblock %}

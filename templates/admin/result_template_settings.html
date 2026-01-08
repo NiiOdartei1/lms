@@ -1,0 +1,30 @@
+{% extends "admin/layout.html" %}
+{% block title %}Select Result Template{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <h3 class="mb-4">Select Result Template Style</h3>
+
+    <form method="POST">
+        <!-- CSRF PROTECTION -->
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="list-group">
+
+            {% for key, label in templates.items() %}
+                <label class="list-group-item d-flex align-items-center">
+                    <input type="radio" name="template" value="{{ key }}"
+                           class="form-check-input me-3"
+                           {% if key == current %}checked{% endif %}>
+                    <strong>{{ label }}</strong>
+                </label>
+            {% endfor %}
+
+        </div>
+
+        <button class="btn btn-primary mt-4">Save Changes</button>
+    </form>
+
+</div>
+{% endblock %}

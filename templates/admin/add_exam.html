@@ -1,0 +1,134 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Add Exam | Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="card shadow-lg border-0">
+    <!-- Gradient Header -->
+    <div class="card-header text-white" 
+         style="background: linear-gradient(90deg, #4e73df, #1cc88a);">
+      <h3 class="mb-0"><i class="fas fa-clipboard-list"></i> Create New Exam</h3>
+    </div>
+
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('admin.add_exam') }}">
+        {{ form.hidden_tag() }}
+
+        <!-- Title -->
+        <div class="mb-3">
+          <label class="form-label fw-bold"><i class="fas fa-heading text-primary"></i> {{ form.title.label }}</label>
+          {{ form.title(class="form-control", placeholder="Enter exam title") }}
+          {% for err in form.title.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+        </div>
+
+        <!-- Subject -->
+        <div class="mb-3">
+          <label class="form-label fw-bold"><i class="fas fa-book text-info"></i> {{ form.subject.label }}</label>
+          {{ form.subject(class="form-control", placeholder="Enter subject name") }}
+          {% for err in form.subject.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+        </div>
+
+        <!-- Class -->
+        <div class="mb-3">
+          <label class="form-label fw-bold"><i class="fas fa-users text-warning"></i> {{ form.assigned_class.label }}</label>
+          {{ form.assigned_class(class="form-select") }}
+          {% for err in form.assigned_class.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+        </div>
+
+        <!-- DateTime -->
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold"><i class="fas fa-clock text-success"></i> {{ form.start_datetime.label }}</label>
+            {{ form.start_datetime(class="form-control", type="datetime-local") }}
+            {% for err in form.start_datetime.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold"><i class="fas fa-hourglass-end text-danger"></i> {{ form.end_datetime.label }}</label>
+            {{ form.end_datetime(class="form-control", type="datetime-local") }}
+            {% for err in form.end_datetime.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+          </div>
+        </div>
+
+        <!-- Duration -->
+        <div class="mb-3">
+          <label class="form-label fw-bold"><i class="fas fa-stopwatch text-primary"></i> {{ form.duration_minutes.label }}</label>
+          {{ form.duration_minutes(class="form-control", id="duration_minutes", placeholder="e.g. 90") }}
+          <div id="durationPreview" class="form-text mt-1"></div>
+          {% for err in form.duration_minutes.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+        </div>
+
+        <!-- Assignment Mode -->
+        <div class="mb-3">
+          <label class="form-label fw-bold"><i class="fas fa-random text-dark"></i> {{ form.assignment_mode.label }}</label>
+          {{ form.assignment_mode(class="form-select", id="assignment_mode") }}
+          <div class="form-text">
+            <span class="badge bg-secondary">Random</span> Each student gets a random set.<br>
+            <span class="badge bg-info">Hash</span> Deterministic set assignment based on student.<br>
+            <span class="badge bg-warning text-dark">Choice</span> Students choose their set manually.
+          </div>
+          {% for err in form.assignment_mode.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+        </div>
+
+        <!-- Assignment Seed -->
+        <div class="mb-3 collapse" id="assignment-seed-group">
+          <label class="form-label fw-bold"><i class="fas fa-key text-success"></i> {{ form.assignment_seed.label }}</label>
+          {{ form.assignment_seed(class="form-control", placeholder="Optional seed value") }}
+          <div class="form-text">Used only in <strong>Hash</strong> mode to make assignments reproducible.</div>
+          {% for err in form.assignment_seed.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+        </div>
+
+        <!-- Buttons -->
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-success">
+            <i class="fas fa-plus-circle"></i> Create Exam
+          </button>
+          <a href="{{ url_for('admin.manage_exams') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-times"></i> Cancel
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Script -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const modeSelect = document.getElementById("assignment_mode");
+  const seedGroup = document.getElementById("assignment-seed-group");
+  const durationInput = document.getElementById("duration_minutes");
+  const durationPreview = document.getElementById("durationPreview");
+
+  // Toggle Seed Field
+  function toggleSeedField() {
+    if (modeSelect.value === "hash") {
+      new bootstrap.Collapse(seedGroup, { show: true });
+    } else {
+      new bootstrap.Collapse(seedGroup, { hide: true });
+    }
+  }
+
+  // Live Duration Preview
+  function updateDurationPreview() {
+    const mins = parseInt(durationInput.value) || 0;
+    if (mins <= 0) {
+      durationPreview.innerHTML = "<span class='badge bg-danger'>Invalid duration</span>";
+      return;
+    }
+    const hours = Math.floor(mins / 60);
+    const remainingMins = mins % 60;
+    let text = "";
+    if (hours > 0) text += `${hours}h `;
+    if (remainingMins > 0) text += `${remainingMins}m`;
+    durationPreview.innerHTML = `<span class="badge bg-success">⏱ ${text.trim()}</span>`;
+  }
+
+  toggleSeedField();
+  modeSelect.addEventListener("change", toggleSeedField);
+  durationInput.addEventListener("input", updateDurationPreview);
+
+  // Initialize preview on load
+  updateDurationPreview();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>{% block title %}Admin Panel | LMS{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+
+  <style>
+    /* ===== Body & Layout ===== */
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.admin-wrapper {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+}
+
+/* ===== Sidebar ===== */
+.sidebar {
+  width: 250px;
+  background-color: #343a40;
+  color: white;
+  position: fixed;
+  top: 56px; /* offset for navbar */
+  bottom: 0;
+  overflow-y: auto;
+  transition: all 0.3s ease;
+  z-index: 1040;
+}
+
+.sidebar.collapsed {
+  width: 60px;
+}
+
+.sidebar h4 {
+  padding: 1rem;
+  margin: 0;
+  background-color: #23272b;
+  border-bottom: 1px solid #495057;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar.collapsed h4 {
+  text-align: center;
+  font-size: 1.2rem;
+}
+
+.sidebar a {
+  color: #adb5bd;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.2s;
+}
+
+.sidebar a i {
+  min-width: 20px;
+  text-align: center;
+}
+
+.sidebar.collapsed a {
+  justify-content: center;
+  padding: 0.75rem 0;
+}
+
+.sidebar a:hover,
+.sidebar a.active {
+  background-color: #495057;
+  color: #fff;
+}
+
+.sidebar.collapsed a span.link-text {
+  display: none;
+}
+
+/* ===== Navbar ===== */
+nav.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  z-index: 1050;
+  transition: margin-left 0.3s ease;
+}
+
+nav.navbar.collapsed {
+  margin-left: 60px;
+}
+
+/* ===== Content Area ===== */
+.content-area {
+  flex: 1;
+  margin-left: 250px;
+  padding: 20px;
+  padding-top: 76px; /* navbar height + spacing */
+  transition: margin-left 0.3s ease;
+}
+
+.content-area.collapsed {
+  margin-left: 60px;
+}
+
+/* ===== Footer ===== */
+footer {
+  margin-left: 250px;
+  background-color: #343a40;
+  color: #ccc;
+  text-align: center;
+  padding: 1rem;
+  transition: margin-left 0.3s ease;
+  margin-top: auto; /* stick footer at bottom */
+}
+
+footer.collapsed {
+  margin-left: 60px;
+}
+
+/* ===== Overlay for Mobile ===== */
+.overlay {
+  display: none;
+  position: fixed;
+  top: 56px;
+  left: 0;
+  width: 100%;
+  height: calc(100% - 56px);
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 1039;
+}
+
+.overlay.active {
+  display: block;
+}
+
+/* ===== Dark Mode ===== */
+body.dark-mode {
+  background-color: #121212;
+  color: #e0e0e0;
+}
+
+.navbar.dark-mode {
+  background-color: #1f1f1f;
+}
+
+.sidebar.dark-mode {
+  background-color: #1e1e1e;
+  color: #ddd;
+}
+
+.sidebar.dark-mode a {
+  color: #ccc;
+}
+
+.sidebar.dark-mode a:hover,
+.sidebar.dark-mode .active {
+  background-color: #333;
+  color: #fff;
+}
+
+.main-content.dark-mode {
+  background-color: #1e1e1e;
+}
+
+.card.dark-mode {
+  background-color: #2a2a2a;
+  color: #e0e0e0;
+}
+
+.alert.dark-mode {
+  background-color: #2e2e2e;
+  color: #f1f1f1;
+}
+
+.dropdown-menu.dark-mode {
+  background-color: #2a2a2a;
+  color: #fff;
+}
+
+.dropdown-menu.dark-mode .dropdown-item {
+  color: #ccc;
+}
+
+.dropdown-menu.dark-mode .dropdown-item:hover {
+  background-color: #444;
+  color: white;
+}
+
+/* ===== Responsive Mobile ===== */
+@media (max-width: 768px) {
+  .sidebar {
+    left: -250px;
+    width: 250px;
+    height: calc(100% - 56px);
+    top: 56px;
+  }
+
+  .sidebar.show {
+    left: 0;
+  }
+
+  .content-area,
+  footer {
+    margin-left: 0 !important;
+    padding-top: 76px; /* maintain navbar space */
+  }
+}
+
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+    <h4 class="text-center py-3" style="background: linear-gradient(90deg, #7b2cbf, #f72585); font-weight:bold; letter-spacing:1px;">
+        LMS Admin
+    </h4>
+
+    <!-- Dashboard -->
+    <a href="{{ url_for('admin.dashboard') }}" class="{% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+        <i class="fas fa-home me-2"></i><span class="link-text"> Dashboard</span>
+        <span class="badge bg-warning ms-auto">New</span>
+    </a>
+
+    <!-- Database & Registration -->
+    <div class="sidebar-section text-white px-3 py-2" style="background: #6f42c1;">Management</div>
+      <a href="{{ url_for('admin.view_database') }}" class="{% if request.endpoint == 'admin.view_database' %}active{% endif %}"><i class="fas fa-database me-2"></i><span class="link-text"> Database</span></a>
+      <a href="{{ url_for('admin.register_user') }}" class="{% if request.endpoint == 'admin.register_user' %}active{% endif %}"><i class="fas fa-user-plus me-2"></i><span class="link-text"> Register User</span></a>
+      <a href="{{ url_for('admin.teacher_assessment_admin_home') }}"class="{% if request.endpoint.startswith('admin.teacher_assessment') %}active{% endif %}"><i class="fas fa-chalkboard-teacher me-2"></i><span class="link-text"> Teacher Assessment</span></a>
+
+    <!-- Virtual Class Accordion -->
+    <div class="accordion mt-3" id="virtualClassAccordion">
+        <div class="accordion-item bg-transparent border-0">
+            <h2 class="accordion-header" id="headingVC">
+                <button class="accordion-button collapsed px-3 py-2"
+                        style="background: linear-gradient(90deg, #ff7e5f, #feb47b); color:#fff; font-weight:500;"
+                        type="button" data-bs-toggle="collapse" data-bs-target="#collapseVC"
+                        aria-expanded="false" aria-controls="collapseVC">
+                    <i class="fas fa-chalkboard me-2"></i><span class="link-text"> Virtual Class</span>
+                </button>
+            </h2>
+            <div id="collapseVC" class="accordion-collapse collapse" aria-labelledby="headingVC"
+                data-bs-parent="#virtualClassAccordion">
+                <div class="accordion-body p-0">
+                    {% set vc_links = [
+                        ['admin.manage_quizzes', 'Manage Quizzes', 'fa-question-circle'],
+                        ['admin.manage_exams', 'Manage Exams', 'fa-file-alt'],
+                        ['admin.manage_assignments', 'Manage Assignments', 'fa-tasks'],
+                        ['admin.manage_materials', 'Manage Materials', 'fa-folder-open'],
+                        ['admin.manage_events', 'Manage Events', 'fa-calendar-alt'],
+                        ['admin.manage_courses', 'Manage Courses', 'fa-book'],
+                        ['admin.manage_timetable', 'Manage Timetable', 'fa-clock'],
+                        ['admin.admin_exam_timetable', 'Exam Timetable', 'fa-calendar-check']
+                    ] %}
+                    {% for endpoint, label, icon in vc_links %}
+                        <a href="{{ url_for(endpoint) }}"
+                           class="d-block px-4 py-2 text-decoration-none text-light {% if request.endpoint == endpoint %}bg-secondary{% endif %}">
+                            <i class="fas {{ icon }} me-2"></i>{{ label }}
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fees & Payments -->
+    <div class="sidebar-section text-white px-3 py-2 mt-3" style="background: #198754;">Finance</div>
+    <a href="{{ url_for('admin.assign_fees') }}" class="{% if request.endpoint == 'admin.assign_fees' %}active{% endif %}">
+        <i class="fas fa-money-bill-wave me-2"></i><span class="link-text"> Assign Fees</span>
+    </a>
+    <a href="{{ url_for('admin.review_payments') }}" class="{% if request.endpoint == 'admin.review_payments' %}active{% endif %}">
+        <i class="fas fa-receipt me-2"></i><span class="link-text"> Review Payments</span>
+    </a>
+    <a href="{{ url_for('admin.promote_all_students') }}" class="btn btn-gradient btn-success mx-3 my-2 w-75 rounded-pill">Promote Students</a>
+
+    <!-- Communication -->
+    <div class="sidebar-section text-white px-3 py-2 mt-3" style="background: #dc3545;">Communication</div>
+    <a href="{{ url_for('chat.chat_home') }}" class="nav-link"><i class="fas fa-comments me-2"></i>Chat</a>
+
+    <!-- Misc -->
+    <div class="sidebar-section text-white px-3 py-2 mt-3" style="background: #0d6efd;">Settings</div>
+
+    <a href="{{ url_for('admin.result_template_settings') }}"
+       class="{% if request.endpoint == 'admin.result_template_settings' %}active{% endif %}">
+        <i class="fas fa-file-pdf me-2"></i>
+        <span class="link-text"> Result Template Style</span>
+    </a>
+
+    <a href="{{ url_for('admin.password_reset_requests_view') }}" class="{% if request.endpoint == 'admin.password_reset_requests' %}active{% endif %}">
+        <i class="fas fa-key me-2"></i><span class="link-text"> Password Reset Requests</span>
+    </a>
+    <a href="{{ url_for('admin.profile') }}"><i class="fas fa-user-circle me-2"></i><span class="link-text"> Profile</span></a>
+    <a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-2"></i><span class="link-text"> Logout</span></a>
+  </div>
+
+<style>
+.sidebar a {
+    transition: all 0.3s ease;
+    border-left: 4px solid transparent;
+}
+.sidebar a:hover {
+    background: linear-gradient(90deg, #ff7e5f, #feb47b);
+    border-left: 4px solid #fff;
+    color: #fff !important;
+    transform: translateX(5px);
+}
+.sidebar .btn-gradient {
+    background: linear-gradient(90deg, #00c6ff, #0072ff);
+    color: #fff;
+    border: none;
+    transition: all 0.3s ease;
+}
+.sidebar .btn-gradient:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+.sidebar-section {
+    font-size: 0.9rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+/* ===== Font Size Adjustments ===== */
+body {
+  font-size: 0.85rem; /* smaller base font */
+}
+
+.sidebar h4 {
+  font-size: 1rem; /* smaller sidebar header */
+}
+
+.sidebar a {
+  font-size: 0.85rem; /* smaller sidebar links */
+}
+
+.sidebar-section {
+  font-size: 0.75rem; /* reduce section label */
+}
+
+nav.navbar .navbar-brand {
+  font-size: 1rem;
+}
+
+nav.navbar,
+footer {
+  font-size: 0.8rem;
+}
+
+.breadcrumb {
+  font-size: 0.8rem;
+}
+
+.card h4, .card h5 {
+  font-size: 1rem;
+}
+
+</style>
+
+  <!-- Overlay for mobile -->
+  <div class="overlay" id="overlay"></div>
+
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg shadow-sm" id="top-navbar">
+    <div class="container-fluid">
+  <button class="btn btn-outline-secondary me-3" id="sidebarToggle">
+    <i class="fas fa-bars"></i>
+  </button>
+
+  <span class="navbar-brand fw-bold">LMS Admin</span>
+
+  <!-- Dark Mode Toggle Button -->
+  <button class="btn btn-sm btn-dark ms-auto me-2" id="toggleDarkMode" title="Toggle Dark Mode">
+    <i class="fas fa-moon"></i>
+  </button>
+
+  <div class="text-muted">Logged in as: {{ current_user.username }}</div>
+</div>
+
+  </nav>
+
+  <!-- Main Content -->
+  <main class="content-area" id="content-area">
+    {% if breadcrumbs %}
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb">
+        {% for crumb in breadcrumbs %}
+          <li class="breadcrumb-item">
+            {% if loop.last %}
+              <strong>{{ crumb.label }}</strong>
+            {% else %}
+              <a href="{{ crumb.url }}">{{ crumb.label }}</a>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ol>
+    </nav>
+    {% endif %}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer -->
+  <footer id="footer">
+    <p class="mb-0">© {{ current_year }} LMS | Powered by Your Organization</p>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+  const sidebar = document.getElementById('sidebar');
+  const contentArea = document.getElementById('content-area');
+  const navbar = document.getElementById('top-navbar');
+  const footer = document.getElementById('footer');
+  const overlay = document.getElementById('overlay');
+  const toggleBtn = document.getElementById('sidebarToggle');
+
+  // Key for localStorage
+  const STORAGE_KEY = 'adminSidebarCollapsed';
+
+  // Apply saved state on load (desktop only)
+  function applySidebarState() {
+    if (window.innerWidth > 768) {
+      const collapsed = localStorage.getItem(STORAGE_KEY) === 'true';
+      if (collapsed) {
+        sidebar.classList.add('collapsed');
+        contentArea.classList.add('collapsed');
+        navbar.classList.add('collapsed');
+        footer.classList.add('collapsed');
+      } else {
+        sidebar.classList.remove('collapsed');
+        contentArea.classList.remove('collapsed');
+        navbar.classList.remove('collapsed');
+        footer.classList.remove('collapsed');
+      }
+      // Make sure mobile classes are removed on desktop load
+      sidebar.classList.remove('show');
+      overlay.classList.remove('active');
+    } else {
+      // On mobile, always reset to expanded hidden sidebar
+      sidebar.classList.remove('collapsed');
+      contentArea.classList.remove('collapsed');
+      navbar.classList.remove('collapsed');
+      footer.classList.remove('collapsed');
+      sidebar.classList.remove('show');
+      overlay.classList.remove('active');
+    }
+  }
+
+  // Toggle function with persistence
+  function toggleSidebar() {
+    if (window.innerWidth <= 768) {
+      sidebar.classList.toggle('show');
+      overlay.classList.toggle('active');
+    } else {
+      sidebar.classList.toggle('collapsed');
+      contentArea.classList.toggle('collapsed');
+      navbar.classList.toggle('collapsed');
+      footer.classList.toggle('collapsed');
+
+      // Save state
+      const isCollapsed = sidebar.classList.contains('collapsed');
+      localStorage.setItem(STORAGE_KEY, isCollapsed);
+    }
+  }
+
+  toggleBtn.addEventListener('click', toggleSidebar);
+  overlay.addEventListener('click', toggleSidebar);
+
+  window.addEventListener('resize', () => {
+    applySidebarState();
+  });
+
+  // Initialize on page load
+  document.addEventListener('DOMContentLoaded', () => {
+    applySidebarState();
+  });
+
+  function updateToggleIcon() {
+  const icon = toggleDarkMode.querySelector('i');
+  if (body.classList.contains('dark-mode')) {
+    icon.classList.remove('fa-moon');
+    icon.classList.add('fa-sun');
+  } else {
+    icon.classList.remove('fa-sun');
+    icon.classList.add('fa-moon');
+  }
+}
+
+  const toggleDarkMode = document.getElementById('toggleDarkMode');
+  const body = document.body;
+  const mainContent = document.getElementById('content-area');
+
+  // Load saved preference
+  if (localStorage.getItem('darkMode') === 'enabled') {
+    enableDarkMode();
+  }
+
+  toggleDarkMode.addEventListener('click', () => {
+    if (body.classList.contains('dark-mode')) {
+      disableDarkMode();
+    } else {
+      enableDarkMode();
+    }
+  });
+
+  function enableDarkMode() {
+  body.classList.add('dark-mode');
+  navbar.classList.add('dark-mode');
+  sidebar.classList.add('dark-mode');
+  mainContent.classList.add('dark-mode');
+  document.querySelectorAll('.card').forEach(el => el.classList.add('dark-mode'));
+  document.querySelectorAll('.alert').forEach(el => el.classList.add('dark-mode'));
+  document.querySelectorAll('.dropdown-menu').forEach(el => el.classList.add('dark-mode'));
+  localStorage.setItem('darkMode', 'enabled');
+  updateToggleIcon();
+}
+
+function disableDarkMode() {
+  body.classList.remove('dark-mode');
+  navbar.classList.remove('dark-mode');
+  sidebar.classList.remove('dark-mode');
+  mainContent.classList.remove('dark-mode');
+  document.querySelectorAll('.card').forEach(el => el.classList.remove('dark-mode'));
+  document.querySelectorAll('.alert').forEach(el => el.classList.remove('dark-mode'));
+  document.querySelectorAll('.dropdown-menu').forEach(el => el.classList.remove('dark-mode'));
+  localStorage.setItem('darkMode', 'disabled');
+  updateToggleIcon();
+}
+</script>
+
+</body>
+</html>

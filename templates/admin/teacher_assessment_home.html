@@ -1,0 +1,75 @@
+{% extends "admin/layout.html" %}
+{% block title %}Teacher Assessment{% endblock %}
+
+{% block content %}
+<div class="container my-1">
+
+  <h4 class="fw-bold mb-4">
+    <i class="fas fa-chalkboard-teacher"></i> Teacher Assessment
+  </h4>
+
+  {% if active_period %}
+    <div class="alert alert-success">
+      <strong>Active Period:</strong>
+      {{ active_period.academic_year }} —
+      {{ active_period.semester }}
+    </div>
+  {% else %}
+    <div class="alert alert-warning">
+      No active assessment period.
+    </div>
+  {% endif %}
+
+  <div class="row g-4">
+
+    <!-- Period Manager -->
+    <div class="col-md-4">
+      <a href="{{ url_for('admin.assessment_periods') }}"
+         class="text-decoration-none">
+        <div class="card shadow-sm h-100">
+          <div class="card-body text-center">
+            <i class="fas fa-calendar-alt fa-2x text-primary mb-2"></i>
+            <h6 class="fw-bold">Assessment Periods</h6>
+            <p class="text-muted small">
+              Open or close assessment semesters
+            </p>
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <!-- Question Manager -->
+    <div class="col-md-4">
+      <a href="{{ url_for('admin.teacher_assessment_questions') }}"
+         class="text-decoration-none">
+        <div class="card shadow-sm h-100">
+          <div class="card-body text-center">
+            <i class="fas fa-question-circle fa-2x text-success mb-2"></i>
+            <h6 class="fw-bold">Assessment Questions</h6>
+            <p class="text-muted small">
+              Manage teacher & student response questions
+            </p>
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <!-- Reports -->
+    <div class="col-md-4">
+      <a href="{{ url_for('admin.assessment_periods') }}"
+         class="text-decoration-none">
+        <div class="card shadow-sm h-100">
+          <div class="card-body text-center">
+            <i class="fas fa-chart-bar fa-2x text-warning mb-2"></i>
+            <h6 class="fw-bold">Assessment Reports</h6>
+            <p class="text-muted small">
+              View analytics & download reports
+            </p>
+          </div>
+        </div>
+      </a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

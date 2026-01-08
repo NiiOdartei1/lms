@@ -1,0 +1,271 @@
+{% extends "admin/layout.html" %}
+{% block title %}Academic Calendar{% endblock %}
+{% block content %}
+
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
+<style>
+  /* Gradient Tabs */
+  .nav-tabs .nav-link.active {
+    background: linear-gradient(90deg, #4e73df, #1cc88a);
+    color: white !important;
+    font-weight: bold;
+    border: none;
+  }
+  .nav-tabs .nav-link {
+    border: none;
+    color: #4e73df;
+    font-weight: 500;
+  }
+  .nav-tabs .nav-link:hover {
+    color: #1cc88a;
+  }
+
+  /* Calendar wrapper */
+  #calendar {
+    background: #fff;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0px 3px 8px rgba(0,0,0,0.15);
+  }
+
+  /* Toolbar Buttons */
+  .fc-toolbar-chunk .btn {
+    border-radius: 20px !important;
+    padding: 5px 12px !important;
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  .fc-toolbar-chunk .btn-primary {
+    background: linear-gradient(90deg, #36b9cc, #6610f2);
+    border: none;
+  }
+  .fc-toolbar-chunk .btn-primary:hover {
+    opacity: 0.9;
+  }
+
+  /* Toast notification */
+  #toastContainer {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2000;
+  }
+</style>
+
+<div class="container mt-4">
+  <!-- Tabs -->
+  <ul class="nav nav-tabs" id="calendarTabs" role="tablist">
+    <li class="nav-item">
+      <button class="nav-link active" id="calendar-tab" data-bs-toggle="tab" data-bs-target="#calendarTab" type="button" role="tab">
+        <i class="fas fa-calendar-alt"></i> Calendar View
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settingsTab" type="button" role="tab">
+        <i class="fas fa-cogs"></i> Academic Year Settings
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content mt-3" id="calendarTabsContent">
+    <!-- Calendar -->
+    <div class="tab-pane fade show active" id="calendarTab" role="tabpanel">
+      <div id="calendar"></div>
+    </div>
+
+    <!-- Academic Year Settings -->
+    <div class="tab-pane fade" id="settingsTab" role="tabpanel">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <h5 class="card-title text-primary mb-3"><i class="fas fa-university"></i> Configure Academic Year</h5>
+          <form method="POST" class="row g-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="col-md-6">
+              <label class="form-label">Academic Year Start</label>
+              <input type="date" name="start_date" value="{{ academic_year.start_date if academic_year else '' }}" class="form-control border-success" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Academic Year End</label>
+              <input type="date" name="end_date" value="{{ academic_year.end_date if academic_year else '' }}" class="form-control border-danger" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Semester 1 Start</label>
+              <input type="date" name="semester_1_start" value="{{ academic_year.semester_1_start if academic_year else '' }}" class="form-control border-info" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Semester 1 End</label>
+              <input type="date" name="semester_1_end" value="{{ academic_year.semester_1_end if academic_year else '' }}" class="form-control border-warning" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Semester 2 Start</label>
+              <input type="date" name="semester_2_start" value="{{ academic_year.semester_2_start if academic_year else '' }}" class="form-control border-info" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Semester 2 End</label>
+              <input type="date" name="semester_2_end" value="{{ academic_year.semester_2_end if academic_year else '' }}" class="form-control border-warning" required>
+            </div>
+            <div class="col-12">
+              <button class="btn btn-success w-100 mt-2"><i class="fas fa-save"></i> Save Academic Year</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="eventModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <form id="eventForm" method="POST" class="modal-content shadow-lg border-0">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="event_id" id="eventId">
+      <input type="hidden" name="date" id="eventDate">
+
+      <div class="modal-header text-white" style="background: linear-gradient(90deg, #36b9cc, #6610f2);">
+        <h5 class="modal-title"><i class="fas fa-calendar-plus"></i> Calendar Event</h5>
+        <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">Break Type</label>
+        <select name="break_type" id="breakType" class="form-select" required>
+          <option value="">Choose…</option>
+          {% for bt, label in break_types.items() %}
+            <option value="{{ bt }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+
+        <label class="form-label mt-2">Label</label>
+        <input type="text" name="label" id="label" class="form-control" required>
+
+        <div class="form-check mt-2">
+          <input class="form-check-input" type="checkbox" name="is_workday" id="isWorkday">
+          <label class="form-check-label" for="isWorkday">Mark as Workday?</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger me-auto" type="button" id="deleteBtn" hidden><i class="fas fa-trash"></i> Delete</button>
+        <button class="btn btn-secondary" data-bs-dismiss="modal" type="button"><i class="fas fa-times"></i> Cancel</button>
+        <button class="btn btn-primary" type="submit"><i class="fas fa-save"></i> Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div id="toastContainer"></div>
+
+<script id="calendarData" type="application/json">
+  {{ cal_events | tojson | safe }}
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+  const form = document.getElementById('eventForm');
+  const events = JSON.parse(document.getElementById('calendarData').textContent);
+
+  const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+    initialView: 'dayGridMonth',
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+    },
+    buttonText: {
+      today: 'Today',
+      month: 'Month',
+      week: 'Week',
+      day: 'Day',
+      list: 'Agenda'
+    },
+    selectable: true,
+    events: events,
+    eventColor: '#4e73df',
+    eventDidMount: function(info) {
+      if (info.event.extendedProps.break_type === "holiday") {
+        info.el.style.backgroundColor = "#e74a3b";
+      } else if (info.event.extendedProps.break_type === "midterm") {
+        info.el.style.backgroundColor = "#f6c23e";
+      } else if (info.event.extendedProps.break_type === "semester") {
+        info.el.style.backgroundColor = "#1cc88a";
+      }
+    },
+    dayCellDidMount: function(info) {
+      const day = info.date.getDay();
+      if (day === 0 || day === 6) {
+        info.el.style.backgroundColor = '#f8f9fc';
+      }
+    },
+    dateClick(info) {
+      form.reset();
+      document.getElementById('eventId').value = '';
+      document.getElementById('eventDate').value = info.dateStr;
+      document.getElementById('deleteBtn').hidden = true;
+      modal.show();
+    },
+    eventClick(info) {
+      const e = info.event;
+      document.getElementById('eventId').value = e.id;
+      document.getElementById('eventDate').value = e.startStr;
+      document.getElementById('label').value = e.title;
+      document.getElementById('breakType').value = e.extendedProps.break_type || '';
+      document.getElementById('isWorkday').checked = e.backgroundColor === '#28a745';
+      document.getElementById('deleteBtn').hidden = false;
+      modal.show();
+    }
+  });
+
+  calendar.render();
+
+  // Auto-fill label
+  document.getElementById('breakType').addEventListener('change', function () {
+    document.getElementById('label').value = this.options[this.selectedIndex].text;
+  });
+
+  // Submit event
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const formData = new FormData(form);
+    const isEdit = formData.get("event_id");
+    const url = isEdit ? `/admin/events/edit/${formData.get("event_id")}` : '/admin/events/add';
+    const res = await fetch(url, { method: 'POST', body: formData });
+    if (res.ok) {
+      showToast("✅ Event saved successfully", "bg-success");
+      setTimeout(() => location.reload(), 1000);
+    } else {
+      showToast("❌ Error saving event", "bg-danger");
+    }
+  });
+
+  // Delete event
+  document.getElementById('deleteBtn').addEventListener('click', async function () {
+    const id = document.getElementById('eventId').value;
+    if (confirm("Delete this event?")) {
+      const res = await fetch(`/admin/events/delete/${id}`, { method: 'POST' });
+      if (res.ok) {
+        showToast("🗑 Event deleted", "bg-warning");
+        setTimeout(() => location.reload(), 1000);
+      }
+    }
+  });
+
+  // Toast function
+  function showToast(message, cls) {
+    const toastEl = document.createElement("div");
+    toastEl.className = `toast align-items-center text-white border-0 ${cls}`;
+    toastEl.role = "alert";
+    toastEl.innerHTML = `
+      <div class="d-flex">
+        <div class="toast-body">${message}</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>`;
+    document.getElementById("toastContainer").appendChild(toastEl);
+    const toast = new bootstrap.Toast(toastEl, { delay: 2000 });
+    toast.show();
+  }
+});
+</script>
+{% endblock %}

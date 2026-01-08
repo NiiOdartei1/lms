@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}Parent Portal{% endblock %}</title>
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Font Awesome + Bootstrap Icons -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+  <!-- FullCalendar (only if used on pages) -->
+  <link href="{{ url_for('static', filename='css/fullcalendar-main.min.css') }}" rel="stylesheet">
+
+  <style>
+  /* ---------- Palette and sizing (keeps your colors) ---------- */
+  :root{
+    --navbar-height:48px;
+    --sidebar-width:220px;
+    --sidebar-collapsed:72px;
+
+    /* LIGHT palette (kept from your template) */
+    --bg: #f4f4f4;
+    --page: #ffffff;
+    --text: #222222;
+    --muted: #555555;
+    --navbar-bg: #5a189a;      /* primary purple */
+    --sidebar-bg: #7b2cbf;     /* sidebar purple */
+    --card-bg: #ffffff;
+    --card-border: rgba(0,0,0,0.04);
+    --link-accent: #7b2cbf;
+    --accent-left: #ffd700;
+    --icon-bg: #f3e8ff;
+  }
+
+  /* Dark theme variables (toggle with body.dark-mode) */
+  body.dark-mode{ --bg:#0f1720; --page:#0e1418; --text:#e6eef6; --muted:#b6c0c8; --navbar-bg:#15141a; --sidebar-bg:#1e1524; --card-bg:#111318; --card-border:rgba(255,255,255,0.04); --link-accent:#9b6df0; --accent-left:#f7c948; --icon-bg:#241832; }
+
+  html{font-size:100%;}
+  body{ font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial; font-size:14px; line-height:1.35; margin:0; padding-top:var(--navbar-height); background:var(--bg); color:var(--text); }
+
+  /* Top navbar */
+  .navbar{ height:var(--navbar-height); background:var(--navbar-bg); }
+  .brand-compact{ display:flex; gap:.5rem; align-items:center; }
+  .brand-compact .title{ font-weight:700; color:#fff; letter-spacing:.2px; }
+
+  /* Sidebar */
+  .sidebar{ position:fixed; inset:0 auto 0 0; left:0; top:0; width:var(--sidebar-width); padding-top:calc(var(--navbar-height) + 12px); background:var(--sidebar-bg); color:var(--page); min-height:100vh; transition:width .22s ease; display:flex; flex-direction:column; }
+  .sidebar .sidebar-header{ padding:12px 16px; font-size:.78rem; text-transform:uppercase; color:rgba(255,235,255,0.95); font-weight:700; letter-spacing:.4px; }
+  .sidebar .nav-link{ color:rgba(255,255,255,0.95); padding:10px 14px; display:flex; align-items:center; gap:.8rem; border-left:4px solid transparent; }
+  .sidebar .nav-link i{ width:20px; text-align:center; }
+  .sidebar .nav-link:hover{ background:rgba(255,255,255,0.04); color:#fff; text-decoration:none; }
+  .sidebar .nav-link.active{ background:rgba(255,255,255,0.06); font-weight:600; border-left:4px solid var(--accent-left); }
+
+  /* Collapsed state */
+  .sidebar.collapsed{ width:var(--sidebar-collapsed); }
+  .sidebar.collapsed .nav-link span.label{ display:none; }
+  .sidebar.collapsed .sidebar-header{ display:none; }
+
+  /* Main content area adapts to sidebar width */
+  .main-content{ margin-left:var(--sidebar-width); padding:18px; transition:margin-left .22s ease, padding .18s ease; min-height:calc(100vh - var(--navbar-height)); }
+  .main-content.collapsed{ margin-left:var(--sidebar-collapsed); }
+
+  /* Cards and shared components */
+  .card, .alert, .dropdown-menu{ background:var(--card-bg); color:var(--text); border-color:var(--card-border); box-shadow:none; }
+  p, small, .muted { color:var(--muted); }
+
+  /* Profile mini */
+  .profile-mini{ display:flex; gap:.6rem; align-items:center; }
+  .profile-mini img{ width:36px; height:36px; object-fit:cover; border-radius:50%; }
+
+  /* Children list inside sidebar: smaller avatars */
+  .child-link{ display:flex; gap:.6rem; align-items:center; padding:8px 14px; color:rgba(255,255,255,0.95); border-left:4px solid transparent; }
+  .child-link .avatar{ width:34px; height:34px; border-radius:50%; background:var(--page); display:flex; align-items:center; justify-content:center; color:var(--link-accent); font-weight:700; }
+  .child-link:hover{ background:rgba(255,255,255,0.03); }
+
+  /* Quick dashboard tiles */
+  .dash-tiles{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+  .tile{ padding:12px; border-radius:10px; display:flex; gap:12px; align-items:center; }
+  .tile .icon{ width:56px; height:56px; border-radius:12px; display:flex; align-items:center; justify-content:center; background:var(--icon-bg); }
+
+  /* Responsive tweaks */
+  @media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    z-index: 1040;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    width: var(--sidebar-width);
+    padding-top: calc(var(--navbar-height) + 12px);
+  }
+
+  .sidebar.active {
+    transform: translateX(0);
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+    padding: 12px;
+  }
+
+  /* Optional: overlay for dim background when sidebar is open */
+  .sidebar-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1039;
+    display: none;
+  }
+  .sidebar-overlay.show { display: block; }
+}
+
+  </style>
+</head>
+<body>
+
+  <!-- Top Navbar -->
+  <nav class="navbar navbar-expand-lg fixed-top shadow-sm">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center">
+        <button class="btn btn-sm btn-light me-2" id="toggleSidebar" aria-label="Toggle sidebar"><i class="fas fa-bars"></i></button>
+        <a class="navbar-brand brand-compact d-flex align-items-center" href="{{ url_for('parent.dashboard') }}">
+          <i class="fas fa-user-friends me-2" style="color:#fff;font-size:1.05rem"></i>
+          <span class="title">Parent Panel</span>
+        </a>
+      </div>
+        <div class="dropdown">
+          <a class="d-flex align-items-center text-white text-decoration-none" href="#" data-bs-toggle="dropdown" aria-expanded="false">
+            <img src="{{ url_for('static', filename='uploads/profile_pictures/' ~ (current_user.profile_picture or 'default.png')) }}" alt="Profile" class="rounded-circle me-2" width="36" height="36">
+            <strong class="d-none d-sm-block">{{ current_user.first_name }}</strong>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+            <li><a class="dropdown-item" href="{{ url_for('parent.profile') }}"><i class="fas fa-user me-2"></i>My profile</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('parent.change_password') }}"><i class="fas fa-lock me-2"></i>Change password</a></li>
+            <li><button class="dropdown-item d-flex align-items-center" id="toggleDarkMode"><i class="fas fa-moon me-2"></i>Toggle Dark Mode</button></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Sidebar -->
+<nav id="sidebar" class="sidebar" role="navigation" aria-label="Parent navigation">
+  <div class="sidebar-header px-2">Welcome back</div>
+
+  <a class="nav-link {% if request.endpoint == 'parent.dashboard' %}active{% endif %}" href="{{ url_for('parent.dashboard') }}">
+    <i class="fas fa-home"></i> <span class="label">Dashboard</span>
+  </a>
+
+  <a class="nav-link {% if request.endpoint == 'parent.view_children' %}active{% endif %}" href="{{ url_for('parent.view_children') }}">
+    <i class="fas fa-child"></i> <span class="label">My Children</span>
+  </a>
+
+  <a class="nav-link {% if request.endpoint == 'parent.reports_list' %}active{% endif %}" href="{{ url_for('parent.reports_list') }}">
+    <i class="fas fa-file-alt"></i> <span class="label">Reports</span>
+  </a>
+
+  <!-- ✅ NEW: Communication Page -->
+  <a href="{{ url_for('chat.chat_home') }}" class="nav-link"><i class="fas fa-comments me-2"></i>Chat</a>
+
+  <a class="nav-link {% if request.endpoint == 'parent.notifications' %}active{% endif %}" href="{{ url_for('parent.notifications') }}">
+    <i class="fas fa-bell"></i>
+    <span class="label">Notifications
+      <span class="badge bg-danger ms-2" id="parent-unread-count" {% if unread_count == 0 %}style="display:none;"{% endif %}>{{ unread_count }}</span>
+    </span>
+  </a>
+
+  <div class="sidebar-header px-2 mt-3">Fees</div>
+
+  {% if current_user.children %}
+    {% for child in current_user.children %}
+      {% set active_child_id = request.view_args.student_id if request.view_args is defined and request.view_args else None %}
+      <a class="child-link nav-link {% if request.endpoint == 'parent.parent_pay_fees' and active_child_id == (child.id|string) %}active{% endif %}" href="{{ url_for('parent.parent_pay_fees', student_id=child.id) }}">
+        <div class="avatar">{{ child.first_name[0]|upper }}</div>
+        <span class="label">{{ child.first_name }} <small class="d-block text-muted">{{ child.class_name or '—' }}</small></span>
+      </a>
+    {% endfor %}
+  {% else %}
+    <div class="px-3 text-muted small">No children linked</div>
+  {% endif %}
+</nav>
+
+  <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+  <!-- Main content -->
+  <main id="mainContent" class="main-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}
+    <!-- Example dashboard layout: remove or replace in child templates -->
+    <div class="container-fluid">
+      <div class="row g-3 mb-3">
+        <div class="col-12 col-md-8">
+          <div class="card p-3 hover-card">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <h5 class="mb-1">Overview</h5>
+                <p class="small muted">Quick summary of recent activity and outstanding items.</p>
+              </div>
+              <div class="d-flex gap-2">
+                <a href="#" class="btn btn-sm btn-outline-secondary">View reports</a>
+                <a href="{{ url_for('parent.notifications') }}" class="btn btn-sm btn-outline-primary">Notifications</a>
+              </div>
+            </div>
+
+            <div class="mt-3 dash-tiles">
+              <div class="tile card">
+                <div class="icon"><i class="fas fa-file-alt fa-lg"></i></div>
+                <div>
+                  <div class="text-gradient">{{ reports_count or 0 }}</div>
+                  <div class="small muted">Reports</div>
+                </div>
+              </div>
+
+              <div class="tile card">
+                <div class="icon"><i class="fas fa-calendar-check fa-lg"></i></div>
+                <div>
+                  <div class="text-gradient">{{ upcoming_events_count or 0 }}</div>
+                  <div class="small muted">Upcoming events</div>
+                </div>
+              </div>
+
+              <div class="tile card">
+                <div class="icon"><i class="fas fa-wallet fa-lg"></i></div>
+                <div>
+                  <div class="text-gradient">{{ due_fees_count or 0 }}</div>
+                  <div class="small muted">Due fees</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-md-4">
+          <div class="card p-3 hover-card">
+            <h6 class="mb-2">Quick actions</h6>
+            <div class="d-grid gap-2">
+              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('parent.pay_now') }}"><i class="fas fa-credit-card me-2"></i>Pay fees</a>
+              <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('parent.view_children') }}"><i class="fas fa-child me-2"></i>View children</a>
+              <a class="btn btn-sm btn-outline-info" href="{{ url_for('parent.reports_list') }}"><i class="fas fa-file-alt me-2"></i>View reports</a>
+            </div>
+          </div>
+
+          <div class="card p-3 mt-3 hover-card">
+            <h6 class="mb-2">Notifications</h6>
+            <div class="small muted">You have <strong>{{ unread_count or 0 }}</strong> unread notification(s). <a href="{{ url_for('parent.notifications') }}">See all</a></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- children summary table -->
+      <div class="card p-3 hover-card">
+        <h6 class="mb-3">Children</h6>
+        <div class="table-responsive">
+          <table class="table table-borderless align-middle mb-0">
+            <thead>
+              <tr class="small text-muted">
+                <th>Student</th>
+                <th>Class</th>
+                <th>Recent report</th>
+                <th>Fees status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for child in current_user.children %}
+              <tr>
+                <td class="d-flex align-items-center gap-3">
+                  <img src="{{ url_for('static', filename='uploads/students/' ~ (child.photo or 'student-default.png')) }}" alt="" width="48" height="48" class="rounded-circle object-fit-cover">
+                  <div>
+                    <div class="fw-semibold">{{ child.first_name }} {{ child.last_name }}</div>
+                    <div class="small muted">{{ child.student_id }}</div>
+                  </div>
+                </td>
+                <td>{{ child.class_name or '—' }}</td>
+                <td class="small muted">{{ child.latest_report_date or 'No reports' }}</td>
+                <td>
+                  {% if child.fees_due %}
+                    <span class="badge bg-danger">₵ {{ child.fees_due }}</span>
+                  {% else %}
+                    <span class="badge bg-success">Up to date</span>
+                  {% endif %}
+                </td>
+                <td class="text-end"><a href="{{ url_for('parent.parent_pay_fees', student_id=child.id) }}" class="btn btn-sm btn-outline-primary">Pay</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+    {% endblock %}
+  </main>
+
+  <!-- Bootstrap JS bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+(function(){
+  const sidebar = document.getElementById('sidebar');
+  const main = document.getElementById('mainContent');
+  const toggle = document.getElementById('toggleSidebar');
+  const darkToggle = document.getElementById('toggleDarkMode');
+  const unreadBadge = document.getElementById('parent-unread-count');
+  const overlay = document.getElementById('sidebarOverlay');
+
+  /* ========== Sidebar Behavior ========== */
+
+  // Restore desktop collapsed state
+  const collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+  if (collapsed && window.innerWidth >= 768) {
+    sidebar.classList.add('collapsed');
+    main.classList.add('collapsed');
+  }
+
+  // Toggle sidebar
+  toggle && toggle.addEventListener('click', () => {
+    if (window.innerWidth < 768) {
+      // Small screens: slide sidebar in/out
+      sidebar.classList.toggle('active');
+      overlay && overlay.classList.toggle('show');
+    } else {
+      // Desktop: collapse/expand
+      const now = sidebar.classList.toggle('collapsed');
+      main.classList.toggle('collapsed');
+      localStorage.setItem('sidebarCollapsed', now);
+    }
+  });
+
+  // Close sidebar when overlay is clicked (mobile only)
+  overlay && overlay.addEventListener('click', () => {
+    sidebar.classList.remove('active');
+    overlay.classList.remove('show');
+  });
+
+  // Auto-close sidebar on mobile link click
+  document.querySelectorAll('#sidebar a.nav-link').forEach(a => {
+    a.addEventListener('click', () => {
+      if (window.innerWidth < 768) {
+        sidebar.classList.remove('active');
+        overlay && overlay.classList.remove('show');
+      }
+    });
+  });
+
+  // Auto-reset to desktop layout when resizing above 768px
+  window.addEventListener('resize', () => {
+    if (window.innerWidth >= 768) {
+      sidebar.classList.remove('active');
+      overlay && overlay.classList.remove('show');
+    }
+  });
+
+
+  /* ========== Dark Mode Toggle ========== */
+
+  function enableDark() {
+    document.body.classList.add('dark-mode');
+    localStorage.setItem('darkMode', 'enabled');
+  }
+
+  function disableDark() {
+    document.body.classList.remove('dark-mode');
+    localStorage.setItem('darkMode', 'disabled');
+  }
+
+  if (localStorage.getItem('darkMode') === 'enabled') enableDark();
+
+  darkToggle && darkToggle.addEventListener('click', () => {
+    document.body.classList.contains('dark-mode') ? disableDark() : enableDark();
+  });
+
+
+  /* ========== Unread Notifications Polling ========== */
+
+  async function updateUnread(){
+    try {
+      const res = await fetch("{{ url_for('parent.get_unread_count') }}");
+      if (!res.ok) throw new Error('network');
+      const data = await res.json();
+      if (unreadBadge) {
+        if (data.unread_count > 0) {
+          unreadBadge.textContent = data.unread_count;
+          unreadBadge.style.display = 'inline-block';
+        } else {
+          unreadBadge.style.display = 'none';
+        }
+      }
+    } catch (e) {
+      console.debug('unread fetch failed', e);
+    }
+  }
+
+  updateUnread();
+  setInterval(updateUnread, 20000);
+
+})();
+</script>
+</body>
+</html>

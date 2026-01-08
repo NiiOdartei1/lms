@@ -1,0 +1,462 @@
+{% extends 'parent/base_parent.html' %}
+{% block title %}Pay Fees{% endblock %}
+
+{% block content %}
+<div class="container mt-1">
+
+  <!-- Filter Bar -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+      <form method="get" class="row g-3" id="filtersForm" novalidate>
+        <div class="col-md-4">
+          <label for="year" class="form-label">Academic Year</label>
+          <select id="year" name="year" class="form-select" required>
+            <option value="">-- Select Academic Year --</option>
+            {% for y in available_years %}
+              <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label for="semester" class="form-label">Semester</label>
+          <select id="semester" name="semester" class="form-select" required>
+            <option value="">-- Select --</option>
+            <option value="First" {% if semester == 'First' %}selected{% endif %}>First</option>
+            <option value="Second" {% if semester == 'Second' %}selected{% endif %}>Second</option>
+          </select>
+        </div>
+
+        <div class="col-md-4 d-grid align-items-end">
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-search me-1"></i> Load
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# server-side computed values #}
+  {% set remaining = (total_fee - current_balance) if (total_fee is not none and current_balance is not none) else 0 %}
+  {% set pct = 0 %}
+  {% if total_fee and total_fee > 0 %}
+    {% set pct = ((current_balance / total_fee) * 100) | round(1) %}
+    {% if pct > 100 %}{% set pct = 100 %}{% endif %}
+  {% endif %}
+
+  <style>
+    /* keep editor happy: use CSS var for dynamic progress width */
+    .progress-bar-dynamic { width: var(--paid-pct, 0%); }
+  </style>
+
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="card shadow mb-3">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+          <div>
+            <i class="fas fa-money-check-alt me-2"></i>
+            Fee Details
+            <small class="text-light ms-2">— {{ year or '—' }} | {{ semester or '—' }} Semester</small>
+          </div>
+          <div>
+            {% if student %}
+              <small class="text-light">Student: {{ student.full_name }}</small>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="card-body">
+          <!-- Flash Messages -->
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                  {{ message }}
+                  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+
+          <!-- Summary / Progress -->
+          <div class="mb-3">
+            <div class="d-flex justify-content-between">
+              <div><strong>Total Fee:</strong></div>
+              <div>GHS {{ "%.2f"|format(total_fee or 0) }}</div>
+            </div>
+            <div class="d-flex justify-content-between">
+              <div><strong>Approved Payments:</strong></div>
+              <div class="text-success">GHS {{ "%.2f"|format(current_balance or 0) }}</div>
+            </div>
+            {% if pending_balance and pending_balance > 0 %}
+              <div class="d-flex justify-content-between">
+                <div><strong>Pending Approval:</strong></div>
+                <div class="text-warning">GHS {{ "%.2f"|format(pending_balance) }}</div>
+              </div>
+            {% endif %}
+            <div class="d-flex justify-content-between fw-bold mt-2">
+              <div>Outstanding:</div>
+              {% if remaining > 0 %}
+                <div class="text-danger">GHS {{ "%.2f"|format(remaining) }}</div>
+              {% else %}
+                <div class="text-success">All fees covered</div>
+              {% endif %}
+            </div>
+
+            <div class="mt-3">
+              <div class="progress" style="height: 18px;">
+                <div class="progress-bar progress-bar-dynamic" role="progressbar"
+                     style="--paid-pct: {{ pct|default(0) }}%;"
+                     aria-valuenow="{{ pct|default(0) }}" aria-valuemin="0" aria-valuemax="100">
+                  {{ pct|default(0) }}%
+                </div>
+              </div>
+              <small class="text-muted">Paid vs Total</small>
+            </div>
+          </div>
+
+          <hr>
+
+          <!-- Assigned Fees list -->
+          <h6 class="mb-2">Assigned Fees</h6>
+          {% if assigned_fees and assigned_fees|length > 0 %}
+            <div class="list-group mb-3">
+              {% for fee in assigned_fees %}
+                <div class="list-group-item d-flex justify-content-between align-items-start">
+                  <div>
+                    <div class="fw-bold">{{ fee.title }}</div>
+                    <small class="text-muted">{{ fee.description or '' }}</small>
+                    <div><small class="text-muted">Due: {{ fee.due_date.strftime('%d %b %Y') if fee.due_date else '—' }}</small></div>
+                  </div>
+                  <div class="text-end">
+                    <div class="fw-bold">GHS {{ "%.2f"|format(fee.amount) }}</div>
+                    <small class="text-muted">Type: {{ fee.fee_type or '—' }}</small>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="alert alert-info">No assigned fees for the selected period.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Submit Payment -->
+      <div class="card shadow mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div><i class="fas fa-credit-card me-2"></i>Submit Payment</div>
+          <div>
+            <small class="text-muted">Max allowed:
+              <strong>GHS <span id="maxAllowed">{{ "%.2f"|format(remaining if remaining>0 else 0) }}</span></strong>
+            </small>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <form id="paymentForm" method="post" enctype="multipart/form-data"
+                {% if student %} action="{{ url_for('parent.parent_pay_fees', student_id=student.id) }}" {% else %} novalidate {% endif %}>
+
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {# sync selects into these hidden fields before submit #}
+            <input type="hidden" name="year" id="yearHidden" value="{{ year or '' }}">
+            <input type="hidden" name="semester" id="semesterHidden" value="{{ semester or '' }}">
+            <input type="hidden" id="remainingValue" value="{{ "%.2f"|format(remaining if remaining>0 else 0) }}">
+
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="amountInput" class="form-label">Amount (GHS)</label>
+                <input type="number" step="0.01" min="0.01" id="amountInput" name="amount" class="form-control" required
+                       aria-describedby="amountHelp">
+                <div id="amountHelp" class="form-text text-muted">Enter an amount up to the outstanding balance.</div>
+                <div class="invalid-feedback" id="amountFeedback"></div>
+              </div>
+
+              <div class="col-md-6">
+                <label for="method" class="form-label">Payment Method</label>
+                <select id="method" name="method" class="form-select" required>
+                  <option value="">-- Select method --</option>
+                  <option value="mobile_money">Mobile Money</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                  <option value="cash">Cash</option>
+                </select>
+              </div>
+
+              <div class="col-12">
+                <label for="descriptionInput" class="form-label">Description</label>
+                <input id="descriptionInput" name="description" class="form-control" placeholder="E.g. Term fee - installment 1" maxlength="200" required>
+              </div>
+
+              <div class="col-md-8">
+                <label for="proofInput" class="form-label">Upload Proof (image/pdf) — max 5MB</label>
+                <input type="file" id="proofInput" name="proof" class="form-control" accept="image/*,application/pdf">
+                <div class="form-text text-muted">Allowed: JPG, PNG, PDF. Max size 5MB.</div>
+                <div id="proofPreview" class="mt-2"></div>
+              </div>
+
+              <div class="col-md-4 d-grid align-self-end">
+                <button type="submit" id="submitBtn" class="btn btn-success"
+                        {% if remaining <= 0 or not (assigned_fees and assigned_fees|length > 0) or not student %} disabled {% endif %}>
+                  <i class="fas fa-paper-plane me-1" aria-hidden="true"></i> Submit Payment
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right column: history & notes -->
+    <div class="col-lg-5">
+      <div class="card shadow mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div><i class="fas fa-history me-2"></i>Payment History</div>
+          <div>
+            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#historyCollapse" aria-expanded="true" aria-controls="historyCollapse">
+              Toggle
+            </button>
+          </div>
+        </div>
+
+        <div id="historyCollapse" class="collapse show">
+          <div class="card-body p-0">
+            {% if transactions and transactions|length > 0 %}
+              <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Date</th>
+                      <th>Description</th>
+                      <th class="text-end">Amount (GHS)</th>
+                      <th>Status</th>
+                      <th>Receipt</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for txn in transactions %}
+                      <tr>
+                        <td>{{ txn.timestamp.strftime('%d %b %Y') }}</td>
+                        <td>{{ txn.description }}</td>
+                        <td class="text-end">{{ "%.2f"|format(txn.amount) }}</td>
+                        <td>
+                          {% if txn.is_approved %}
+                            <span class="badge bg-success">Approved</span>
+                          {% else %}
+                            <span class="badge bg-warning text-dark">Pending</span>
+                          {% endif %}
+                        </td>
+                        <td>
+                          {% if txn.proof_filename %}
+                            <a href="{{ url_for('static', filename='payment_proofs/' ~ txn.proof_filename) }}" target="_blank" class="btn btn-sm btn-outline-secondary">View</a>
+                          {% else %}
+                            <span class="text-muted small">N/A</span>
+                          {% endif %}
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="p-3">
+                <p class="text-muted mb-0">No payment history for this period.</p>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-header bg-light"><strong>Notes</strong></div>
+        <div class="card-body">
+          <ul class="small mb-0">
+            <li>Payments submitted will be reviewed by the finance team before approval.</li>
+            <li>Please keep receipt copies for your records.</li>
+            <li>If uploading a photo, ensure it clearly shows the transaction reference.</li>
+            <li>For bank transfers include the bank reference in the description.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div> <!-- /.row -->
+
+</div> <!-- /.container -->
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const yearSelect = document.getElementById('year');
+  const semesterSelect = document.getElementById('semester');
+  const yearHidden = document.getElementById('yearHidden');
+  const semesterHidden = document.getElementById('semesterHidden');
+  const amountInput = document.getElementById('amountInput');
+  const remainingValueEl = document.getElementById('remainingValue');
+  const submitBtn = document.getElementById('submitBtn');
+  const amountFeedback = document.getElementById('amountFeedback');
+  const proofInput = document.getElementById('proofInput');
+  const proofPreview = document.getElementById('proofPreview');
+  const maxAllowed = document.getElementById('maxAllowed');
+
+  // remaining from server
+  const remaining = parseFloat(remainingValueEl ? remainingValueEl.value : '0') || 0;
+  if (maxAllowed) maxAllowed.innerText = remaining.toFixed(2);
+
+  // helper: are year & semester selected?
+  function filtersSelected() {
+    return yearSelect && semesterSelect && yearSelect.value !== '' && semesterSelect.value !== '';
+  }
+
+  // sync selects -> hidden inputs
+  function syncHiddenFilters() {
+    if (yearHidden) yearHidden.value = yearSelect ? yearSelect.value : '';
+    if (semesterHidden) semesterHidden.value = semesterSelect ? semesterSelect.value : '';
+  }
+
+  // Enable/disable submit depending on filters + amount + assigned fees existence
+  function toggleSubmitState() {
+    // must have filters selected on client
+    if (!filtersSelected()) {
+      if (submitBtn) submitBtn.disabled = true;
+      return;
+    }
+
+    // if no remaining or no assigned fees, keep disabled (server sets initial disabled state)
+    if (remaining <= 0) {
+      if (submitBtn) submitBtn.disabled = true;
+      return;
+    }
+
+    // validate current amount value
+    validateAmount();
+  }
+
+  // amount validation
+  function validateAmount() {
+    if (!amountInput || !submitBtn) return false;
+    const val = parseFloat(amountInput.value || '0');
+    if (isNaN(val) || val <= 0) {
+      submitBtn.disabled = true;
+      amountInput.classList.add('is-invalid');
+      if (amountFeedback) amountFeedback.textContent = 'Enter a valid amount greater than 0.';
+      return false;
+    }
+    if (val > remaining) {
+      submitBtn.disabled = true;
+      amountInput.classList.add('is-invalid');
+      if (amountFeedback) amountFeedback.textContent = `Amount exceeds outstanding balance (GHS ${remaining.toFixed(2)}).`;
+      return false;
+    }
+    amountInput.classList.remove('is-invalid');
+    if (amountFeedback) amountFeedback.textContent = '';
+    submitBtn.disabled = false;
+    return true;
+  }
+
+  // attach listeners
+  if (yearSelect) {
+    yearSelect.addEventListener('change', function () {
+      // make user-driven selection persistent locally
+      try { localStorage.setItem('selectedYear', this.value); } catch(e){}
+      syncHiddenFilters();
+      toggleSubmitState();
+    });
+    // restore selection if available in localStorage (friendly)
+    try {
+      const stored = localStorage.getItem('selectedYear');
+      if (stored && yearSelect.value === '') yearSelect.value = stored;
+    } catch(e){}
+  }
+
+  if (semesterSelect) {
+    semesterSelect.addEventListener('change', function () {
+      try { localStorage.setItem('selectedSemester', this.value); } catch(e){}
+      syncHiddenFilters();
+      toggleSubmitState();
+    });
+    try {
+      const stored = localStorage.getItem('selectedSemester');
+      if (stored && semesterSelect.value === '') semesterSelect.value = stored;
+    } catch(e){}
+  }
+
+  if (amountInput) {
+    amountInput.addEventListener('input', validateAmount);
+    try { amountInput.max = remaining.toFixed(2); } catch(e){}
+  }
+
+  // file preview
+  if (proofInput && proofPreview) {
+    proofInput.addEventListener('change', function () {
+      proofPreview.innerHTML = '';
+      const file = proofInput.files[0];
+      if (!file) return;
+      const maxSize = 5 * 1024 * 1024;
+      if (file.size > maxSize) {
+        proofPreview.innerHTML = '<div class="text-danger small">File too large (max 5MB).</div>';
+        if (submitBtn) submitBtn.disabled = true;
+        return;
+      }
+      const mime = file.type;
+      if (mime.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '180px';
+        img.classList.add('img-thumbnail');
+        img.alt = 'Proof preview';
+        proofPreview.appendChild(img);
+        const reader = new FileReader();
+        reader.onload = e => img.src = e.target.result;
+        reader.readAsDataURL(file);
+      } else if (mime === 'application/pdf') {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(file);
+        a.target = '_blank';
+        a.innerText = file.name;
+        a.className = 'btn btn-sm btn-outline-secondary';
+        proofPreview.appendChild(a);
+      } else {
+        proofPreview.innerHTML = '<div class="small text-muted">Preview not available for this file type.</div>';
+      }
+      validateAmount();
+    });
+  }
+
+  // On form submit: final sync + checks
+  const paymentForm = document.getElementById('paymentForm');
+  if (paymentForm) {
+    paymentForm.addEventListener('submit', function (e) {
+      // ensure filters are selected
+      if (!filtersSelected()) {
+        e.preventDefault();
+        alert('Please select Academic Year and Semester before submitting a payment.');
+        return false;
+      }
+
+      // sync hidden filters to POST
+      syncHiddenFilters();
+
+      // validate amount
+      if (!validateAmount()) {
+        e.preventDefault();
+        return false;
+      }
+
+      // confirmation
+      const confirmMsg = 'Submit payment of GHS ' + parseFloat(amountInput.value).toFixed(2) + '?';
+      if (!confirm(confirmMsg)) {
+        e.preventDefault();
+        return false;
+      }
+
+      // disable to prevent double-submit
+      if (submitBtn) submitBtn.disabled = true;
+      return true;
+    });
+  }
+
+  // initial state
+  syncHiddenFilters();
+  toggleSubmitState();
+});
+</script>
+{% endblock %}

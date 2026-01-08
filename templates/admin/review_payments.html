@@ -1,0 +1,147 @@
+{% extends 'admin/layout.html' %} 
+{% block title %}Review Student Payments{% endblock %}
+
+{% block content %}
+<div class="container mt-2">
+
+  <h5 class="mb-3 text-primary fw-semibold text-center">
+    <i class="fas fa-credit-card me-2"></i> Review Student Payments
+  </h5>
+
+  <!-- Search Filter -->
+  <div class="mb-2 d-flex justify-content-between align-items-center">
+    <input type="text" id="searchPayment" 
+           class="form-control form-control-sm w-25 shadow-sm" 
+           placeholder="🔍 Search by student or description...">
+  </div>
+
+  <!-- Payment Table Card -->
+  <div class="card shadow-sm border-0">
+    <div class="card-header text-white py-2" style="background: linear-gradient(90deg, #ff416c, #ff4b2b); font-size: 0.9rem;">
+      <i class="fas fa-wallet me-2"></i> Payment Transactions
+    </div>
+    <div class="card-body p-0">
+      {% if transactions %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover table-bordered align-middle mb-0">
+          <thead class="table-dark text-center small">
+            <tr>
+              <th>Student</th>
+              <th>Year</th>
+              <th>Semester</th>
+              <th>Amount (GHS)</th>
+              <th>Description</th>
+              <th>Proof</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="paymentTable" class="small">
+            {% for txn in transactions %}
+            <tr class="text-center align-middle">
+              <td>{{ txn.student.full_name }}</td>
+              <td>{{ txn.academic_year }}</td>
+              <td>{{ txn.semester }}</td>
+              <td><strong>{{ "%.2f"|format(txn.amount) }}</strong></td>
+              <td>{{ txn.description }}</td>
+              <td>
+                {% if txn.proof_filename %}
+                  <a href="{{ url_for('static', filename='uploads/payments/' ~ txn.proof_filename) }}" target="_blank" 
+                     class="btn btn-sm btn-outline-info">
+                    <i class="fas fa-eye"></i>
+                  </a>
+                {% else %}
+                  <span class="text-muted">None</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if txn.is_approved %}
+                  <span class="badge bg-success">Approved</span>
+                {% else %}
+                  <span class="badge bg-warning text-dark">Pending</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if not txn.is_approved %}
+                <form method="POST" action="{{ url_for('admin.approve_payment', txn_id=txn.id) }}" class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-sm btn-success">
+                    <i class="fas fa-check"></i>
+                  </button>
+                </form>
+                {% else %}
+                  <span class="text-muted">-</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+        <p class="text-center text-muted py-3 small">No payments submitted yet.</p>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<style>
+/* General font scaling */
+body, .card, .table {
+  font-size: 0.85rem;
+}
+
+/* Card hover */
+.card:hover {
+  transform: translateY(-3px);
+  transition: all 0.2s ease-in-out;
+}
+
+/* Buttons */
+.btn-sm {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+}
+.btn:hover {
+  transform: translateY(-1px);
+  transition: all 0.2s;
+}
+
+/* Table hover */
+.table-hover tbody tr:hover {
+  background: rgba(255, 126, 95, 0.08);
+}
+
+/* Badge */
+.badge {
+  font-size: 0.75rem;
+  padding: 0.35em 0.55em;
+}
+
+/* Responsive search */
+@media (max-width:768px){
+  #searchPayment {
+    width: 100% !important;
+    margin-bottom: 0.5rem;
+  }
+}
+</style>
+
+<script>
+// Real-time search filter
+document.addEventListener('DOMContentLoaded', () => {
+  const searchInput = document.getElementById('searchPayment');
+  const tableRows = document.querySelectorAll('#paymentTable tr');
+
+  searchInput.addEventListener('input', () => {
+    const query = searchInput.value.toLowerCase();
+    tableRows.forEach(row => {
+      const text = row.textContent.toLowerCase();
+      row.style.display = text.includes(query) ? '' : 'none';
+    });
+  });
+});
+</script>
+
+{% endblock %}

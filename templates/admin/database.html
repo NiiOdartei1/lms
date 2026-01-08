@@ -1,0 +1,442 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Database Viewer{% endblock %}
+
+{% block head_extra %}
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-1 db-viewer">
+  <div class="d-flex align-items-start justify-content-between mb-2 gap-2">
+    <div>
+      <h5 class="mb-0">📊 Full Database Overview</h5>
+      <div class="small text-muted">Browse, inspect and manage records from all models</div>
+    </div>
+
+    <div class="d-flex gap-2 align-items-center">
+      <button id="exportAllBtn" class="btn btn-sm btn-outline-secondary" title="Export visible table to CSV">
+        <i class="fas fa-file-csv"></i> Export CSV
+      </button>
+
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="compactToggle">
+        <label class="form-check-label small" for="compactToggle">Compact mode</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <ul class="nav nav-tabs mb-3" id="dbTabs" role="tablist">
+    {% for model_name, rows in data.items() %}
+      <li class="nav-item" role="presentation">
+        <button class="nav-link {% if loop.first %}active{% endif %}" id="tab-btn-{{ loop.index }}" data-bs-toggle="tab"
+                data-bs-target="#tab-{{ loop.index }}" type="button" role="tab" aria-controls="tab-{{ loop.index }}"
+                aria-selected="{{ 'true' if loop.first else 'false' }}">
+          {{ model_name }} <span class="badge bg-secondary ms-1">{{ rows|length }}</span>
+        </button>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <div class="tab-content">
+    {% for model_name, rows in data.items() %}
+      <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="tab-{{ loop.index }}" role="tabpanel"
+           aria-labelledby="tab-btn-{{ loop.index }}">
+        <div class="d-flex justify-content-between align-items-center mb-2 gap-2">
+          <div class="d-flex gap-2 align-items-center">
+            <h6 class="mb-0 small fw-semibold">{{ model_name }}</h6>
+            <span class="small text-muted">({{ rows|length }} records)</span>
+          </div>
+
+          <div class="d-flex gap-2 align-items-center">
+            <input type="search" class="form-control form-control-sm search-input" placeholder="🔍 Search in {{ model_name }}..." aria-label="Search {{ model_name }}">
+            <select class="form-select form-select-sm rows-per-page" aria-label="Rows per page">
+              <option value="10">10 / page</option>
+              <option value="25" {% if rows|length <= 25 %}selected{% endif %}>25 / page</option>
+              <option value="50">50 / page</option>
+              <option value="100">100 / page</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          {% if rows %}
+            {% set columns = rows[0].keys()|list %}
+            <table class="table table-hover table-sm compact-table" data-model="{{ model_name|lower|replace(' ', '_') }}" aria-label="{{ model_name }} table">
+              <thead class="table-light small sticky-top">
+                <tr>
+                  {% for col in columns %}
+                    <th class="text-nowrap sortable" data-key="{{ loop.index0 }}" scope="col" role="columnheader" tabindex="0" aria-sort="none">
+                      {{ col }}
+                      <span class="sort-indicator ms-1" aria-hidden="true"></span>
+                    </th>
+                  {% endfor %}
+                  <th class="text-center" scope="col">Actions</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {% for row in rows %}
+                  <tr data-json='{{ row|tojson | safe }}' role="row">
+                    {% for val in row.values() %}
+                      <td class="text-truncate" style="max-width:180px;" title="{{ val }}">{{ val }}</td>
+                    {% endfor %}
+                    <td class="text-center">
+                      <div class="btn-group btn-group-sm" role="group" aria-label="Row actions">
+                        <button class="btn btn-outline-info view-btn" title="View details" aria-label="View">👁️</button>
+                        <button class="btn btn-outline-primary edit-btn" title="Edit record" aria-label="Edit">✏️</button>
+                        <button class="btn btn-outline-danger delete-btn" title="Delete record" aria-label="Delete">🗑️</button>
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+
+            <!-- Pagination controls (client-side) -->
+            <div class="d-flex justify-content-between align-items-center mt-2 small">
+              <div>
+                <span class="text-muted pages-info">Showing <span class="start">1</span>-<span class="end">1</span> of <strong class="total">{{ rows|length }}</strong></span>
+              </div>
+
+              <nav aria-label="Table pages">
+                <ul class="pagination pagination-sm mb-0">
+                  <li class="page-item prev-page disabled"><button class="page-link" aria-label="Previous">&laquo;</button></li>
+                  <li class="page-item next-page {% if rows|length <= 10 %}disabled{% endif %}"><button class="page-link" aria-label="Next">&raquo;</button></li>
+                </ul>
+              </nav>
+            </div>
+
+          {% else %}
+            <p class="text-muted small mb-0">No records available for {{ model_name }}.</p>
+          {% endif %}
+        </div>
+
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Context Menu -->
+<ul id="context-menu" class="dropdown-menu shadow-sm" style="display:none; position:absolute; min-width:160px;">
+  <li><a class="dropdown-item context-view" href="#"><i class="fas fa-eye me-2"></i>View</a></li>
+  <li><a class="dropdown-item context-edit" href="#"><i class="fas fa-edit me-2"></i>Edit</a></li>
+  <li><hr class="dropdown-divider"></li>
+  <li><a class="dropdown-item text-danger context-delete" href="#"><i class="fas fa-trash me-2"></i>Delete</a></li>
+</ul>
+
+<style>
+/* Compact sizing + visual polish */
+.db-viewer { font-size: 0.88rem; }
+.db-viewer h5 { font-size: 1rem; }
+.compact-table { font-size: 0.82rem; }
+.compact-table th, .compact-table td { padding: .35rem .5rem; vertical-align: middle; }
+.compact-table tbody tr:hover { background: #f8f9fa; cursor: pointer; }
+.small .form-control-sm, .form-control-sm { font-size: .82rem; }
+.search-input { min-width: 220px; }
+.sticky-top { background: #fff; z-index: 5; }
+
+/* Sort indicator */
+.sort-indicator::after { content: ''; display:inline-block; width: 0; height: 0; margin-left: .25rem; vertical-align: middle; }
+th.sort-asc .sort-indicator::after { border-left: .35rem solid transparent; border-right: .35rem solid transparent; border-bottom: .45rem solid #333; }
+th.sort-desc .sort-indicator::after { border-left: .35rem solid transparent; border-right: .35rem solid transparent; border-top: .45rem solid #333; }
+
+/* Compact mode toggle */
+body.compact-mode .db-viewer { font-size: 0.78rem; }
+body.compact-mode .compact-table th, body.compact-mode .compact-table td { padding: .25rem .4rem; }
+
+/* Context menu */
+#context-menu { z-index: 2000; }
+
+/* Truncation */
+.text-truncate { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+
+/* Pagination tiny */
+.pagination-sm .page-link { padding: .2rem .45rem; font-size: .78rem; }
+</style>
+
+<script>
+// Utility helpers
+function debounce(fn, wait=250){ let t; return (...args) => { clearTimeout(t); t = setTimeout(()=>fn(...args), wait); }; }
+function textOf(node){ return (node && node.textContent) ? node.textContent.trim().toLowerCase() : ''; }
+function csvEscape(val){ if (val == null) return ''; return '"' + String(val).replace(/"/g, '""') + '"'; }
+
+// Read CSRF token
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+// Sort table rows by column index (string/numeric safe)
+function sortTable(table, colIndex, direction) {
+  const tbody = table.tBodies[0];
+  if (!tbody) return;
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  rows.sort((a,b) => {
+    const av = a.children[colIndex].innerText.trim();
+    const bv = b.children[colIndex].innerText.trim();
+    const an = Number(av.replace(/[^0-9.-]/g,'')), bn = Number(bv.replace(/[^0-9.-]/g,''));
+    if (!isNaN(an) && !isNaN(bn)) {
+      return direction === 'asc' ? an - bn : bn - an;
+    }
+    return direction === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+// Pagination handler for a table container
+function applyPagination(tabPane) {
+  const table = tabPane.querySelector('table');
+  if (!table) return;
+  const rows = Array.from(table.tBodies[0].rows);
+  const perPageSelect = tabPane.querySelector('.rows-per-page');
+  const prevBtn = tabPane.querySelector('.prev-page');
+  const nextBtn = tabPane.querySelector('.next-page');
+  const startSpan = tabPane.querySelector('.start');
+  const endSpan = tabPane.querySelector('.end');
+  const totalSpan = tabPane.querySelector('.total');
+
+  let perPage = Number(perPageSelect.value);
+  let page = 1;
+  const total = rows.length;
+  totalSpan.innerText = total;
+
+  function render() {
+    const start = (page - 1) * perPage;
+    const end = Math.min(start + perPage, total);
+    rows.forEach((r, i) => r.style.display = (i >= start && i < end) ? '' : 'none');
+    startSpan.innerText = total === 0 ? 0 : start + 1;
+    endSpan.innerText = end;
+    prevBtn.classList.toggle('disabled', page === 1);
+    nextBtn.classList.toggle('disabled', page * perPage >= total);
+  }
+
+  perPageSelect.addEventListener('change', () => { perPage = Number(perPageSelect.value); page = 1; render(); });
+  prevBtn.addEventListener('click', (e) => { e.preventDefault(); if (page > 1) { page--; render(); }});
+  nextBtn.addEventListener('click', (e) => { e.preventDefault(); if (page * perPage < total) { page++; render(); }});
+
+  render();
+}
+
+// Build modal form fields (basic type guess)
+function buildForm(data, editable=false) {
+  const form = document.getElementById('recordForm');
+  form.innerHTML = '';
+
+  // Fields that should never be editable
+  const readonlyFields = ['id', 'created_at', 'updated_at', 'timestamp', 'createdon', 'modifiedon', 'added_at', 'date_added'];
+
+  Object.entries(data).forEach(([k, v]) => {
+    const name = k.toLowerCase();
+    const isReadonly = readonlyFields.includes(name);
+    let inputHtml = '';
+
+    // Guess input type
+    if (typeof v === 'boolean') {
+      inputHtml = `
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="${k}" 
+                 ${v ? 'checked' : ''} 
+                 ${editable && !isReadonly ? '' : 'disabled'}>
+        </div>`;
+    } 
+    else if (String(v).length > 160) {
+      inputHtml = `
+        <textarea class="form-control" name="${k}" rows="4" 
+                  ${editable && !isReadonly ? '' : 'readonly'}>${v ?? ''}</textarea>`;
+    } 
+    else if (/date|time|created|updated|at$/i.test(name) && String(v).length <= 30) {
+      inputHtml = `
+        <input class="form-control" type="text" name="${k}" 
+               value="${v ?? ''}" 
+               ${editable && !isReadonly ? '' : 'readonly'}>`;
+    } 
+    else {
+      inputHtml = `
+        <input class="form-control" type="text" name="${k}" 
+               value="${v ?? ''}" 
+               ${editable && !isReadonly ? '' : 'readonly'}>`;
+    }
+
+    form.insertAdjacentHTML('beforeend', `
+      <div class="col-md-6 mb-3">
+        <label class="form-label small text-muted">${k}</label>
+        ${inputHtml}
+      </div>
+    `);
+  });
+}
+
+// Export single table to CSV (visible rows)
+function exportTableToCSV(table, filename) {
+  const cols = Array.from(table.tHead.rows[0].cells).slice(0, -1).map(th => th.innerText.trim());
+  const rows = Array.from(table.tBodies[0].rows).filter(r => r.style.display !== 'none');
+  const csv = [cols.map(csvEscape).join(',')].concat(rows.map(r => {
+    const cells = Array.from(r.cells).slice(0, -1).map(td => csvEscape(td.innerText.trim()));
+    return cells.join(',');
+  }));
+  const blob = new Blob([csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename || 'export.csv';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+// Initialize per-tab behaviors
+document.addEventListener('DOMContentLoaded', () => {
+  const tabPanes = document.querySelectorAll('.tab-pane');
+  const compactToggle = document.getElementById('compactToggle');
+  const exportAllBtn = document.getElementById('exportAllBtn');
+  const contextMenu = document.getElementById('context-menu');
+  let currentRow = null;
+
+  // Compact mode remembered
+  if (localStorage.getItem('compactMode') === '1') {
+    document.body.classList.add('compact-mode');
+    compactToggle.checked = true;
+  }
+  compactToggle.addEventListener('change', () => {
+    document.body.classList.toggle('compact-mode', compactToggle.checked);
+    localStorage.setItem('compactMode', compactToggle.checked ? '1' : '0');
+  });
+
+  // For each tab: enable search, sort, pagination and row action handlers
+  tabPanes.forEach(pane => {
+    const table = pane.querySelector('table');
+    if (!table) return;
+
+    // pagination
+    applyPagination(pane);
+
+    // Sorting: click header
+    Array.from(table.tHead.querySelectorAll('th.sortable')).forEach((th, idx) => {
+      th.addEventListener('click', () => {
+        const currentAsc = th.classList.contains('sort-asc');
+        // Reset other headers
+        th.parentElement.querySelectorAll('th.sortable').forEach(h => h.classList.remove('sort-asc','sort-desc'));
+        if (currentAsc) { th.classList.add('sort-desc'); sortTable(table, idx, 'desc'); th.setAttribute('aria-sort','descending'); }
+        else { th.classList.add('sort-asc'); sortTable(table, idx, 'asc'); th.setAttribute('aria-sort','ascending'); }
+      });
+      // keyboard accessible
+      th.addEventListener('keypress', (e) => { if (e.key === 'Enter') th.click(); });
+    });
+
+    // Debounced search
+    const search = pane.querySelector('.search-input');
+    const rows = Array.from(table.tBodies[0].rows);
+    search.addEventListener('input', debounce(() => {
+      const q = search.value.trim().toLowerCase();
+      rows.forEach(r => {
+        const match = q === '' || r.innerText.toLowerCase().includes(q);
+        r.style.display = match ? '' : 'none';
+      });
+      // update pagination info (simple approach: reapply pagination)
+      applyPagination(pane);
+    }, 250));
+
+    // Row buttons: view, edit, delete
+    pane.querySelectorAll('tbody tr').forEach(tr => {
+      tr.querySelector('.view-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const data = JSON.parse(tr.dataset.json);
+        buildForm(data, false);
+        recordModal.show();
+      });
+
+      tr.querySelector('.edit-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const data = JSON.parse(tr.dataset.json);
+        const table = tr.closest('table');
+        const model = table.dataset.model;
+        const id = data.id || data.user_id || data.admin_id;
+        if (!id) return alert('No valid id found for edit.');
+
+        // Redirect to edit page
+        window.location.href = `/admin/edit/${model}/${id}`;
+    });
+
+
+      tr.querySelector('.delete-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const data = JSON.parse(tr.dataset.json);
+        const model = table.dataset.model;
+        const id = data.id || data.user_id || data.admin_id;
+        if (!id) return alert('No valid id found for delete.');
+        if (!confirm(`Delete ${model} id ${id}?`)) return;
+        fetch(`/admin/delete/${model}/${id}`, {
+          method: 'DELETE',
+          headers: {'X-CSRFToken': csrfToken}
+        }).then(r => {
+          if (r.ok) tr.remove();
+          else r.text().then(t => alert('Delete failed: ' + t));
+        }).catch(() => alert('Network error'));
+      });
+
+      // Right-click row to show context menu
+      tr.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        currentRow = tr;
+        contextMenu.style.display = 'block';
+        contextMenu.style.left = e.pageX + 'px';
+        contextMenu.style.top = e.pageY + 'px';
+      });
+    });
+  });
+
+  // Context menu actions
+  document.querySelectorAll('#context-menu .context-view').forEach(el => el.addEventListener('click', (e) => {
+    e.preventDefault(); contextMenu.style.display = 'none';
+    if (!currentRow) return;
+    const data = JSON.parse(currentRow.dataset.json);
+    buildForm(data, false);
+    recordModal.show();
+  }));
+
+  document.querySelectorAll('#context-menu .context-edit').forEach(el => el.addEventListener('click', (e) => {
+    e.preventDefault(); contextMenu.style.display = 'none';
+    if (!currentRow) return;
+    const data = JSON.parse(currentRow.dataset.json);
+    const model = currentRow.closest('table').dataset.model;
+    const id = data.id || data.user_id || data.admin_id;
+    if (!id) return alert('No valid id found for edit.');
+
+    window.location.href = `/admin/edit/${model}/${id}`;
+}));
+
+  document.querySelectorAll('#context-menu .context-delete').forEach(el => el.addEventListener('click', (e) => {
+    e.preventDefault(); contextMenu.style.display = 'none';
+    if (!currentRow) return;
+    const data = JSON.parse(currentRow.dataset.json);
+    const model = currentRow.closest('table').dataset.model;
+    const id = data.id || data.user_id || data.admin_id;
+    if (!id) return alert('No valid id found for delete.');
+    if (!confirm(`Delete ${model} id ${id}?`)) return;
+    fetch(`/admin/delete/${model}/${id}`, {
+      method: 'DELETE',
+      headers: {'X-CSRFToken': csrfToken}
+    }).then(r => {
+      if (r.ok) currentRow.remove();
+      else r.text().then(t => alert('Delete failed: ' + t));
+    }).catch(() => alert('Network error'));
+  }));
+
+  // hide context menu on click outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#context-menu')) contextMenu.style.display = 'none';
+  });
+
+  // Export visible table when pressing the top Export button
+  exportAllBtn.addEventListener('click', () => {
+    const visibleTable = document.querySelector('.tab-pane.show table');
+    if (!visibleTable) return alert('No table visible to export.');
+    const model = visibleTable.dataset.model || 'export';
+    exportTableToCSV(visibleTable, `${model}-${new Date().toISOString().slice(0,10)}.csv`);
+  });
+
+  // Keyboard: press Escape to hide context menu
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') contextMenu.style.display = 'none';
+  });
+
+});
+</script>
+{% endblock %}

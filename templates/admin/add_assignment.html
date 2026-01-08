@@ -1,0 +1,276 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Add New Assignment{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="card shadow-lg border-0">
+    <!-- Gradient Header -->
+    <div class="card-header text-white"
+         style="background: linear-gradient(90deg, #4e73df, #1cc88a);">
+      <h3 class="mb-0"><i class="fas fa-tasks me-2"></i> Add New Assignment</h3>
+    </div>
+
+    <div class="card-body">
+      <!-- Progress Bar -->
+      <div class="progress mb-4" style="height: 25px;">
+        <div id="progressBar"
+             class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+             role="progressbar" style="width: 20%">
+          Step 1 of 6
+        </div>
+      </div>
+
+      <form id="wizardForm" method="POST" enctype="multipart/form-data">
+        {{ form.hidden_tag() }}
+
+        <!-- Step 1 -->
+        <div class="wizard-step" id="step1">
+          <h5 class="text-primary mb-3">📖 Step 1: Assignment Title</h5>
+          <div class="mb-3">
+            {{ form.title.label(class="form-label fw-bold") }}
+            {{ form.title(class="form-control", placeholder="Enter assignment title") }}
+            <div class="invalid-feedback d-none" data-field="title"></div>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="wizard-step d-none" id="step2">
+          <h5 class="text-info mb-3">📝 Step 2: Description & Instructions</h5>
+          <div class="mb-3">
+            {{ form.description.label(class="form-label fw-bold") }}
+            {{ form.description(class="form-control", rows=3, placeholder="Short description") }}
+            <div class="invalid-feedback d-none" data-field="description"></div>
+          </div>
+          <div class="mb-3">
+            {{ form.instructions.label(class="form-label fw-bold") }}
+            {{ form.instructions(class="form-control", rows=3, placeholder="Detailed instructions") }}
+            <div class="invalid-feedback d-none" data-field="instructions"></div>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="wizard-step d-none" id="step3">
+          <h5 class="text-warning mb-3">📘 Step 3: Course & Class</h5>
+          <div class="mb-3">
+            {{ form.course_name.label(class="form-label fw-bold") }}
+            {{ form.course_name(class="form-control", placeholder="Enter course name") }}
+            <div class="invalid-feedback d-none" data-field="course_name"></div>
+          </div>
+          <div class="mb-3">
+            {{ form.assigned_class.label(class="form-label fw-bold") }}
+            {{ form.assigned_class(class="form-select") }}
+            <div class="invalid-feedback d-none" data-field="assigned_class"></div>
+          </div>
+        </div>
+
+        <!-- Step 4 (Due Date + Max Score) -->
+        <div class="wizard-step d-none" id="step4">
+          <h5 class="text-danger mb-3">📅 Step 4: Due Date & Scoring</h5>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-bold">{{ form.due_date.label }}</label>
+              {{ form.due_date(class="form-control", type="datetime-local") }}
+              <div class="invalid-feedback d-none" data-field="due_date"></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">{{ form.max_score.label }}</label>
+              {{ form.max_score(class="form-control", placeholder="e.g. 100") }}
+              <div class="invalid-feedback d-none" data-field="max_score"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="wizard-step d-none" id="step5">
+          <h5 class="text-success mb-3">📂 Step 5: Attach File</h5>
+          <div class="mb-3">
+            {{ form.file.label(class="form-label fw-bold") }}
+            {{ form.file(class="form-control", id="fileInput") }}
+            <small class="form-text text-muted">Allowed: PDF, DOCX, PPTX, ZIP</small>
+            <div id="filePreview" class="mt-2 small text-muted"></div>
+            <div class="invalid-feedback d-none" data-field="file"></div>
+          </div>
+        </div>
+
+        <!-- Step 6 -->
+        <div class="wizard-step d-none" id="step6">
+          <h5 class="text-success mb-3">✅ Review & Submit</h5>
+          <ul class="list-group mb-3">
+            <li class="list-group-item"><strong>Title:</strong> <span id="confirmTitle"></span></li>
+            <li class="list-group-item"><strong>Description:</strong> <span id="confirmDesc"></span></li>
+            <li class="list-group-item"><strong>Instructions:</strong> <span id="confirmInstr"></span></li>
+            <li class="list-group-item"><strong>Course:</strong> <span id="confirmCourse"></span></li>
+            <li class="list-group-item"><strong>Class:</strong> <span id="confirmClass"></span></li>
+            <li class="list-group-item"><strong>Due Date:</strong> <span id="confirmDate"></span></li>
+            <li class="list-group-item"><strong>Max Score:</strong> <span id="confirmScore"></span></li>
+            <li class="list-group-item"><strong>Files:</strong> <span id="confirmFiles"></span></li>
+          </ul>
+        </div>
+
+        <!-- Navigation Buttons -->
+        <div class="d-flex justify-content-between mt-4">
+          <button type="button" id="prevBtn" class="btn btn-secondary d-none">⬅ Previous</button>
+          <button type="button" id="nextBtn" class="btn btn-primary">Next ➡</button>
+          <button type="submit" id="submitBtn" class="btn btn-success d-none">
+            <i class="fas fa-save"></i> Save Assignment
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Notifications -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
+  <div id="toastSuccess" class="toast align-items-center text-bg-success border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body">✅ Assignment added successfully!</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+  <div id="toastError" class="toast align-items-center text-bg-danger border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body" id="toastErrorBody">❌ Failed to save assignment. Try again.</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  let currentStep = 1;
+  const totalSteps = 6;
+  const steps = document.querySelectorAll(".wizard-step");
+  const progressBar = document.getElementById("progressBar");
+  const prevBtn = document.getElementById("prevBtn");
+  const nextBtn = document.getElementById("nextBtn");
+  const submitBtn = document.getElementById("submitBtn");
+
+  const fileInput = document.getElementById("fileInput");
+  const filePreview = document.getElementById("filePreview");
+
+  function showStep(step) {
+    steps.forEach((s, i) => s.classList.toggle("d-none", i !== step - 1));
+    prevBtn.classList.toggle("d-none", step === 1);
+    nextBtn.classList.toggle("d-none", step === totalSteps);
+    submitBtn.classList.toggle("d-none", step !== totalSteps);
+
+    progressBar.style.width = (step / totalSteps) * 100 + "%";
+    progressBar.innerText = `Step ${step} of ${totalSteps}`;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  nextBtn.addEventListener("click", () => {
+    if (currentStep < totalSteps) {
+      currentStep++;
+      if (currentStep === totalSteps) fillConfirmation();
+      showStep(currentStep);
+    }
+  });
+
+  prevBtn.addEventListener("click", () => {
+    if (currentStep > 1) {
+      currentStep--;
+      showStep(currentStep);
+    }
+  });
+
+  fileInput.addEventListener("change", () => {
+    filePreview.innerHTML = "";
+    if (fileInput.files.length > 0) {
+      Array.from(fileInput.files).forEach(file => {
+        filePreview.innerHTML += `<div>📄 ${file.name} (${(file.size/1024).toFixed(1)} KB)</div>`;
+      });
+    }
+  });
+
+  function fillConfirmation() {
+    document.getElementById("confirmTitle").innerText = document.querySelector("[name='title']").value || '—';
+    document.getElementById("confirmDesc").innerText = document.querySelector("[name='description']").value || '—';
+    document.getElementById("confirmInstr").innerText = document.querySelector("[name='instructions']").value || '—';
+    document.getElementById("confirmCourse").innerText = document.querySelector("[name='course_name']").value || '—';
+    document.getElementById("confirmClass").innerText = document.querySelector("[name='assigned_class']").value || '—';
+    document.getElementById("confirmDate").innerText = document.querySelector("[name='due_date']").value || '—';
+    document.getElementById("confirmScore").innerText = document.querySelector("[name='max_score']").value || '—';
+
+    if (fileInput.files.length > 0) {
+      document.getElementById("confirmFiles").innerHTML = Array.from(fileInput.files)
+        .map(f => `📄 ${f.name}`).join("<br>");
+    } else {
+      document.getElementById("confirmFiles").innerText = "No file uploaded";
+    }
+  }
+
+  // Handle validation errors from server
+  function showFieldErrors(errors) {
+    document.querySelectorAll('.invalid-feedback').forEach(el => {
+      el.classList.add('d-none');
+      el.innerText = '';
+    });
+    for (const [field, msgs] of Object.entries(errors || {})) {
+      const el = document.querySelector(`.invalid-feedback[data-field="${field}"]`);
+      if (el) {
+        el.innerText = msgs.join(' ');
+        el.classList.remove('d-none');
+        const input = document.querySelector(`[name="${field}"]`);
+        if (input) input.classList.add('is-invalid');
+      }
+    }
+  }
+
+  function clearFieldHighlights() {
+    document.querySelectorAll('.is-invalid').forEach(i => i.classList.remove('is-invalid'));
+    document.querySelectorAll('.invalid-feedback').forEach(el => el.classList.add('d-none'));
+  }
+
+  // AJAX Submit
+  const form = document.getElementById("wizardForm");
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    clearFieldHighlights();
+
+    const formData = new FormData(form);
+    fetch("{{ url_for('admin.add_assignment') }}", {
+      method: "POST",
+      body: formData,
+      headers: { "X-Requested-With": "XMLHttpRequest" }
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        new bootstrap.Toast(document.getElementById("toastSuccess")).show();
+        setTimeout(() => {
+          window.location.href = "{{ url_for('admin.manage_assignments') }}";
+        }, 1500);
+      } else {
+        if (data.errors) {
+          showFieldErrors(data.errors);
+          const errFields = Object.keys(data.errors || {});
+          if (errFields.length) {
+            const firstField = errFields[0];
+            if (['title'].includes(firstField)) currentStep = 1;
+            else if (['description','instructions'].includes(firstField)) currentStep = 2;
+            else if (['course_name','assigned_class'].includes(firstField)) currentStep = 3;
+            else if (['due_date','max_score'].includes(firstField)) currentStep = 4;
+            else if (['file'].includes(firstField)) currentStep = 5;
+            showStep(currentStep);
+          }
+          document.getElementById('toastErrorBody').innerText = Object.values(data.errors).flat().join(' ');
+          new bootstrap.Toast(document.getElementById("toastError")).show();
+        } else {
+          document.getElementById('toastErrorBody').innerText = 'Failed to save assignment. Try again.';
+          new bootstrap.Toast(document.getElementById("toastError")).show();
+        }
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      document.getElementById('toastErrorBody').innerText = 'Network or server error.';
+      new bootstrap.Toast(document.getElementById("toastError")).show();
+    });
+  });
+
+  showStep(currentStep);
+});
+</script>
+{% endblock %}

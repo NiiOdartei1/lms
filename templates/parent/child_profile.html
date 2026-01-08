@@ -1,0 +1,148 @@
+{% extends "parent/layout.html" %}
+{% block title %}Child Profile{% endblock %}
+
+{% block content %}
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.1/font/bootstrap-icons.min.css" />
+<style>
+  .profile-container {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+    margin-bottom: 2rem;
+  }
+
+  .profile-left {
+    border-right: 1px solid #dee2e6;
+    background-color: #fdfdfd;
+    text-align: center;
+    padding: 2rem 1rem;
+  }
+
+  .profile-left .profile-pic {
+    width: 130px;
+    height: 130px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid #007bff;
+    margin-bottom: 1rem;
+  }
+
+  .profile-left h5 {
+    color: #007bff;
+    font-weight: 600;
+  }
+
+  .info-section {
+    margin-top: 1rem;
+  }
+
+  .info-card {
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    background: #fff;
+  }
+
+  .info-card .card-header {
+    background-color: #f0f4f8;
+    font-weight: 600;
+    color: #004085;
+  }
+
+  .info-card .card-body p {
+    margin-bottom: 0.4rem;
+    font-size: 0.95rem;
+  }
+
+  .info-label {
+    font-weight: 600;
+    color: #555;
+  }
+
+  .info-value {
+    color: #333;
+  }
+
+  @media (max-width: 768px) {
+    .profile-left {
+      border-right: none;
+      border-bottom: 1px solid #dee2e6;
+      text-align: center;
+    }
+  }
+</style>
+
+<h3 class="mb-4"><i class="fas fa-user-graduate me-2"></i>My Children</h3>
+
+{% if children %}
+  {% for child in children %}
+  <div class="container profile-container">
+    <div class="row">
+      <!-- LEFT PANEL -->
+      <div class="col-md-4 profile-left">
+        <img src="{{ child.user.profile_picture_url or url_for('static', filename='img/default_profile.png') }}"
+             alt="Profile Picture" class="profile-pic shadow-sm">
+        <h5>{{ child.user.full_name }}</h5>
+        <p class="text-muted mb-1">{{ child.current_class or 'N/A' }}</p>
+        <p><i class="bi bi-envelope me-1"></i>{{ child.user.email }}</p>
+        <hr>
+        <p><span class="info-label">DOB:</span> {{ child.dob.strftime('%B %d, %Y') if child.dob else 'N/A' }}</p>
+        <p><span class="info-label">Gender:</span> {{ child.gender or 'N/A' }}</p>
+        <p><span class="info-label">Blood Group:</span> {{ child.blood_group or 'N/A' }}</p>
+      </div>
+
+      <!-- RIGHT PANEL -->
+      <div class="col-md-8 p-4">
+        <div class="info-section">
+          <!-- Academic Info -->
+          <div class="info-card">
+            <div class="card-header">
+              <i class="bi bi-mortarboard-fill me-2"></i>Academic Information
+            </div>
+            <div class="card-body">
+              <p><span class="info-label">Current Class:</span> {{ child.current_class or 'N/A' }}</p>
+              <p><span class="info-label">Academic Year:</span> {{ child.academic_year or 'N/A' }}</p>
+              <p><span class="info-label">Previous School:</span> {{ child.previous_school or 'N/A' }}</p>
+              <p><span class="info-label">Academic Performance:</span> {{ child.academic_performance or 'N/A' }}</p>
+            </div>
+          </div>
+
+          <!-- Guardian Info -->
+          <div class="info-card">
+            <div class="card-header">
+              <i class="bi bi-people-fill me-2"></i>Guardian Information
+            </div>
+            <div class="card-body">
+              <p><span class="info-label">Name:</span> {{ child.guardian_name or 'N/A' }}</p>
+              <p><span class="info-label">Relation:</span> {{ child.guardian_relation or 'N/A' }}</p>
+              <p><span class="info-label">Contact:</span> {{ child.guardian_contact or 'N/A' }}</p>
+            </div>
+          </div>
+
+          <!-- Emergency & Sibling Info -->
+          <div class="info-card mb-0">
+            <div class="card-header text-danger">
+              <i class="bi bi-exclamation-triangle-fill me-2"></i>Emergency & Sibling Information
+            </div>
+            <div class="card-body row">
+              <div class="col-md-6">
+                <p><span class="info-label">Emergency Contact Name:</span> {{ child.emergency_contact_name or 'N/A' }}</p>
+                <p><span class="info-label">Emergency Contact Number:</span> {{ child.emergency_contact_number or 'N/A' }}</p>
+              </div>
+              <div class="col-md-6">
+                <p><span class="info-label">Sibling Name:</span> {{ child.sibling_name or 'N/A' }}</p>
+                <p><span class="info-label">Sibling Class:</span> {{ child.sibling_class or 'N/A' }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="alert alert-info">No child profiles linked to your account.</div>
+{% endif %}
+{% endblock %}

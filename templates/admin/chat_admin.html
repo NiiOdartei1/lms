@@ -1,0 +1,637 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Admin Messaging{% endblock %}
+
+{% block content %}
+<meta name="csrf-token" content="{{ csrf_token() }}">
+
+<style>
+/* Layout (kept from your design) */
+.chat-root { padding: 1.5rem 1rem; }
+.chat-container { display: flex; gap: 1rem; height: calc(100vh - 96px); }
+.chat-sidebar { width: 320px; min-width: 260px; max-width: 360px; display: flex; flex-direction: column; background: linear-gradient(180deg,#fff,#fbfdff); border-radius: 10px; border: 1px solid rgba(0,0,0,0.04); overflow: hidden; box-shadow: 0 6px 24px rgba(10,20,40,0.04); }
+.sidebar-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .85rem 1rem; border-bottom: 1px solid rgba(0,0,0,0.03); }
+.sidebar-search { padding: .75rem 1rem; border-bottom: 1px solid rgba(0,0,0,0.02); }
+.sidebar-search .form-control { border-radius: 10px; padding: .5rem .75rem; }
+.sidebar-body { padding: .75rem 0.5rem; overflow: auto; display: flex; flex-direction: column; gap: .75rem; flex: 1 1 auto; }
+.contact-list { padding: 0 .5rem; }
+.contact-item { display: flex; align-items: center; gap: .6rem; padding: .5rem; border-radius: 10px; background: transparent; border: none; width: 100%; text-align: left; cursor: pointer; }
+.contact-item img { width: 44px; height: 44px; object-fit: cover; border-radius: 50%; flex-shrink: 0; box-shadow: 0 2px 6px rgba(9,20,50,0.06); }
+.contact-item .contact-meta { display: flex; flex-direction: column; }
+.contact-item .name { font-weight: 600; font-size: .92rem; }
+.contact-item .role { font-size: .78rem; color: #6c757d; text-transform: capitalize; }
+.contact-item.active { background: #f1f8ff; border-left: 3px solid #2b6cff; }
+
+.list-group.broadcast-item { padding: 0 .5rem; }
+.broadcast-item { cursor: pointer; user-select: none; }
+.broadcast-item.role { display:block; border-radius:8px; margin-bottom:4px; }
+.broadcast-item.class { display:block; border-radius:8px; margin-bottom:4px; }
+.broadcast-item.selected { background:#fff3e0; border-left:4px solid #ff9800 !important; }
+
+.sidebar-footer { padding: .75rem 1rem; border-top: 1px solid rgba(0,0,0,0.03); font-size: .85rem; color: #6b7280; }
+
+.chat-panel { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
+.chat-card { display: flex; flex-direction: column; border-radius: 12px; height: 100%; overflow: hidden; background: linear-gradient(180deg,#fff,#fbfeff); border: 1px solid rgba(0,0,0,0.04); box-shadow: 0 10px 30px rgba(2,6,23,0.04); }
+.chat-header { display: flex; gap: .75rem; align-items: center; padding: .85rem 1rem; border-bottom: 1px solid rgba(0,0,0,0.03); background: linear-gradient(90deg,#7b2cbf,#f72585); color: #fff; }
+.chat-header .avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.12); font-weight:700; color: #fff; }
+.chat-header .title h5 { margin: 0; font-size: 1rem; }
+.chat-header .title small { opacity: .9; }
+.chat-body { flex: 1 1 auto; padding: 1rem; overflow: auto; background: #f7fbff; display: flex; flex-direction: column; gap: .75rem; justify-content: flex-end; }
+.date-badge { text-align:center; margin: .6rem 0; }
+.msg-row { display:flex; flex-direction:column; gap:.35rem; max-width: 80%; }
+.message-bubble { padding: .55rem .8rem; border-radius: 12px; box-shadow: 0 3px 8px rgba(18,20,30,0.04); word-wrap:break-word; }
+.message-self { align-self: flex-end; background: linear-gradient(90deg,#c6afff,#e0b3ff); color: #120b3a; }
+.message-other { align-self: flex-start; background: #fff; border: 1px solid #eef3ff; color:#0b2545; }
+.meta-row { display:flex; gap:.5rem; align-items:center; font-size:.72rem; color:#6b7280; }
+
+.chat-footer { display: flex; gap: .5rem; align-items: center; padding: .65rem; border-top: 1px solid rgba(0,0,0,0.03); background: #fff; }
+.msg-input { flex: 1 1 auto; border-radius: 10px; padding: .5rem .75rem; min-height: 44px; resize: none; }
+.btn-send { min-width:56px; border-radius:10px; }
+
+@media (max-width: 900px) {
+  .chat-container { flex-direction: column; height: auto; }
+  .chat-sidebar { width: 100%; max-width: none; min-width: 0; order: 2; }
+  .chat-panel { order: 1; }
+}
+</style>
+
+<div class="chat-root">
+  <div class="chat-container">
+
+    <!-- SIDEBAR -->
+    <aside class="chat-sidebar" id="chatSidebar" aria-label="Chat sidebar">
+      <div class="sidebar-head">
+        <div>
+          <h5 class="mb-0">Direct Message</h5>
+          <small class="text-muted">Admins & Teachers</small>
+        </div>
+        <div>
+          <button class="btn btn-sm btn-light" id="clearSelectionBtn" title="Clear selection">Clear</button>
+        </div>
+      </div>
+
+      <div class="sidebar-search">
+        <input id="userSearch" class="form-control" placeholder="Search contacts..." aria-label="Search contacts">
+      </div>
+
+      <div class="sidebar-body">
+        <div class="list-group contact-list" id="usersList" role="list">
+          {% for user in users %}
+          <button type="button"
+                  class="contact-item list-group-item-action"
+                  data-id="{{ user.user_id }}"
+                  data-role="{{ user.role }}"
+                  title="{{ user.full_name }}">
+            <img src="{{ user.profile_picture_url or url_for('static', filename='img/default-avatar.png') }}" alt="avatar">
+            <div class="contact-meta">
+              <div class="name">{{ user.full_name }}</div>
+              <div class="role">{{ user.role }}</div>
+            </div>
+          </button>
+          {% else %}
+          <div class="small text-muted px-3">No contacts available</div>
+          {% endfor %}
+        </div>
+
+        <hr>
+
+        <h6 class="mb-1 fw-bold">Broadcast Channels</h6>
+        <label class="form-label small text-muted">Target Role (single)</label>
+        <div class="list-group mb-2" id="broadcastRoles" role="list">
+          <button class="list-group-item broadcast-item role" data-type="role" data-value="teacher">All Teachers</button>
+          <button class="list-group-item broadcast-item role" data-type="role" data-value="student">All Students</button>
+          <button class="list-group-item broadcast-item role" data-type="role" data-value="parent">All Parents</button>
+        </div>
+
+        <label class="form-label small text-muted">Classes (multi-select)</label>
+        <div class="list-group mb-2" id="broadcastClasses" role="list">
+          <div class="small text-muted ps-2">Loading…</div>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <p class="mb-1"><strong>Notes</strong></p>
+        <ul class="mb-0">
+          <li>Click a user to open a direct chat.</li>
+          <li>Select a role (single) and/or one or more classes to broadcast to.</li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- CHAT PANEL -->
+    <section class="chat-panel" aria-live="polite">
+      <div class="chat-card" role="region" aria-label="Chat window">
+        <header class="chat-header">
+          <div class="avatar" id="chatAvatar" aria-hidden="true">--</div>
+
+          <div class="title">
+            <h5 id="chatHeader">Select a user or channel</h5>
+            <small id="chatSub">Messages appear here</small>
+          </div>
+
+          <div class="ms-auto d-flex align-items-center gap-2">
+            <span id="broadcastBadge" class="badge bg-info text-dark d-none" aria-hidden="true">Broadcast Mode</span>
+            <button class="btn btn-sm btn-outline-light" id="refreshBtn" title="Refresh messages" aria-label="Refresh">
+              <i class="fas fa-sync-alt"></i>
+            </button>
+          </div>
+        </header>
+
+        <div id="chatBox" class="chat-body" aria-live="polite">
+          <p class="text-center text-muted mt-4">No conversation selected</p>
+        </div>
+
+        <div class="chat-footer">
+          <textarea id="messageInput" class="form-control msg-input" placeholder="Type a message..." rows="1" aria-label="Message"></textarea>
+          <button id="sendBtn" class="btn btn-primary btn-send" title="Send message" aria-label="Send"><i class="fas fa-paper-plane"></i></button>
+          <!-- broadcast-send button MUST exist to avoid null JS errors -->
+          <button id="sendBroadcastBtn" class="btn btn-warning btn-send d-none" title="Send broadcast" aria-label="Send broadcast"><i class="fas fa-bullhorn"></i></button>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- Socket.IO -->
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const socket = io();
+  const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+  // current user id and role: if admin object use admin_id otherwise user_id
+  const currentUserId = "{{ current_user.admin_id if current_user.__class__.__name__ == 'Admin' else current_user.user_id }}";
+  const currentUserRole = "{{ 'admin' if current_user.__class__.__name__ == 'Admin' else current_user.role }}";
+
+  // DOM refs
+  const usersList = document.getElementById('usersList');
+  const broadcastRoles = document.getElementById('broadcastRoles');
+  const broadcastClasses = document.getElementById('broadcastClasses');
+  const chatBox = document.getElementById('chatBox');
+  const chatHeader = document.getElementById('chatHeader');
+  const chatAvatar = document.getElementById('chatAvatar');
+  const sendBtn = document.getElementById('sendBtn');
+  const sendBroadcastBtn = document.getElementById('sendBroadcastBtn');
+  const broadcastBadge = document.getElementById('broadcastBadge');
+  const refreshBtn = document.getElementById('refreshBtn');
+  const messageInput = document.getElementById('messageInput');
+  const userSearch = document.getElementById('userSearch');
+  const clearSelectionBtn = document.getElementById('clearSelectionBtn');
+
+  let receiverId = null;
+  let receiverRole = null;
+  let broadcastMode = false;
+  let activeRoleButton = null;
+  let activeClassButtons = new Set(); // allow multi-class selection
+  const messageStore = {}; // keyed by conversationKey()
+
+  // Helpers
+  const parseDate = ts => {
+    try { return new Date(ts.replace(' ', 'T')); } catch { return new Date(ts); }
+  };
+  const formatTime = ts => parseDate(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const formatDateLabel = ts => {
+    const d = parseDate(ts);
+    const today = new Date();
+    const yesterday = new Date(); yesterday.setDate(today.getDate()-1);
+    if (d.toDateString() === today.toDateString()) return 'Today';
+    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return d.toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' });
+  };
+  const escapeHtml = s => String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  // conversation key: single-role, single-class, or custom
+  function conversationKey() {
+    if (broadcastMode) {
+      const role = activeRoleButton ? activeRoleButton.dataset.value : null;
+      const classes = Array.from(activeClassButtons).sort();
+      if (role && classes.length === 1) return `broadcast:role:${role}:class:${classes[0]}`;
+      if (role && classes.length === 0) return `broadcast:role:${role}`;
+      if (!role && classes.length === 1) return `broadcast:class:${classes[0]}`;
+      return `broadcast:custom:${role || 'none'}:classes:${classes.join(',')}`;
+    }
+    if (receiverId) return `dm:${receiverId}`;
+    return 'root';
+  }
+
+  // Render functions
+  function renderMessagesByDate(messages) {
+    if (!messages || !messages.length) return '<p class="text-center text-muted mt-3">No messages</p>';
+    messages = messages.slice().sort((a,b) => parseDate(a.timestamp) - parseDate(b.timestamp));
+    const grouped = {};
+    messages.forEach(m => {
+      const label = formatDateLabel(m.timestamp);
+      grouped[label] = grouped[label] || [];
+      grouped[label].push(m);
+    });
+
+    let html = '';
+    for (const [date, msgs] of Object.entries(grouped)) {
+      html += `<div class="date-badge"><span class="badge bg-secondary">${date}</span></div>`;
+      msgs.forEach(m => {
+        const mine = String(m.sender_id) === String(currentUserId);
+        const cls = mine ? 'message-self' : 'message-other';
+        const broadcastBadge = m.is_broadcast ? ' <span class="badge bg-warning ms-2">Broadcast</span>' : '';
+        html += `
+          <div class="msg-row ${mine ? 'text-end' : 'text-start'}">
+            <div class="message-bubble ${cls}">
+              <div>${escapeHtml(m.message)}${broadcastBadge}</div>
+              <div class="meta-row ${mine ? 'justify-content-end' : 'justify-content-start'}"><small>${formatTime(m.timestamp)}</small></div>
+            </div>
+          </div>`;
+      });
+    }
+    return html;
+  }
+
+  function setChatHtml(html) {
+    chatBox.innerHTML = html;
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+
+  // Loaders
+  async function loadMessagesForReceiver(id) {
+    if (!id) return;
+    const key = `dm:${id}`;
+    setChatHtml('<p class="text-center text-muted mt-3">Loading…</p>');
+    try {
+      const res = await fetch(`/chat/messages/${encodeURIComponent(id)}`);
+      if (!res.ok) throw new Error('Failed to fetch messages');
+      const data = await res.json();
+      messageStore[key] = data || [];
+      setChatHtml(renderMessagesByDate(messageStore[key]));
+    } catch (err) {
+      console.error(err);
+      setChatHtml('<p class="text-center text-muted mt-3">Failed to load messages</p>');
+    }
+  }
+
+  // load broadcast messages and filter client-side according to selected role/classes
+  async function loadBroadcasts() {
+    setChatHtml('<p class="text-center text-muted mt-3">Loading broadcasts…</p>');
+    try {
+      const res = await fetch('/chat/messages/broadcast');
+      if (!res.ok) throw new Error('Failed to fetch broadcasts');
+      const all = await res.json();
+
+      // filter based on current broadcast selection
+      const role = activeRoleButton ? activeRoleButton.dataset.value : null;
+      const classes = Array.from(activeClassButtons).map(v => Number(v));
+
+      const filtered = all.filter(m => {
+        // if we selected a role, include messages that were targeted to that role (target_role) OR messages saved per-recipient with receiver_role
+        if (role) {
+          if (m.target_role && String(m.target_role) === String(role)) return true;
+          if (m.receiver_role && String(m.receiver_role) === String(role)) return true;
+        }
+
+        // if classes selected, include messages whose class_id matches any selected class
+        if (classes.length) {
+          if (m.class_id && classes.includes(Number(m.class_id))) return true;
+        }
+
+        // if no role/classes selected, include generic broadcast entries (receiver_id null) and messages sent by admin (helpful fallback)
+        if (!role && !classes.length) {
+          return true;
+        }
+
+        return false;
+      });
+
+      // store under conversation key
+      const key = conversationKey();
+      messageStore[key] = filtered || [];
+      setChatHtml(renderMessagesByDate(messageStore[key]));
+    } catch (err) {
+      console.error(err);
+      setChatHtml('<p class="text-center text-muted mt-3">Failed to load broadcasts</p>');
+    }
+  }
+
+  // Load classes (multiple selection supported)
+  async function loadClasses() {
+    broadcastClasses.innerHTML = '<div class="small text-muted ps-2">Loading…</div>';
+    const endpoints = ['/chat/teacher/classes', '/chat/admin/classes'];
+    let data = null;
+    for (const url of endpoints) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) continue;
+        const json = await res.json();
+        if (Array.isArray(json)) { data = json; break; }
+      } catch (err) {
+        // try next endpoint
+      }
+    }
+    broadcastClasses.innerHTML = '';
+    if (data && data.length) {
+      data.forEach(c => {
+        const btn = document.createElement('button');
+        btn.className = 'list-group-item broadcast-item class';
+        btn.dataset.type = 'class';
+        btn.dataset.value = c.id;
+        btn.textContent = c.name;
+        broadcastClasses.appendChild(btn);
+      });
+      attachBroadcastListeners(); // attach to freshly created class buttons too
+    } else {
+      broadcastClasses.innerHTML = '<div class="small text-muted ps-2">No classes available</div>';
+    }
+  }
+
+  // Send message (direct or broadcast)
+  async function sendMessage() {
+    const text = (messageInput.value || '').trim();
+    if (!text) return;
+
+    // Broadcast path
+    if (broadcastMode) {
+      // collect role (single) and selected class ids (array)
+      const targetRole = activeRoleButton ? activeRoleButton.dataset.value : null;
+      const class_ids = Array.from(activeClassButtons).map(v => Number(v));
+
+      if (!targetRole && class_ids.length === 0) {
+        return alert('Select a role or at least one class to broadcast to.');
+      }
+
+      const payload = { message: text, broadcast: true };
+      if (targetRole) payload.target_role = targetRole;
+      if (class_ids.length) payload.class_ids = class_ids;
+
+      try {
+        const res = await fetch('/chat/admin/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          const newMsgs = data.messages || [];
+          if (newMsgs.length) {
+            // append returned messages if any
+            const key = conversationKey();
+            messageStore[key] = (messageStore[key] || []).concat(newMsgs);
+            setChatHtml(renderMessagesByDate(messageStore[key]));
+            messageInput.value = '';
+          } else {
+            // fallback: reload broadcast history from server to ensure display matches DB
+            await loadBroadcasts();
+            messageInput.value = '';
+          }
+        } else {
+          alert(data.error || 'Failed to send broadcast');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Broadcast failed');
+      }
+      return;
+    }
+
+    // Direct message path
+    if (!receiverId) return alert('Select a recipient first');
+
+    const pending = {
+      id: 'pending-' + Date.now(),
+      sender_id: currentUserId,
+      receiver_id: receiverId,
+      sender_role: currentUserRole,
+      receiver_role: receiverRole,
+      message: text,
+      timestamp: (new Date()).toISOString().slice(0,19).replace('T',' '),
+      is_broadcast: false
+    };
+    const key = conversationKey();
+    messageStore[key] = (messageStore[key] || []).concat([pending]);
+    setChatHtml(renderMessagesByDate(messageStore[key]));
+    messageInput.value = '';
+
+    // emit via sockets for real-time delivery; server will persist and ack
+    socket.emit('send_message', {
+      sender_id: currentUserId,
+      sender_role: currentUserRole,
+      receiver_id: receiverId,
+      receiver_role: receiverRole,
+      message: text
+    });
+  }
+
+  // Event attachers
+  function attachUserListeners() {
+    document.querySelectorAll('.contact-item').forEach(btn => {
+      btn.removeEventListener('click', btn._handler);
+      const handler = async () => {
+        // clear broadcast state
+        broadcastMode = false;
+        activeRoleButton = null;
+        activeClassButtons.clear();
+        document.querySelectorAll('.broadcast-item').forEach(b => b.classList.remove('selected'));
+        broadcastBadge.classList.add('d-none');
+        sendBtn.classList.remove('d-none');
+        sendBroadcastBtn.classList.add('d-none');
+
+        receiverId = btn.dataset.id;
+        receiverRole = btn.dataset.role;
+        const name = btn.querySelector('.name')?.textContent?.trim() || receiverId;
+        chatHeader.textContent = `Chat with ${name}`;
+        chatAvatar.textContent = name.split(' ').map(x => x[0]).slice(0,2).join('').toUpperCase();
+
+        document.querySelectorAll('.contact-item').forEach(u => u.classList.remove('active'));
+        btn.classList.add('active');
+
+        await loadMessagesForReceiver(receiverId);
+      };
+      btn._handler = handler;
+      btn.addEventListener('click', handler);
+    });
+  }
+
+  function attachBroadcastListeners() {
+    // role buttons: single-select (radio-like)
+    document.querySelectorAll('.broadcast-item.role').forEach(btn => {
+      btn.removeEventListener('click', btn._roleHandler);
+      const handler = async () => {
+        // toggle selection: selecting another role clears previous
+        document.querySelectorAll('.broadcast-item.role').forEach(b => b.classList.remove('selected'));
+        if (activeRoleButton === btn) {
+          // clicked same role -> deselect
+          activeRoleButton = null;
+        } else {
+          activeRoleButton = btn;
+          btn.classList.add('selected');
+        }
+
+        // set broadcast state
+        broadcastMode = true;
+        receiverId = null;
+        receiverRole = null;
+        broadcastBadge.classList.remove('d-none');
+        sendBtn.classList.add('d-none');
+        sendBroadcastBtn.classList.remove('d-none');
+        chatHeader.textContent = activeRoleButton ? `Broadcast — ${activeRoleButton.textContent.trim()}` : 'Broadcast — (role cleared)';
+        chatAvatar.textContent = 'BC';
+
+        await loadBroadcasts();
+      };
+      btn._roleHandler = handler;
+      btn.addEventListener('click', handler);
+    });
+
+    // class buttons: multi-select
+    document.querySelectorAll('.broadcast-item.class').forEach(btn => {
+      btn.removeEventListener('click', btn._classHandler);
+      const handler = async () => {
+        const id = btn.dataset.value;
+        if (activeClassButtons.has(id)) {
+          activeClassButtons.delete(id);
+          btn.classList.remove('selected');
+        } else {
+          activeClassButtons.add(id);
+          btn.classList.add('selected');
+        }
+
+        // ensure we're in broadcast mode
+        broadcastMode = true;
+        receiverId = null;
+        receiverRole = null;
+        broadcastBadge.classList.remove('d-none');
+        sendBtn.classList.add('d-none');
+        sendBroadcastBtn.classList.remove('d-none');
+
+        // update header text
+        const roleText = activeRoleButton ? `role: ${activeRoleButton.textContent.trim()}` : null;
+        const classesText = Array.from(activeClassButtons).length ? `classes: ${Array.from(activeClassButtons).map(x=>x).join(',')}` : null;
+        chatHeader.textContent = `Broadcast — ${[roleText, classesText].filter(Boolean).join(' • ') || 'custom'}`;
+        chatAvatar.textContent = 'BC';
+
+        await loadBroadcasts();
+      };
+      btn._classHandler = handler;
+      btn.addEventListener('click', handler);
+    });
+  }
+
+  // clear selection (sidebar top)
+  clearSelectionBtn.addEventListener('click', () => {
+    // clear DM and broadcast selections
+    receiverId = null;
+    receiverRole = null;
+    broadcastMode = false;
+    activeRoleButton = null;
+    activeClassButtons.clear();
+    document.querySelectorAll('.broadcast-item').forEach(b => b.classList.remove('selected'));
+    document.querySelectorAll('.contact-item').forEach(c => c.classList.remove('active'));
+    chatHeader.textContent = 'Select a user or channel';
+    chatAvatar.textContent = '--';
+    setChatHtml('<p class="text-center text-muted mt-4">No conversation selected</p>');
+    sendBtn.classList.remove('d-none');
+    sendBroadcastBtn.classList.add('d-none');
+    broadcastBadge.classList.add('d-none');
+  });
+
+  // Search filter
+  userSearch.addEventListener('input', e => {
+    const q = (e.target.value || '').toLowerCase();
+    Array.from(usersList.children).forEach(li => {
+      const txt = li.textContent.toLowerCase();
+      li.style.display = q ? (txt.includes(q) ? '' : 'none') : '';
+    });
+  });
+
+  // Keyboard send (Enter)
+  messageInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  // Buttons
+  sendBtn.addEventListener('click', sendMessage);
+  sendBroadcastBtn.addEventListener('click', sendMessage);
+  refreshBtn.addEventListener('click', () => {
+    if (broadcastMode) loadBroadcasts();
+    else if (receiverId) loadMessagesForReceiver(receiverId);
+  });
+
+  // Sockets: realtime delivery and broadcast acks
+  socket.on('connect', () => {
+    if (currentUserId) socket.emit('join', { user_id: currentUserId });
+  });
+
+  socket.on('new_message', msg => {
+    try {
+      if (msg.is_broadcast) {
+        // append to internal store for any relevant broadcast keys
+        // we'll just push into a generic 'broadcast_all' store and reload filtered view when needed
+        messageStore['broadcast_all'] = messageStore['broadcast_all'] || [];
+        messageStore['broadcast_all'].push(msg);
+
+        // if currently viewing broadcasts, and the incoming message matches our selection, append it live
+        if (broadcastMode) {
+          const role = activeRoleButton ? activeRoleButton.dataset.value : null;
+          const classes = Array.from(activeClassButtons).map(v => Number(v));
+          let match = false;
+          if (role && (msg.target_role === role || msg.receiver_role === role)) match = true;
+          if (classes.length && msg.class_id && classes.includes(Number(msg.class_id))) match = true;
+          // if nothing selected, show all broadcast messages
+          if (!role && classes.length === 0) match = true;
+
+          if (match) {
+            // append message to the current conversation view
+            const key = conversationKey();
+            messageStore[key] = messageStore[key] || [];
+            messageStore[key].push(msg);
+            setChatHtml(renderMessagesByDate(messageStore[key]));
+          }
+        }
+        return;
+      }
+
+      // direct message: put in the right DM bucket
+      const other = String(msg.sender_id) === String(currentUserId) ? msg.receiver_id : msg.sender_id;
+      const key = `dm:${other}`;
+      messageStore[key] = messageStore[key] || [];
+      messageStore[key].push(msg);
+
+      // if currently viewing this DM, append
+      if (!broadcastMode && receiverId && (String(msg.sender_id) === String(receiverId) || String(msg.receiver_id) === String(receiverId))) {
+        setChatHtml(renderMessagesByDate(messageStore[key]));
+      }
+    } catch (err) {
+      console.error('new_message handler error', err);
+    }
+  });
+
+  socket.on('message_ack', () => {
+    if (!broadcastMode && receiverId) loadMessagesForReceiver(receiverId);
+  });
+
+  socket.on('broadcast_ack', d => {
+    if (d && d.broadcast_sent !== undefined) {
+      const note = `<div class="text-center small text-muted mt-2">Broadcast sent to ${d.broadcast_sent} recipients</div>`;
+      // append to current view if it's a broadcast view
+      if (broadcastMode) {
+        const key = conversationKey();
+        messageStore[key] = messageStore[key] || [];
+        messageStore[key].push({ id: `ack-${Date.now()}`, sender_id: currentUserId, message: `Broadcast: ${d.broadcast_sent} recipients`, timestamp: (new Date()).toISOString().slice(0,19).replace('T',' '), is_broadcast: true });
+        setChatHtml(renderMessagesByDate(messageStore[key]) + note);
+      } else {
+        setChatHtml((chatBox.innerHTML || '') + note);
+      }
+    }
+  });
+
+  socket.on('error', e => console.error('socket error', e));
+  socket.on('disconnect', r => console.log('socket disconnected', r));
+
+  // Init
+  attachUserListeners();
+  attachBroadcastListeners(); // attaches to role buttons (class buttons attached after loadClasses runs)
+  loadClasses();
+
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "admin/layout.html" %}
+{% block title %}Assessment Periods{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-bold">
+      <i class="bi bi-calendar-event"></i> Teacher Assessment Periods
+    </h5>
+    <a href="{{ url_for('admin.add_assessment_period') }}"
+       class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-circle"></i> New Period
+    </a>
+  </div>
+
+  <div class="card shadow-sm">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Academic Year</th>
+          <th>Semester</th>
+          <th>Duration</th>
+          <th>Status</th>
+          <th class="text-end">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in periods %}
+        <tr>
+          <td>{{ p.academic_year }}</td>
+          <td>{{ p.semester }}</td>
+          <td>{{ p.start_date }} → {{ p.end_date }}</td>
+          <td>
+            {% if p.is_active %}
+              <span class="badge bg-success">Active</span>
+            {% else %}
+              <span class="badge bg-secondary">Closed</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <form method="POST"
+                  action="{{ url_for('admin.toggle_assessment_period', pid=p.id) }}"
+                  class="d-inline">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm
+                {% if p.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %}">
+                {% if p.is_active %}Close{% else %}Open{% endif %}
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="text-center text-muted py-4">
+            No assessment periods created.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

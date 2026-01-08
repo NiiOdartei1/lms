@@ -1,0 +1,70 @@
+{% extends "admin/layout.html" %}
+{% block title %}New Assessment Period{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <div class="card shadow-sm">
+    <div class="card-header fw-bold">
+      <i class="bi bi-calendar-plus"></i> Create Assessment Period
+    </div>
+
+    <form method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="card-body row g-3">
+
+        <div class="col-md-6">
+          <label class="form-label">Academic Year</label>
+          <input type="text" name="academic_year"
+                 class="form-control"
+                 placeholder="2025/2026" required>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Semester</label>
+          <select name="semester" class="form-select" required>
+            <option value="">-- Select Semester --</option>
+            <option value="Semester 1">Semester 1</option>
+            <option value="Semester 2">Semester 2</option>
+          </select>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Start Date</label>
+          <input type="date" name="start_date"
+                 class="form-control" required>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">End Date</label>
+          <input type="date" name="end_date"
+                 class="form-control" required>
+        </div>
+
+        <div class="col-12">
+          <div class="form-check mt-2">
+            <input class="form-check-input"
+                   type="checkbox"
+                   name="activate"
+                   id="activate">
+            <label class="form-check-label" for="activate">
+              Activate immediately
+            </label>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="card-footer text-end">
+        <a href="{{ url_for('admin.assessment_periods') }}"
+           class="btn btn-secondary btn-sm">
+          Cancel
+        </a>
+        <button class="btn btn-primary btn-sm">
+          Create Period
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

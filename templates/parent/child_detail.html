@@ -1,0 +1,63 @@
+{% extends "parent/base_parent.html" %}
+{% block title %}{{ user.full_name }} - Details{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">{{ user.full_name }}</h2>
+
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Academic Information</h5>
+            <ul class="list-group mb-3">
+                <li class="list-group-item"><strong>Current Class:</strong> {{ profile.current_class or 'N/A' }}</li>
+                <li class="list-group-item"><strong>Academic Year:</strong> {{ profile.academic_year or 'N/A' }}</li>
+                <li class="list-group-item"><strong>Last Class Completed:</strong> {{ profile.last_class_completed or 'N/A' }}</li>
+                <li class="list-group-item"><strong>Previous School:</strong> {{ profile.previous_school or 'N/A' }}</li>
+                <li class="list-group-item"><strong>Performance:</strong> {{ profile.academic_performance or 'N/A' }}</li>
+                <li class="list-group-item"><strong>Preferred 2nd Language:</strong> {{ profile.preferred_second_language or 'N/A' }}</li>
+            </ul>
+
+            <h5 class="card-title">Personal Information</h5>
+            <ul class="list-group mb-3">
+                <li class="list-group-item"><strong>Date of Birth:</strong> {{ profile.dob.strftime('%d %B %Y') if profile.dob else 'N/A' }}</li>
+                <li class="list-group-item"><strong>Gender:</strong> {{ profile.gender or 'N/A' }}</li>
+                <li class="list-group-item"><strong>Nationality:</strong> {{ profile.nationality or 'N/A' }}</li>
+                <li class="list-group-item"><strong>Religion:</strong> {{ profile.religion or 'N/A' }}</li>
+                <li class="list-group-item"><strong>Blood Group:</strong> {{ profile.blood_group or 'N/A' }}</li>
+                <li class="list-group-item"><strong>Medical Conditions:</strong> {{ profile.medical_conditions or 'None' }}</li>
+            </ul>
+
+            <h5 class="card-title">Contact Information</h5>
+            <ul class="list-group mb-3">
+                <li class="list-group-item"><strong>Phone:</strong> {{ profile.phone or 'N/A' }}</li>
+                <li class="list-group-item"><strong>Email:</strong> {{ profile.email or 'N/A' }}</li>
+                <li class="list-group-item"><strong>Address:</strong> {{ profile.address or 'N/A' }}</li>
+                <li class="list-group-item"><strong>City:</strong> {{ profile.city or 'N/A' }}</li>
+                <li class="list-group-item"><strong>State:</strong> {{ profile.state or 'N/A' }}</li>
+                <li class="list-group-item"><strong>Postal Code:</strong> {{ profile.postal_code or 'N/A' }}</li>
+            </ul>
+
+            <h5 class="card-title">Guardian Information</h5>
+            <ul class="list-group mb-3">
+                <li class="list-group-item"><strong>Guardian Name:</strong> {{ profile.guardian_name or 'N/A' }}</li>
+                <li class="list-group-item"><strong>Relation:</strong> {{ profile.guardian_relation or 'N/A' }}</li>
+                <li class="list-group-item"><strong>Contact:</strong> {{ profile.guardian_contact or 'N/A' }}</li>
+            </ul>
+
+            <h5 class="card-title">Emergency Information</h5>
+            <ul class="list-group mb-3">
+                <li class="list-group-item"><strong>Emergency Contact Name:</strong> {{ profile.emergency_contact_name or 'N/A' }}</li>
+                <li class="list-group-item"><strong>Emergency Contact Number:</strong> {{ profile.emergency_contact_number or 'N/A' }}</li>
+            </ul>
+
+            <h5 class="card-title">Sibling Information</h5>
+            <ul class="list-group">
+                <li class="list-group-item"><strong>Sibling Name:</strong> {{ profile.sibling_name or 'N/A' }}</li>
+                <li class="list-group-item"><strong>Sibling Class:</strong> {{ profile.sibling_class or 'N/A' }}</li>
+            </ul>
+        </div>
+    </div>
+
+    <a href="{{ url_for('parent.view_children') }}" class="btn btn-secondary mt-3">⬅ Back to My Children</a>
+</div>
+{% endblock %}

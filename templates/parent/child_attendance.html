@@ -1,0 +1,45 @@
+{% extends 'base_parent.html' %}
+{% block title %}Child Attendance{% endblock %}
+{% block content %}
+
+<div class="container mt-4">
+  <div class="card shadow border-0">
+    <div class="card-header bg-primary text-white">
+      <h4><i class="fas fa-calendar-check me-2"></i> Attendance Records</h4>
+    </div>
+    <div class="card-body">
+      {% if records %}
+      <table class="table table-hover">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Class</th>
+            <th>Student</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in records %}
+          <tr>
+            <td>{{ r.date.strftime('%b %d, %Y') }}</td>
+            <td>{{ r.current_class }}</td>
+            <td>{{ r.full_name }}</td>
+            <td>
+              {% if r.is_present %}
+                <span class="badge bg-success">Present</span>
+              {% else %}
+                <span class="badge bg-danger">Absent</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="alert alert-info">No attendance records found for this child.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}

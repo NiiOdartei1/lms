@@ -1,0 +1,125 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Edit Set: {{ exam_set.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h2>Edit Set: {{ exam_set.name }} (Exam: {{ exam.title }})</h2>
+
+  <!-- Edit Set Form -->
+  <form method="POST" class="mb-3">
+    {{ form.hidden_tag() }}
+    <div class="row g-2 align-items-center">
+      <div class="col-md-4">
+        {{ form.name.label(class="form-label") }}
+        {{ form.name(class="form-control") }}
+        {% for err in form.name.errors %}
+          <div class="text-danger">{{ err }}</div>
+        {% endfor %}
+      </div>
+      <div class="col-md-4">
+        {{ form.access_password.label(class="form-label") }}
+        {{ form.access_password(class="form-control") }}
+        {% for err in form.access_password.errors %}
+          <div class="text-danger">{{ err }}</div>
+        {% endfor %}
+      </div>
+      <div class="col-md-4 d-flex align-items-end">
+        <button class="btn btn-success" type="submit">Save Changes</button>
+        <a class="btn btn-outline-secondary ms-2" href="{{ url_for('admin.exam_sets', exam_id=exam.id) }}">Back to Sets</a>
+      </div>
+    </div>
+  </form>
+
+  <div class="row mt-4">
+    <!-- Questions in Set -->
+    <div class="col-md-4">
+      <h5>Questions in "{{ exam_set.name }}"</h5>
+      <ul class="list-group" id="set-questions">
+        {% for q in set_questions %}
+        <li class="list-group-item d-flex justify-content-between align-items-center" 
+            data-qid="{{ q.id }}" draggable="true">
+          <div>
+            {{ q.question_text[:140] }}{% if q.question_text|length > 140 %}...{% endif %}
+            <div class="small text-muted">Type: {{ q.question_type }} | Marks: {{ q.marks }}</div>
+          </div>
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted">No questions in this set yet.</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <!-- Available Questions -->
+    <div class="col-md-8">
+      <h5>Available Questions (Pool)</h5>
+      <div class="mb-2">
+        <a href="{{ url_for('admin.create_exam_question', exam_id=exam.id) }}" class="btn btn-sm btn-primary">+ Add Question to Pool</a>
+      </div>
+      <ul class="list-group" id="available-questions">
+        {% for q in available_questions %}
+        <li class="list-group-item d-flex justify-content-between align-items-center" 
+            data-qid="{{ q.id }}" draggable="true">
+          <div>
+            {{ q.question_text[:140] }}{% if q.question_text|length > 140 %}...{% endif %}
+            <div class="small text-muted">Type: {{ q.question_type }} | Marks: {{ q.marks }}</div>
+          </div>
+        </li>
+        {% else %}
+        <li class="list-group-item text-muted">No available questions in pool.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+  const addUrl = "{{ url_for('admin.add_questions_to_set', exam_id=exam.id, set_id=exam_set.id) }}";
+  const removeUrl = "{{ url_for('admin.remove_question_from_set', exam_id=exam.id, set_id=exam_set.id) }}";
+
+  // Drag & Drop Logic
+  let dragged = null;
+
+  document.querySelectorAll('li[draggable="true"]').forEach(li => {
+    li.addEventListener('dragstart', e => {
+      dragged = e.target;
+      e.dataTransfer.effectAllowed = 'move';
+    });
+  });
+
+  const lists = [document.getElementById('set-questions'), document.getElementById('available-questions')];
+
+  lists.forEach(list => {
+    list.addEventListener('dragover', e => e.preventDefault());
+    list.addEventListener('drop', async e => {
+      e.preventDefault();
+      if (!dragged) return;
+
+      const sourceList = dragged.parentElement.id;
+      const targetList = list.id;
+      const qid = parseInt(dragged.dataset.qid);
+
+      // Move the element visually
+      list.appendChild(dragged);
+
+      // Send AJAX request based on direction
+      if (sourceList === 'available-questions' && targetList === 'set-questions') {
+        await fetch(addUrl, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+          body: JSON.stringify({ question_ids: [qid] })
+        });
+      } else if (sourceList === 'set-questions' && targetList === 'available-questions') {
+        await fetch(removeUrl, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+          body: JSON.stringify({ question_id: qid })
+        });
+      }
+      dragged = null;
+    });
+  });
+});
+</script>
+{% endblock %}

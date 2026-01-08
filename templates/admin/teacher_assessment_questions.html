@@ -1,0 +1,74 @@
+{% extends "admin/layout.html" %}
+{% block title %}Teacher Assessment Questions{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-bold">
+      <i class="bi bi-list-check"></i> Teacher Assessment Questions
+    </h5>
+    <a href="{{ url_for('admin.add_teacher_assessment_question') }}"
+       class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-circle"></i> Add Question
+    </a>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>Question</th>
+            <th>Category</th>
+            <th>Status</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for q in questions %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ q.question }}</td>
+            <td>
+              <span class="badge bg-secondary">
+                {{ q.category.replace('_', ' ').title() }}
+              </span>
+            </td>
+            <td>
+              {% if q.is_active %}
+                <span class="badge bg-success">Active</span>
+              {% else %}
+                <span class="badge bg-danger">Disabled</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <a href="{{ url_for('admin.edit_teacher_assessment_question', qid=q.id) }}"
+                 class="btn btn-sm btn-outline-primary">
+                Edit
+              </a>
+
+              <form method="POST"
+                    action="{{ url_for('admin.delete_teacher_assessment_question', qid=q.id) }}"
+                    class="d-inline"
+                    onsubmit="return confirm('Delete this question?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-danger">
+                  Delete
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="text-center text-muted py-4">
+              No assessment questions added yet.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

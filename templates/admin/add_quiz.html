@@ -1,0 +1,379 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Add Quiz | Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="card shadow-lg border-0">
+    <div class="card-header d-flex justify-content-between align-items-center text-white"
+         style="background: linear-gradient(90deg, #4e73df, #1cc88a);">
+      <h3 class="mb-0"><i class="fas fa-question-circle"></i> Create New Quiz</h3>
+      <span class="badge bg-warning text-dark fs-6" id="question-counter">Questions: 0</span>
+    </div>
+
+    <div class="card-body">
+      <form method="POST" enctype="multipart/form-data" novalidate autocomplete="off" >
+        {{ form.hidden_tag() }}
+
+        <div class="mb-3">
+          <label class="form-label fw-bold"><i class="fas fa-users text-warning"></i> {{ form.assigned_class.label }}</label>
+          {{ form.assigned_class(class="form-select", id="assigned_class") }}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-bold"><i class="fas fa-heading text-primary"></i> {{ form.title.label }}</label>
+          {{ form.title(class="form-control", placeholder="Quiz title") }}
+        </div>
+
+        <!-- Put this in place of your current course_name / course_id block -->
+        <div class="mb-3">
+          <label class="form-label fw-bold">
+            <i class="fas fa-book text-info"></i> {{ form.course_name.label }}
+          </label>
+          {{ form.course_name(class="form-select", id="course_name", autocomplete="off") }}
+          {{ form.course_id(type="hidden", id="course_id") }}
+        </div>
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold"><i class="fas fa-calendar-plus text-success"></i> Start Date & Time</label>
+            {{ form.start_datetime(class="form-control", type="datetime-local") }}
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold"><i class="fas fa-calendar-times text-danger"></i> End Date & Time</label>
+            {{ form.end_datetime(class="form-control", type="datetime-local") }}
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold"><i class="fas fa-stopwatch text-primary"></i> {{ form.duration.label }}</label>
+            {{ form.duration(class="form-select") }}
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label fw-bold"><i class="fas fa-redo-alt text-dark"></i> {{ form.attempts_allowed.label }}</label>
+            {{ form.attempts_allowed(class="form-control", type="number", min="1") }}
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label for="content_file" class="form-label fw-bold"><i class="fas fa-file-upload text-info"></i> Upload File</label>
+          <div class="border p-3 rounded bg-light text-center" id="dropZone">
+            <i class="fas fa-cloud-upload-alt fa-2x text-primary mb-2"></i>
+            <p class="mb-1">Drag & drop your file here or click to upload</p>
+            <small class="text-muted">Supported: PDF, DOC, DOCX, TXT</small>
+            <input type="file" class="form-control mt-2" name="content_file" id="content_file" accept=".pdf,.doc,.docx,.txt">
+          </div>
+        </div>
+
+        <div class="card shadow-sm mb-4 border-0">
+          <div class="card-header bg-gradient text-white" style="background: linear-gradient(90deg, #1cc88a, #36b9cc);">
+            <i class="fas fa-tasks"></i> Quiz Questions
+          </div>
+          <div class="card-body">
+            <div class="accordion" id="questions-accordion"></div>
+            <button type="button" class="btn btn-outline-primary mt-2" onclick="addQuestion()">
+              <i class="fas fa-plus"></i> Add Question
+            </button>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+          {{ form.submit(class="btn btn-success px-4") }}
+          <a href="{{ url_for('admin.manage_quizzes') }}" class="btn btn-outline-secondary px-4">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<style>
+  .question-card { transition: all 0.3s ease-in-out; }
+  .question-card:hover { transform: scale(1.01); box-shadow: 0 0 10px rgba(0,0,0,0.15); }
+  #dropZone:hover { background: #f1f9ff; cursor: pointer; }
+</style>
+
+<script>
+let questionCount = 0;
+const optionCounters = {};
+const labelStyles = { abc: ['a','b','c','d','e','f'], roman: ['i','ii','iii','iv','v','vi'] };
+
+function updateCounter() {
+  const el = document.getElementById("question-counter");
+  if (el) el.textContent = "Questions: " + document.querySelectorAll('.accordion-item').length;
+}
+
+/* --- question builder functions (unchanged except safe DOM checks) --- */
+function addQuestion() {
+  const qIndex = questionCount++;
+  const container = document.getElementById('questions-accordion');
+  if (!container) return;
+  const cardHtml = `
+    <div class="accordion-item question-card" id="question-${qIndex}">
+      <h2 class="accordion-header" id="heading-${qIndex}">
+        <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse"
+                data-bs-target="#collapse-${qIndex}" aria-expanded="false" aria-controls="collapse-${qIndex}">
+          Question ${qIndex + 1}
+        </button>
+      </h2>
+      <div id="collapse-${qIndex}" class="accordion-collapse collapse" aria-labelledby="heading-${qIndex}"
+           data-bs-parent="#questions-accordion">
+        <div class="accordion-body">
+          <label class="form-label fw-bold">Question Type</label>
+          <select class="form-select mb-3" name="questions[${qIndex}][type]" id="question-type-${qIndex}" onchange="toggleQuestionType(${qIndex})">
+            <option value="mcq">Multiple Choice</option>
+            <option value="fill">Fill in the Blank</option>
+          </select>
+
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <label class="form-label fw-bold mb-0">Question Text</label>
+            <button type="button" class="btn btn-sm btn-outline-info" onclick="insertBlank(${qIndex})">
+              <i class="fas fa-pen"></i> Insert Blank
+            </button>
+          </div>
+          <textarea name="questions[${qIndex}][text]" class="form-control mb-3" id="question-text-${qIndex}" placeholder="Enter question text..." required></textarea>
+
+          <div id="options-block-${qIndex}">
+            <label class="form-label">Option Label Style</label>
+            <select class="form-select mb-2" name="questions[${qIndex}][label_style]" onchange="updateOptionLabels(${qIndex})">
+              <option value="abc">a, b, c, d</option>
+              <option value="roman">i, ii, iii, iv</option>
+            </select>
+            <div id="options-${qIndex}"></div>
+            <div class="mt-2">
+              <button type="button" class="btn btn-sm btn-outline-secondary me-1" onclick="addOption(${qIndex})">+ Add Option</button>
+              <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeOption(${qIndex})">− Remove Option</button>
+            </div>
+          </div>
+
+          <div id="fill-block-${qIndex}" class="mt-3" style="display:none;">
+            <label class="form-label fw-bold">Expected Answers (match blanks)</label>
+            <div id="answers-${qIndex}"></div>
+            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" onclick="addAnswer(${qIndex})">
+              + Add Another Expected Answer
+            </button>
+          </div>
+
+          <button type="button" class="btn btn-sm btn-danger float-end mt-3" onclick="removeQuestion(${qIndex})">Remove Question</button>
+        </div>
+      </div>
+    </div>`;
+  container.insertAdjacentHTML('beforeend', cardHtml);
+  optionCounters[qIndex] = 0;
+  addOption(qIndex);
+  addOption(qIndex);
+  updateCounter();
+}
+
+function toggleQuestionType(qIndex) {
+  const typeEl = document.getElementById(`question-type-${qIndex}`);
+  if (!typeEl) return;
+  const type = typeEl.value;
+  const optionsBlock = document.getElementById(`options-block-${qIndex}`);
+  const fillBlock = document.getElementById(`fill-block-${qIndex}`);
+  if (type === 'fill') {
+    if (optionsBlock) optionsBlock.style.display = 'none';
+    if (fillBlock) fillBlock.style.display = 'block';
+  } else {
+    if (optionsBlock) optionsBlock.style.display = 'block';
+    if (fillBlock) fillBlock.style.display = 'none';
+  }
+}
+
+function insertBlank(qIndex) {
+  const textarea = document.getElementById(`question-text-${qIndex}`);
+  if (!textarea) return;
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = textarea.value;
+
+  // Insert blank at cursor
+  textarea.value = text.substring(0, start) + " _____ " + text.substring(end);
+  textarea.focus();
+  textarea.selectionStart = textarea.selectionEnd = start + 6;
+
+  // Count number of blanks in question
+  const numBlanks = (textarea.value.match(/_{3,}|_____/g) || []).length;
+  const answersDiv = document.getElementById(`answers-${qIndex}`);
+  const currentCount = answersDiv ? answersDiv.children.length : 0;
+
+  // Add more answer inputs if needed
+  for (let i = currentCount; i < numBlanks; i++) {
+    addAnswer(qIndex);
+  }
+
+  // Remove extra inputs if blanks reduced
+  for (let i = currentCount - 1; i >= numBlanks; i--) {
+    removeAnswer(qIndex, i);
+  }
+}
+
+function removeQuestion(qIndex) {
+  const node = document.getElementById(`question-${qIndex}`);
+  if (node) node.remove();
+  delete optionCounters[qIndex];
+  updateCounter();
+}
+
+function addOption(qIndex) {
+  optionCounters[qIndex] = optionCounters[qIndex] ?? 0;
+  const oIndex = optionCounters[qIndex]++;
+  const styleSelect = document.querySelector(`#question-${qIndex} select[name*='label_style']`);
+  const style = styleSelect ? styleSelect.value : 'abc';
+  const label = labelStyles[style][oIndex] || `opt${oIndex+1}`;
+  const optionsContainer = document.getElementById(`options-${qIndex}`);
+  if (!optionsContainer) return;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'input-group mb-2';
+  wrapper.id = `question-${qIndex}-option-${oIndex}`;
+  wrapper.innerHTML = `
+    <span class="input-group-text bg-light">${label}</span>
+    <input type="text" class="form-control" name="questions[${qIndex}][options][${oIndex}][text]" placeholder="Option text" required />
+    <span class="input-group-text bg-success text-white">
+      <input type="checkbox" class="form-check-input me-1" name="questions[${qIndex}][options][${oIndex}][is_correct]" />✔
+    </span>`;
+  optionsContainer.appendChild(wrapper);
+}
+
+function removeOption(qIndex) {
+  const count = optionCounters[qIndex] ?? 0;
+  if (count > 0) {
+    const last = count - 1;
+    const el = document.getElementById(`question-${qIndex}-option-${last}`);
+    if (el) el.remove();
+    optionCounters[qIndex] = last;
+  }
+}
+
+function updateOptionLabels(qIndex) {
+  const styleSelect = document.querySelector(`#question-${qIndex} select[name*='label_style']`);
+  const style = styleSelect ? styleSelect.value : 'abc';
+  const container = document.getElementById(`options-${qIndex}`);
+  if (!container) return;
+  const optionGroups = container.querySelectorAll('.input-group');
+  optionGroups.forEach((group, idx) => {
+    const labelSpan = group.querySelector('.input-group-text');
+    if (labelSpan) labelSpan.textContent = labelStyles[style][idx] || `opt${idx + 1}`;
+  });
+}
+
+function addAnswer(qIndex, presetValue = '') {
+  const answersDiv = document.getElementById(`answers-${qIndex}`);
+  if (!answersDiv) return;
+  const aIndex = answersDiv.children.length;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'input-group mb-2';
+  wrapper.id = `question-${qIndex}-answer-${aIndex}`;
+  wrapper.innerHTML = `
+    <span class="input-group-text bg-light">Blank ${aIndex + 1}</span>
+    <input type="text" class="form-control" name="questions[${qIndex}][answers][${aIndex}]" 
+           placeholder="Expected answer for blank ${aIndex + 1}" value="${presetValue}">
+    <button type="button" class="btn btn-outline-danger" onclick="removeAnswer(${qIndex}, ${aIndex})">
+      &times;
+    </button>`;
+  answersDiv.appendChild(wrapper);
+}
+
+function removeAnswer(qIndex, aIndex) {
+  const element = document.getElementById(`question-${qIndex}-answer-${aIndex}`);
+  if (element) element.remove();
+}
+
+/* ---------- Course handling: populate by class, sync course_id from data-id ---------- */
+
+const classSelect = document.getElementById('assigned_class');
+const courseSelect = document.getElementById('course_name');
+const courseIdInput = document.getElementById('course_id');
+
+function populateCoursesForClass(selectedClass, preselectId) {
+  if (!courseSelect) return;
+  courseSelect.disabled = true;
+  courseSelect.innerHTML = '<option value="">Loading...</option>';
+  if (courseIdInput) courseIdInput.value = '';
+
+  fetch(`/admin/get_courses/${encodeURIComponent(selectedClass)}`)
+    .then(response => {
+      if (!response.ok) throw new Error('Network response was not ok');
+      return response.json();
+    })
+    .then(data => {
+      courseSelect.innerHTML = '';
+      courseSelect.disabled = false;
+
+      if (!Array.isArray(data) || data.length === 0) {
+        const opt = document.createElement('option');
+        opt.textContent = 'No courses available';
+        opt.value = '';
+        courseSelect.appendChild(opt);
+        return;
+      }
+
+      data.forEach(course => {
+        const opt = document.createElement('option');
+        opt.value = course.name;      // visible text
+        opt.textContent = course.name;
+        opt.dataset.id = String(course.id);   // store id as string for comparison
+        courseSelect.appendChild(opt);
+      });
+
+      // If preselectId provided (editing), select by data-id; else select first and set hidden id
+      if (preselectId) {
+        const match = Array.from(courseSelect.options).find(o => o.dataset.id === String(preselectId));
+        if (match) {
+          courseSelect.value = match.value;
+          if (courseIdInput) courseIdInput.value = match.dataset.id || '';
+          return;
+        }
+      }
+
+      // Default: auto-select first valid and set its data-id
+      const firstReal = Array.from(courseSelect.options).find(o => o.value !== '');
+      if (firstReal) {
+        courseSelect.value = firstReal.value;
+        if (courseIdInput) courseIdInput.value = firstReal.dataset.id || '';
+      } else {
+        if (courseIdInput) courseIdInput.value = '';
+      }
+    })
+    .catch(err => {
+      console.error('Error loading courses:', err);
+      if (courseSelect) {
+        courseSelect.disabled = false;
+        courseSelect.innerHTML = '<option value="">Error loading courses</option>';
+      }
+      if (courseIdInput) courseIdInput.value = '';
+    });
+}
+
+if (classSelect) {
+  classSelect.addEventListener('change', function () {
+    const cls = this.value;
+    // If editing and server provided course_id, use that to preselect, otherwise no preselect.
+    const pre = courseIdInput && courseIdInput.value ? courseIdInput.value : null;
+    populateCoursesForClass(cls, pre);
+  });
+}
+
+// Sync hidden field when user changes visible course (defensive)
+if (courseSelect && courseIdInput) {
+  courseSelect.addEventListener('change', function () {
+    const selected = courseSelect.options[courseSelect.selectedIndex];
+    courseIdInput.value = selected?.dataset?.id || '';
+  });
+}
+
+// On page load - if class already selected (edit mode), populate and preselect using hidden course_id
+document.addEventListener("DOMContentLoaded", function() {
+  const cls = classSelect && classSelect.value ? classSelect.value : null;
+  const pre = courseIdInput && courseIdInput.value ? courseIdInput.value : null;
+  if (cls) {
+    populateCoursesForClass(cls, pre);
+  } else if (courseSelect) {
+    // No class selected but course select has options (rare): ensure hidden input synced
+    const sel = courseSelect.options[courseSelect.selectedIndex];
+    if (sel && courseIdInput) courseIdInput.value = sel.dataset?.id || '';
+  }
+});
+</script>
+{% endblock %}

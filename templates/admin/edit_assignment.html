@@ -1,0 +1,78 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Edit Assignment{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3 class="mb-3">Edit Assignment</h3>
+  <form method="POST" enctype="multipart/form-data">
+    {{ form.hidden_tag() }}
+
+    <!-- Title -->
+    <div class="mb-3">
+      {{ form.title.label(class="form-label") }}
+      {{ form.title(class="form-control", value=assignment.title) }}
+    </div>
+
+    <!-- Course -->
+    <div class="mb-3">
+      {{ form.course_name.label(class="form-label") }}
+      {{ form.course_name(class="form-control", value=assignment.course_name) }}
+    </div>
+
+    <!-- Assigned Class -->
+    <div class="mb-3">
+      {{ form.assigned_class.label(class="form-label") }}
+      {{ form.assigned_class(class="form-control", value=assignment.assigned_class) }}
+    </div>
+
+    <!-- Description -->
+    <div class="mb-3">
+      {{ form.description.label(class="form-label") }}
+      {{ form.description(class="form-control", rows=4) }}
+      <script>
+        document.addEventListener("DOMContentLoaded", function() {
+          document.getElementById("{{ form.description.id }}").value = `{{ assignment.description|safe }}`;
+        });
+      </script>
+    </div>
+
+    <!-- Instructions -->
+    <div class="mb-3">
+      {{ form.instructions.label(class="form-label") }}
+      {{ form.instructions(class="form-control", rows=3) }}
+      <script>
+        document.addEventListener("DOMContentLoaded", function() {
+          document.getElementById("{{ form.instructions.id }}").value = `{{ assignment.instructions|safe }}`;
+        });
+      </script>
+    </div>
+
+    <!-- Due Date -->
+    <div class="mb-3">
+      {{ form.due_date.label(class="form-label") }}
+      {{ form.due_date(class="form-control", value=assignment.due_date.strftime('%Y-%m-%d')) }}
+    </div>
+
+    <!-- File Upload -->
+    <div class="mb-3">
+      {{ form.file.label(class="form-label") }}
+      {{ form.file(class="form-control") }}
+      {% if assignment.filename %}
+        <div class="mt-2">
+          <p class="text-muted">
+            Current file: 
+            <a href="{{ url_for('static', filename='uploads/assignments/' ~ assignment.filename) }}" target="_blank">
+              {{ assignment.original_name }}
+            </a>
+          </p>
+          <small class="text-muted">Upload a new file to replace the existing one.</small>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Buttons -->
+    <button type="submit" class="btn btn-primary">Update Assignment</button>
+    <a href="{{ url_for('admin.manage_assignments') }}" class="btn btn-secondary">Cancel</a>
+  </form>
+</div>
+{% endblock %}

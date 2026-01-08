@@ -1,0 +1,927 @@
+{% extends "admin/layout.html" %}
+{% block title %}Register New User{% endblock %}
+
+{% block content %}
+<div class="container py-1">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+      <h2 class="mb-0">Register New User</h2>
+      <small class="text-muted">Create a Student, Teacher, or Parent account with smart defaults and validation.</small>
+    </div>
+    <div class="text-end">
+      <span class="badge bg-primary-subtle text-primary border border-primary">Admin</span>
+    </div>
+  </div>
+
+  <form id="registerForm" method="POST" action="{{ url_for('admin.register_user') }}" enctype="multipart/form-data" novalidate>
+    {{ form.hidden_tag() }}
+
+    <!-- ====== BASIC INFO (REARRANGED) ====== -->
+<div class="card shadow-sm mb-4">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <strong>Basic Information</strong>
+    <span class="text-muted small">Required</span>
+  </div>
+
+  <div class="card-body">
+    <div class="row g-3">
+      <!-- LEFT: Profile picture (use this block in your "Basic Info" area) -->
+<div class="col-md-3 d-flex flex-column align-items-center">
+  <label for="profile_picture" class="form-label w-100">Profile Picture <span class="text-danger">*</span></label>
+
+  <div id="profileDropZone" class="w-100 profile-dropzone text-center" tabindex="0" role="button" aria-label="Profile picture drop zone">
+    <input
+      type="file"
+      name="profile_picture"
+      id="profile_picture"
+      class="form-control form-control-sm visually-hidden"
+      accept="image/*"
+      aria-describedby="profileError"
+      required>
+    <div class="mt-1 profile-preview-wrapper" style="max-width:150px;">
+      <img
+        id="profilePreview"
+        src="{{ url_for('static', filename='uploads/profile_pictures/default_avatar.png') }}"
+        alt="Profile Preview"
+        class="img-thumbnail"
+        style="max-width:150px; max-height:150px;">
+    </div>
+
+    <div class="d-grid mt-2">
+      <button type="button" id="removeProfileBtn" class="btn btn-sm btn-outline-danger d-none">Remove Picture</button>
+      <button type="button" id="chooseProfileBtn" class="btn btn-sm btn-outline-secondary mt-2">Choose file...</button>
+    </div>
+
+    <small id="profileError" class="text-danger d-none" role="alert" aria-live="polite"></small>
+    <div class="form-text small mt-2">Drop an image here or click <strong>Choose file</strong>. Max 2MB. JPG/PNG/GIF/WEBP.</div>
+  </div>
+</div>
+
+      <!-- RIGHT: name / role / username / password -->
+      <div class="col-md-9">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label for="first_name" class="form-label">First Name <span class="text-danger">*</span></label>
+            <input type="text" name="first_name" id="first_name" class="form-control form-control-sm" autocomplete="given-name" required>
+            <div class="invalid-feedback">Please enter a first name.</div>
+          </div>
+
+          <div class="col-md-4">
+            <label for="middle_name" class="form-label">Middle Name</label>
+            <input type="text" name="middle_name" id="middle_name" class="form-control form-control-sm" autocomplete="additional-name">
+          </div>
+
+          <div class="col-md-4">
+            <label for="last_name" class="form-label">Last Name <span class="text-danger">*</span></label>
+            <input type="text" name="last_name" id="last_name" class="form-control form-control-sm" autocomplete="family-name" required>
+            <div class="invalid-feedback">Please enter a last name.</div>
+          </div>
+
+          <!-- role + username -->
+          <div class="col-md-6">
+            <label for="role" class="form-label">Role <span class="text-danger">*</span></label>
+            <select name="role" id="role" class="form-select form-select-sm" required aria-describedby="roleHelp">
+              <option value="">Select Role</option>
+              <option value="student">Student</option>
+              <option value="teacher">Teacher</option>
+              <option value="parent">Parent</option>
+            </select>
+            <div id="roleHelp" class="form-text small">Choosing a role reveals the relevant section below.</div>
+            <div class="invalid-feedback">Please select a role.</div>
+          </div>
+
+          <div class="col-md-6">
+            <label for="username" class="form-label">Username <span class="text-muted small">(auto-generated)</span></label>
+            <div class="input-group input-group-sm">
+              <input type="text" name="username" id="username" class="form-control" readonly aria-describedby="usernameStatus">
+              <button class="btn btn-outline-secondary" type="button" id="copyUsernameBtn" title="Copy username">Copy</button>
+            </div>
+            <div id="usernameStatus" class="form-text small" aria-live="polite"></div>
+          </div>
+
+          <!-- password (full width) -->
+          <div class="col-12">
+            <label class="form-label">Temporary Password <span class="text-danger">*</span></label>
+            <div id="password-options" class="mb-2" aria-live="polite"></div>
+
+            <div class="input-group input-group-sm">
+              <input type="text" name="password" id="password" class="form-control" placeholder="Or type your own" required autocomplete="new-password">
+              <button class="btn btn-outline-secondary" type="button" id="copyPasswordBtn" title="Copy password">Copy</button>
+            </div>
+            <div class="invalid-feedback">Please provide a password.</div>
+
+            <div class="progress mt-2" style="height:8px;" role="progressbar" aria-label="Password strength">
+              <div id="pwStrengthBar" class="progress-bar" style="width: 0%"></div>
+            </div>
+            <div id="pwStrengthText" class="small mt-1 text-muted">Strength: —</div>
+          </div>
+        </div>
+      </div>
+    </div> <!-- /row -->
+  </div> <!-- /card-body -->
+</div> <!-- /card -->
+
+    <!-- ====== ROLE SECTIONS ====== -->
+
+    <!-- ====== STUDENT ====== -->
+    <div id="student-fields" class="card shadow-sm mb-4 d-none" data-role="student" aria-hidden="true">
+      <div class="card-header"><strong>Student Information</strong></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label for="dob" class="form-label">Date of Birth</label>
+            <input type="date" name="dob" id="dob" class="form-control" autocomplete="bday">
+          </div>
+          <div class="col-md-4">
+            <label for="gender" class="form-label">Gender</label>
+            <select name="gender" id="gender" class="form-select" autocomplete="sex">
+              <option value="">Select Gender</option>
+              <option>Male</option>
+              <option>Female</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label for="nationality" class="form-label">Nationality</label>
+            <input type="text" name="nationality" id="nationality" class="form-control" autocomplete="country-name">
+          </div>
+
+          <div class="col-md-6">
+            <label for="religion" class="form-label">Religion</label>
+            <input type="text" name="religion" id="religion" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label for="blood_group" class="form-label">Blood Group</label>
+            <input type="text" name="blood_group" id="blood_group" class="form-control" placeholder="e.g., O+, A-">
+          </div>
+
+          <div class="col-12">
+            <label for="medical_conditions" class="form-label">Medical Conditions</label>
+            <textarea name="medical_conditions" id="medical_conditions" class="form-control" rows="2" maxlength="500"></textarea>
+            <div class="form-text"><span id="mcCount">0</span>/500</div>
+          </div>
+        </div>
+
+        <hr class="my-4">
+
+        <h6>Contact Information</h6>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label for="email" class="form-label">Email</label>
+            <input type="email" name="email" id="email" class="form-control" autocomplete="email">
+            <div class="invalid-feedback">Please enter a valid email.</div>
+          </div>
+          <div class="col-md-6">
+            <label for="phone" class="form-label">Phone</label>
+            <input type="tel" name="phone" id="phone" class="form-control" inputmode="tel" pattern="^[0-9+\-\s()]{7,}$" placeholder="e.g., +233 24 123 4567">
+            <div class="invalid-feedback">Please enter a valid phone number.</div>
+          </div>
+          <div class="col-12">
+            <label for="address" class="form-label">Address</label>
+            <input type="text" name="address" id="address" class="form-control" autocomplete="street-address">
+          </div>
+          <div class="col-md-4">
+            <label for="city" class="form-label">City</label>
+            <input type="text" name="city" id="city" class="form-control" autocomplete="address-level2">
+          </div>
+          <div class="col-md-4">
+            <label for="state" class="form-label">State/Region</label>
+            <input type="text" name="state" id="state" class="form-control" autocomplete="address-level1">
+          </div>
+          <div class="col-md-4">
+            <label for="postal_code" class="form-label">Postal Code</label>
+            <input type="text" name="postal_code" id="postal_code" class="form-control" autocomplete="postal-code">
+          </div>
+        </div>
+
+        <hr class="my-4">
+
+        <h6>Guardian Details</h6>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label for="guardian_name" class="form-label">Guardian Name</label>
+            <input type="text" name="guardian_name" id="guardian_name" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label for="guardian_relation" class="form-label">Guardian Relation</label>
+            <input type="text" name="guardian_relation" id="guardian_relation" class="form-control" placeholder="e.g., Mother, Uncle">
+          </div>
+          <div class="col-md-6">
+            <label for="guardian_contact" class="form-label">Guardian Contact</label>
+            <input type="tel" name="guardian_contact" id="guardian_contact" class="form-control" inputmode="tel" pattern="^[0-9+\-\s()]{7,}$">
+            <div class="invalid-feedback">Please enter a valid phone number.</div>
+          </div>
+        </div>
+
+        <hr class="my-4">
+
+        <h6>Academic Info</h6>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label for="previous_school" class="form-label">Previous School</label>
+            <input type="text" name="previous_school" id="previous_school" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label for="last_class_completed" class="form-label">Last Class Completed</label>
+            <input type="text" name="last_class_completed" id="last_class_completed" class="form-control">
+          </div>
+
+          <div class="col-md-4">
+            <label for="academic_performance" class="form-label">Academic Performance</label>
+            <input type="text" name="academic_performance" id="academic_performance" class="form-control" placeholder="e.g., A/B">
+          </div>
+          <div class="col-md-4">
+            {{ form.current_class.label(class="form-label") }}
+            {{ form.current_class(class="form-select") }}
+          </div>
+          <div class="col-md-4">
+            <label for="academic_year" class="form-label">Academic Year</label>
+            <input type="text" name="academic_year" id="academic_year" class="form-control" placeholder="e.g., 2025/2026">
+          </div>
+
+          <div class="col-md-6">
+            <label for="preferred_second_language" class="form-label">Preferred Second Language</label>
+            <input type="text" name="preferred_second_language" id="preferred_second_language" class="form-control">
+          </div>
+        </div>
+
+        <hr class="my-4">
+
+        <h6>Sibling & Emergency Info</h6>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label for="sibling_name" class="form-label">Sibling Name</label>
+            <input type="text" name="sibling_name" id="sibling_name" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label for="sibling_class" class="form-label">Sibling Class</label>
+            <input type="text" name="sibling_class" id="sibling_class" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label for="emergency_contact_name" class="form-label">Emergency Contact Name</label>
+            <input type="text" name="emergency_contact_name" id="emergency_contact_name" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label for="emergency_contact_number" class="form-label">Emergency Contact Number</label>
+            <input type="tel" name="emergency_contact_number" id="emergency_contact_number" class="form-control" inputmode="tel" pattern="^[0-9+\-\s()]{7,}$">
+            <div class="invalid-feedback">Please enter a valid phone number.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== TEACHER ====== -->
+    <div id="teacher-fields" class="card shadow-sm mb-4 d-none" data-role="teacher" aria-hidden="true">
+      <div class="card-header"><strong>Teacher Information</strong></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label for="teacher_dob" class="form-label">Date of Birth</label>
+            <input type="date" name="teacher_dob" id="teacher_dob" class="form-control" autocomplete="bday">
+          </div>
+          <div class="col-md-4">
+            <label for="teacher_gender" class="form-label">Gender</label>
+            <select name="teacher_gender" id="teacher_gender" class="form-select" autocomplete="sex">
+              <option value="">Select Gender</option>
+              <option>Male</option>
+              <option>Female</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label for="teacher_nationality" class="form-label">Nationality</label>
+            <input type="text" name="teacher_nationality" id="teacher_nationality" class="form-control" autocomplete="country-name">
+          </div>
+
+          <div class="col-md-6">
+            <label for="qualification" class="form-label">Qualification</label>
+            <input type="text" name="qualification" id="qualification" class="form-control" placeholder="e.g., B.Ed, M.Ed">
+          </div>
+          <div class="col-md-6">
+            <label for="specialization" class="form-label">Specialization</label>
+            <input type="text" name="specialization" id="specialization" class="form-control" placeholder="e.g., Mathematics">
+          </div>
+
+          <div class="col-md-4">
+            <label for="years_of_experience" class="form-label">Years of Experience</label>
+            <input type="number" name="years_of_experience" id="years_of_experience" class="form-control" min="0" step="1">
+          </div>
+          <div class="col-md-4">
+            <label for="subjects_taught" class="form-label">Subjects Taught</label>
+            <input type="text" name="subjects_taught" id="subjects_taught" class="form-control" placeholder="e.g., English, Math">
+          </div>
+          <div class="col-md-4">
+            <label for="employment_type" class="form-label">Employment Type</label>
+            <select name="employment_type" id="employment_type" class="form-select">
+              <option value="">Select Type</option>
+              <option>Full-time</option>
+              <option>Part-time</option>
+              <option>Contract</option>
+            </select>
+          </div>
+
+          <div class="col-md-4">
+            <label for="employee_id" class="form-label">Employee ID</label>
+            <input type="text" name="employee_id" id="employee_id" class="form-control" autocomplete="off">
+          </div>
+          <div class="col-md-4">
+            <label for="department" class="form-label">Department</label>
+            <input type="text" name="department" id="department" class="form-control">
+          </div>
+          <div class="col-md-4">
+            <label for="date_of_hire" class="form-label">Date of Hire</label>
+            <input type="date" name="date_of_hire" id="date_of_hire" class="form-control">
+          </div>
+
+          <div class="col-md-12">
+            <label for="office_location" class="form-label">Office Location</label>
+            <input type="text" name="office_location" id="office_location" class="form-control">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== PARENT ====== -->
+    <div id="parent-fields" class="card shadow-sm mb-4 d-none" data-role="parent" aria-hidden="true">
+      <div class="card-header"><strong>Parent Information</strong></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label for="parent_dob" class="form-label">Date of Birth</label>
+            <input type="date" name="parent_dob" id="parent_dob" class="form-control" autocomplete="bday">
+          </div>
+          <div class="col-md-4">
+            <label for="parent_gender" class="form-label">Gender</label>
+            <select name="parent_gender" id="parent_gender" class="form-select" autocomplete="sex">
+              <option value="">Select Gender</option>
+              <option>Male</option>
+              <option>Female</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label for="parent_nationality" class="form-label">Nationality</label>
+            <input type="text" name="parent_nationality" id="parent_nationality" class="form-control" autocomplete="country-name">
+          </div>
+
+          <div class="col-md-6">
+            <label for="occupation" class="form-label">Occupation</label>
+            <input type="text" name="occupation" id="occupation" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label for="education_level" class="form-label">Education Level</label>
+            <input type="text" name="education_level" id="education_level" class="form-control">
+          </div>
+
+          <div class="col-md-6">
+            <label for="parent_email" class="form-label">Email</label>
+            <input type="email" name="parent_email" id="parent_email" class="form-control" autocomplete="email">
+            <div class="invalid-feedback">Please enter a valid email.</div>
+          </div>
+          <div class="col-md-6">
+            <label for="phone_number" class="form-label">Phone</label>
+            <input type="tel" name="phone_number" id="phone_number" class="form-control" inputmode="tel" pattern="^[0-9+\-\s()]{7,}$" placeholder="e.g., +233 24 123 4567">
+            <div class="invalid-feedback">Please enter a valid phone number.</div>
+          </div>
+
+          <div class="col-12">
+            <label for="parent_address" class="form-label">Address</label>
+            <input type="text" name="parent_address" id="parent_address" class="form-control" autocomplete="street-address">
+          </div>
+
+          <div class="col-md-6">
+            <label for="relationship_to_student" class="form-label">Relationship to Student</label>
+            <input type="text" name="relationship_to_student" id="relationship_to_student" class="form-control" placeholder="e.g., Father, Aunt">
+          </div>
+          <div class="col-md-6">
+            <label for="number_of_children" class="form-label">Number of Children</label>
+            <input type="number" name="number_of_children" id="number_of_children" class="form-control" min="0" step="1">
+          </div>
+
+          <div class="col-md-6">
+            <label for="emergency_contact_name" class="form-label">Emergency Contact Name</label>
+            <input type="text" name="emergency_contact_name" id="emergency_contact_name" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label for="emergency_contact_phone" class="form-label">Emergency Contact Phone</label>
+            <input type="tel" name="emergency_contact_phone" id="emergency_contact_phone" class="form-control" inputmode="tel" pattern="^[0-9+\-\s()]{7,}$">
+            <div class="invalid-feedback">Please enter a valid phone number.</div>
+          </div>
+
+          <div class="col-md-6">
+            <label for="preferred_contact_method" class="form-label">Preferred Contact Method</label>
+            <select name="preferred_contact_method" id="preferred_contact_method" class="form-select">
+              <option value="">Select Method</option>
+              <option>Phone</option>
+              <option>Email</option>
+              <option>SMS</option>
+            </select>
+          </div>
+        </div>
+
+        <hr class="my-4">
+
+        <!-- Class -> Children dynamic loader -->
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label for="class_filter" class="form-label">Select Class</label>
+            <select id="class_filter" class="form-select" aria-describedby="classFilterHelp">
+              <option value="">-- Select Class --</option>
+              {% for class_name in classes %}
+                <option value="{{ class_name }}">{{ class_name }}</option>
+              {% endfor %}
+            </select>
+            <div id="classFilterHelp" class="form-text">Pick a class to load available children.</div>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">Select Child(ren)</label>
+            <div id="child_checkboxes" class="border rounded p-2">
+              <p class="text-muted mb-0">Please select a class first</p>
+            </div>
+            <div class="form-text">You can select multiple children.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== ACTIONS ====== -->
+    <div class="d-flex gap-2">
+      <button id="submitBtn" type="submit" class="btn btn-success">
+        <span class="spinner-border spinner-border-sm me-2 d-none" id="submitSpinner" role="status" aria-hidden="true"></span>
+        Register User
+      </button>
+      <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">Cancel</a>
+      <button type="reset" class="btn btn-outline-secondary">Reset</button>
+    </div>
+    <div class="form-text mt-2">You have unsaved changes.</div>
+  </form>
+</div>
+
+<script>
+  // --- Utils ---
+  function getCSRFToken() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute('content') : '';
+  }
+
+  const debounce = (fn, delay = 400) => {
+    let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+  };
+
+  // --- Username: auto-generate + copy ---
+  const usernameInput = document.getElementById('username');
+  const copyUsernameBtn = document.getElementById('copyUsernameBtn');
+  const usernameStatus = document.getElementById('usernameStatus');
+
+  function requestUsername() {
+    const first = document.getElementById('first_name').value.trim();
+    const middle = document.getElementById('middle_name').value.trim();
+    const last = document.getElementById('last_name').value.trim();
+    const role = document.getElementById('role').value;
+
+    if (!(first && last && role)) { return; }
+
+    usernameStatus.textContent = 'Generating…';
+    fetch('{{ url_for("admin.generate_username") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+      body: JSON.stringify({ first_name: first, middle_name: middle, last_name: last, role })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data && data.username) {
+        usernameInput.value = data.username;
+        usernameStatus.textContent = 'Username generated.';
+      } else {
+        usernameStatus.textContent = 'Could not generate username.';
+      }
+    })
+    .catch(() => usernameStatus.textContent = 'Error generating username.');
+  }
+
+  const debouncedUsername = debounce(requestUsername);
+
+  ['first_name','middle_name','last_name','role'].forEach(id => {
+    document.getElementById(id).addEventListener('input', debouncedUsername);
+    document.getElementById(id).addEventListener('change', debouncedUsername);
+  });
+
+  copyUsernameBtn.addEventListener('click', () => {
+    if (!usernameInput.value) return;
+    navigator.clipboard.writeText(usernameInput.value).then(() => {
+      copyUsernameBtn.textContent = 'Copied';
+      setTimeout(() => copyUsernameBtn.textContent = 'Copy', 1200);
+    });
+  });
+
+  // --- Password options: load, select, copy, strength ---
+  const passwordOptions = document.getElementById('password-options');
+  const passwordInput = document.getElementById('password');
+  const copyPasswordBtn = document.getElementById('copyPasswordBtn');
+  const pwStrengthBar = document.getElementById('pwStrengthBar');
+  const pwStrengthText = document.getElementById('pwStrengthText');
+
+  function loadPasswordOptions() {
+    fetch('{{ url_for("admin.generate_passwords") }}')
+      .then(res => res.json())
+      .then(data => {
+        passwordOptions.innerHTML = '';
+        (data.passwords || []).forEach((pw, i) => {
+          const id = `pw${i}`;
+          const wrapper = document.createElement('div');
+          wrapper.className = 'form-check form-check-inline me-3';
+          wrapper.innerHTML = `
+            <input class="form-check-input" type="radio" name="passwordOption" id="${id}" value="${pw}">
+            <label class="form-check-label me-2" for="${id}">${pw}</label>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-password="${pw}" title="Copy">📋</button>
+          `;
+          passwordOptions.appendChild(wrapper);
+        });
+
+        passwordOptions.querySelectorAll('input[name="passwordOption"]').forEach(radio => {
+          radio.addEventListener('change', () => {
+            passwordInput.value = radio.value;
+            evaluateStrength(radio.value);
+          });
+        });
+
+        passwordOptions.querySelectorAll('button[data-password]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const pw = btn.dataset.password;
+            navigator.clipboard.writeText(pw).then(() => {
+              btn.textContent = '✅';
+              setTimeout(() => btn.textContent = '📋', 1200);
+            });
+          });
+        });
+      })
+      .catch(() => {
+        passwordOptions.innerHTML = '<span class="text-danger">Error loading suggestions.</span>';
+      });
+  }
+
+  function evaluateStrength(pw) {
+    // Lightweight heuristic (no external libs)
+    let score = 0;
+    if (!pw) score = 0;
+    else {
+      const len = pw.length;
+      const hasLower = /[a-z]/.test(pw);
+      const hasUpper = /[A-Z]/.test(pw);
+      const hasNum   = /[0-9]/.test(pw);
+      const hasSym   = /[^A-Za-z0-9]/.test(pw);
+      score = (len >= 8) + (len >= 12) + hasLower + hasUpper + hasNum + hasSym; // 0..6
+    }
+    const pct = Math.min(100, Math.round((score/6)*100));
+    pwStrengthBar.style.width = pct + '%';
+    pwStrengthBar.classList.remove('bg-danger','bg-warning','bg-success');
+    let label = 'Weak';
+    if (pct < 40) { pwStrengthBar.classList.add('bg-danger'); label = 'Weak'; }
+    else if (pct < 70) { pwStrengthBar.classList.add('bg-warning'); label = 'Medium'; }
+    else { pwStrengthBar.classList.add('bg-success'); label = 'Strong'; }
+    pwStrengthText.textContent = 'Strength: ' + label;
+  }
+
+  passwordInput.addEventListener('input', (e) => evaluateStrength(e.target.value));
+  copyPasswordBtn.addEventListener('click', () => {
+    if (!passwordInput.value) return;
+    navigator.clipboard.writeText(passwordInput.value).then(() => {
+      copyPasswordBtn.textContent = 'Copied';
+      setTimeout(() => copyPasswordBtn.textContent = 'Copy', 1200);
+    });
+  });
+
+// --- Profile picture preview, remove & drag-drop with green background processing ---
+// Elements
+const profileInput = document.getElementById('profile_picture');
+const previewImg = document.getElementById('profilePreview');
+const removeBtn = document.getElementById('removeProfileBtn');
+const chooseBtn  = document.getElementById('chooseProfileBtn');
+const dropZone   = document.getElementById('profileDropZone');
+const errorMsg   = document.getElementById('profileError');
+
+// Config
+const MAX_SIZE = 2 * 1024 * 1024; // 2MB
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const DEFAULT_AVATAR = "{{ url_for('static', filename='uploads/profile_pictures/default_avatar.png') }}";
+// Green background color used for uniformity:
+const BG_COLOR = '#1fa84a'; // adjust as desired
+const OUTPUT_SIZE = 500; // output square px (keeps consistent sizes; server stores PNG)
+
+// Helper: show error
+function showProfileError(text) {
+  errorMsg.textContent = text;
+  errorMsg.classList.remove('d-none');
+}
+
+// Helper: clear error
+function clearProfileError() {
+  errorMsg.textContent = '';
+  errorMsg.classList.add('d-none');
+}
+
+// Reset preview to default
+function resetProfilePreview() {
+  previewImg.src = DEFAULT_AVATAR;
+  removeBtn.classList.add('d-none');
+  clearProfileError();
+
+  // also clear input files
+  try {
+    profileInput.value = '';
+  } catch (e) {
+    // some browsers restrict setting value; fall back to creating an empty DataTransfer
+    const dt = new DataTransfer();
+    profileInput.files = dt.files;
+  }
+}
+
+// Compose image onto green background canvas and return a Promise<File>
+function processImageWithGreenBackground(file, size = OUTPUT_SIZE) {
+  return new Promise((resolve, reject) => {
+    if (!file) return reject(new Error('No file provided'));
+
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = (ev) => {
+      img.onload = () => {
+        // create square canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        // fill background
+        ctx.fillStyle = BG_COLOR;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // compute scaled dims to cover or fit (we'll cover with 'contain' scaled and centered)
+        const iw = img.naturalWidth;
+        const ih = img.naturalHeight;
+        // Fit inside square while preserving aspect
+        const scale = Math.min(size / iw, size / ih);
+        const w = Math.round(iw * scale);
+        const h = Math.round(ih * scale);
+        const x = Math.round((size - w) / 2);
+        const y = Math.round((size - h) / 2);
+
+        // Draw image centered
+        ctx.drawImage(img, x, y, w, h);
+
+        // Optionally: draw subtle inner white frame or circle crop (not required)...
+        // Convert to blob (PNG keeps transparency but background is already filled)
+        canvas.toBlob((blob) => {
+          if (!blob) return reject(new Error('Canvas conversion failed'));
+          // Make a File so it can be assigned to input.files
+          const outFile = new File([blob], `profile_${Date.now()}.png`, { type: 'image/png' });
+          resolve({ file: outFile, url: canvas.toDataURL('image/png') });
+        }, 'image/png', 0.92);
+      };
+
+      img.onerror = () => reject(new Error('Invalid image data'));
+      img.src = ev.target.result;
+    };
+
+    reader.onerror = () => reject(new Error('File read error'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Update UI after processing
+function applyProcessedImage(out) {
+  // out: { file: File, url: dataURL }
+  previewImg.src = out.url;
+  removeBtn.classList.remove('d-none');
+  clearProfileError();
+
+  // replace input.files with processed file using DataTransfer
+  try {
+    const dt = new DataTransfer();
+    dt.items.add(out.file);
+    profileInput.files = dt.files;
+  } catch (e) {
+    // some environments may not support DataTransfer constructor, but modern browsers do
+    console.warn('Could not set processed file into input.files:', e);
+    // In that fallback case, the server will get the original uploaded file (less ideal).
+  }
+}
+
+// Validate file and process
+function handleProfileFile(file) {
+  clearProfileError();
+  if (!file) { resetProfilePreview(); return; }
+
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    showProfileError('Invalid file type. Allowed: JPG, PNG, GIF, WEBP.');
+    resetProfilePreview();
+    return;
+  }
+  if (file.size > MAX_SIZE) {
+    showProfileError('File is too large (max 2 MB).');
+    resetProfilePreview();
+    return;
+  }
+
+  processImageWithGreenBackground(file)
+    .then(out => applyProcessedImage(out))
+    .catch(err => {
+      console.error(err);
+      showProfileError('Error processing image. Try another file.');
+      resetProfilePreview();
+    });
+}
+
+// Choose button opens file picker
+chooseBtn.addEventListener('click', () => profileInput.click());
+
+// Regular file selection
+profileInput.addEventListener('change', (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (f) handleProfileFile(f);
+  else resetProfilePreview();
+});
+
+// Remove button
+removeBtn.addEventListener('click', (e) => {
+  e.preventDefault();
+  resetProfilePreview();
+});
+
+// Drag & drop affordances
+['dragenter','dragover'].forEach(evt => {
+  dropZone.addEventListener(evt, (e) => {
+    e.preventDefault(); e.stopPropagation();
+    dropZone.classList.add('dragover');
+  });
+});
+['dragleave','drop','dragend'].forEach(evt => {
+  dropZone.addEventListener(evt, (e) => {
+    e.preventDefault(); e.stopPropagation();
+    dropZone.classList.remove('dragover');
+  });
+});
+
+dropZone.addEventListener('drop', (e) => {
+  const dt = e.dataTransfer;
+  if (!dt || !dt.files || !dt.files.length) return;
+  const file = dt.files[0];
+  // set file into input for progressive enhancement
+  try {
+    const newDT = new DataTransfer();
+    newDT.items.add(file);
+    profileInput.files = newDT.files;
+  } catch (err) {
+    // ignore silently
+  }
+  handleProfileFile(file);
+});
+
+// keyboard accessibility: Enter/Space opens file chooser
+dropZone.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    profileInput.click();
+  }
+});
+
+// Init: ensure default state
+document.addEventListener('DOMContentLoaded', () => {
+  // If default avatar is present, composite it on green background (so default shows same style)
+  // We'll fetch the default avatar image and composite it to match visual uniformity (optional)
+  fetch(DEFAULT_AVATAR)
+    .then(r => r.blob())
+    .then(blob => {
+      const f = new File([blob], 'default_avatar.png', { type: blob.type || 'image/png' });
+      return processImageWithGreenBackground(f);
+    })
+    .then(out => {
+      // apply composited default (but don't replace file input)
+      previewImg.src = out.url;
+    })
+    .catch(() => {
+      // ignore if fetch fails; fallback to existing src
+    });
+});
+
+  // --- Role toggling (replaces inline styles) ---
+  function toggleRoleSections() {
+    const role = document.getElementById('role').value;
+    document.querySelectorAll('[data-role]').forEach(block => {
+      const isActive = block.dataset.role === role;
+      block.classList.toggle('d-none', !isActive);
+      block.setAttribute('aria-hidden', String(!isActive));
+    });
+  }
+  document.getElementById('role').addEventListener('change', toggleRoleSections);
+
+  // --- Parent: Class -> children loader (idempotent, multi-class friendly) ---
+  const classFilter = document.getElementById('class_filter');
+  const childContainer = document.getElementById('child_checkboxes');
+  const loadedClassGroups = new Set();
+
+  if (classFilter) {
+    classFilter.addEventListener('change', function () {
+      const className = this.value;
+      if (!className) {
+        childContainer.innerHTML = '<p class="text-muted mb-0">Please select a class first</p>';
+        return;
+      }
+      // allow reselecting previously loaded class without duplicate fetch
+      if (document.getElementById(`class_group_${CSS.escape(className)}`)) return;
+
+      const placeholder = document.createElement('div');
+      placeholder.className = 'text-muted';
+      placeholder.textContent = 'Loading students…';
+      childContainer.appendChild(placeholder);
+
+      fetch(`/admin/get-students-by-class/${encodeURIComponent(className)}`)
+        .then(res => res.json())
+        .then(data => {
+          placeholder.remove();
+          const groupDiv = document.createElement('div');
+          groupDiv.id = `class_group_${className}`;
+          groupDiv.className = 'mb-3 p-2 border rounded';
+
+          let html = `<div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-1">${className}</h6>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-remove-class="${className}">Remove</button>
+                      </div>`;
+
+          if (data.students && data.students.length) {
+            data.students.forEach(s => {
+              html += `
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox"
+                         name="child_student_ids" value="${s.id}"
+                         id="student_${s.id}">
+                  <label class="form-check-label" for="student_${s.id}">
+                    ${s.name} (${s.current_class})
+                  </label>
+                </div>`;
+            });
+          } else {
+            html += `<p class="text-muted mb-0">No students found in this class</p>`;
+          }
+
+          groupDiv.innerHTML = html;
+          childContainer.appendChild(groupDiv);
+
+          groupDiv.querySelector('[data-remove-class]').addEventListener('click', () => {
+            groupDiv.remove();
+          });
+        })
+        .catch(() => {
+          placeholder.textContent = 'Error loading students';
+          placeholder.classList.replace('text-muted', 'text-danger');
+          setTimeout(() => placeholder.remove(), 2500);
+        });
+    });
+  }
+
+  // --- Character counter for medical conditions ---
+  const mc = document.getElementById('medical_conditions');
+  const mcCount = document.getElementById('mcCount');
+  if (mc && mcCount) {
+    mc.addEventListener('input', () => mcCount.textContent = mc.value.length);
+  }
+
+  // --- Bootstrap validation + submit UX ---
+  const form = document.getElementById('registerForm');
+  const submitBtn = document.getElementById('submitBtn');
+  const submitSpinner = document.getElementById('submitSpinner');
+  let isSubmitting = false;
+  let isDirty = false;
+
+  form.addEventListener('input', () => { isDirty = true; });
+
+  window.addEventListener('beforeunload', (e) => {
+    if (isDirty && !isSubmitting) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+
+  form.addEventListener('submit', (event) => {
+    // HTML5 validation
+    if (!form.checkValidity()) {
+      event.preventDefault();
+      event.stopPropagation();
+      form.classList.add('was-validated');
+      const firstInvalid = form.querySelector(':invalid');
+      if (firstInvalid) firstInvalid.focus();
+      return;
+    }
+    isSubmitting = true;
+    submitBtn.setAttribute('disabled', 'disabled');
+    submitSpinner.classList.remove('d-none');
+  });
+
+  // --- Init on DOM ready ---
+  document.addEventListener('DOMContentLoaded', () => {
+    loadPasswordOptions();
+    toggleRoleSections();
+    evaluateStrength(passwordInput.value || '');
+  });
+</script>
+{% endblock %}

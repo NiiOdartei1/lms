@@ -1,0 +1,30 @@
+{% extends 'admin/layout.html' %}
+{% block content %}
+<div class="container mt-3">
+  <h3>Course Limits</h3>
+  <a href="{{ url_for('admin.add_limit') }}" class="btn btn-primary mb-3">Set New Limits</a>
+  <table class="table table-striped">
+    <thead><tr>
+      <th>Class</th><th>Semester</th><th>Year</th><th>Mandatory</th><th>Optional</th><th>Actions</th>
+    </tr></thead>
+    <tbody>
+      {% for l in limits %}
+      <tr>
+        <td>{{ l.class_level }}</td>
+        <td>{{ l.semester }}</td>
+        <td>{{ l.academic_year }}</td>
+        <td>{{ l.mandatory_limit }}</td>
+        <td>{{ l.optional_limit }}</td>
+        <td>
+          <a href="{{ url_for('admin.edit_limit', limit_id=l.id) }}" class="btn btn-sm btn-info">Edit</a>
+          <form method="POST" action="{{ url_for('admin.delete_limit', limit_id=l.id) }}" style="display:inline;">
+            {{ csrf_token() }}<button class="btn btn-sm btn-danger"
+             onclick="return confirm('Delete limits?')">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

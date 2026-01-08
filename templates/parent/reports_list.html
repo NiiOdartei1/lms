@@ -1,0 +1,84 @@
+{% extends "parent/base_parent.html" %}
+{% block title %}Reports{% endblock %}
+
+{% block content %}
+<div class="container mt-1">
+
+    <!-- Page Header -->
+    <div class="text-center mb-5">
+        <h2 class="fw-bold text-gradient">📑 Reports</h2>
+        <p class="text-muted">Select a child to view their academic performance and progress reports.</p>
+    </div>
+
+    {% if children %}
+        <div class="row g-4">
+            {% for student, user in children %}
+                <div class="col-sm-6 col-lg-4">
+                    <div class="card shadow-sm rounded-4 h-100 hover-card border-0">
+                        <div class="card-body text-center p-4">
+                            <div class="icon-circle mb-3">
+                                <i class="fas fa-user-graduate fa-2x"></i>
+                            </div>
+                            <h5 class="fw-semibold mb-1">{{ user.first_name }} {{ user.last_name }}</h5>
+                            <p class="mb-2 text-muted small">
+                                <strong>Class:</strong> {{ student.current_class or 'N/A' }}
+                            </p>
+                            <a href="{{ url_for('parent.view_student_report', child_id=student.id) }}" 
+                               class="btn btn-primary w-100 rounded-pill mt-2">
+                               View Report
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info rounded-4 text-center mt-4">
+            No children linked to your account.
+        </div>
+    {% endif %}
+
+    <div class="text-center mt-5">
+        <a href="{{ url_for('parent.dashboard') }}" 
+           class="btn btn-outline-dark rounded-pill px-4">
+           ⬅ Back to Dashboard
+        </a>
+    </div>
+
+</div>
+
+<style>
+/* Gradient text */
+.text-gradient {
+    background: linear-gradient(45deg, #7b2cbf, #5a189a);
+    -webkit-background-clip: text;  /* For Chrome, Safari */
+    background-clip: text;          /* Standard property */
+    -webkit-text-fill-color: transparent;
+    color: transparent;             /* Fallback */
+}
+
+/* Card hover effect */
+.hover-card {
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.hover-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+}
+
+/* Circle icon styling */
+.icon-circle {
+    width: 60px;
+    height: 60px;
+    background: #f3e8ff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+}
+.icon-circle i {
+    color: #7b2cbf;
+}
+</style>
+{% endblock %}

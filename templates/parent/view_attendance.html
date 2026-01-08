@@ -1,0 +1,48 @@
+{% extends "parent/base_parent.html" %}
+{% block title %}Attendance - {{ user.first_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-5">
+  <h2 class="mb-4">Attendance: {{ user.first_name }} {{ user.last_name }}</h2>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <p><strong>Class:</strong> {{ student.current_class or 'N/A' }}</p>
+      <p><strong>Date of Birth:</strong> {{ student.date_of_birth.strftime('%d %B %Y') if student.date_of_birth else 'N/A' }}</p>
+    </div>
+  </div>
+
+  {% if records %}
+    <div class="table-responsive">
+      <table class="table table-striped align-middle">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in records %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ r.date }}</td>
+            <td>
+              {% if r.is_present %}
+                <span class="badge bg-success">Present</span>
+              {% else %}
+                <span class="badge bg-danger">Absent</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="alert alert-info">No attendance records found for this student.</div>
+  {% endif %}
+
+  <a href="{{ url_for('parent.dashboard') }}" class="btn btn-outline-secondary mt-3">Back to Dashboard</a>
+</div>
+{% endblock %}

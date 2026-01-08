@@ -1,0 +1,286 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Upload New Material{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="card shadow-lg border-0">
+    <div class="card-header text-white"
+         style="background: linear-gradient(90deg, #36b9cc, #1cc88a);">
+      <h3 class="mb-0"><i class="fas fa-upload me-2"></i>Upload New Material</h3>
+    </div>
+    <div class="card-body">
+
+      <!-- Progress Bar -->
+      <div class="progress mb-4" style="height: 25px;">
+        <div id="progressBar"
+             class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+             role="progressbar"
+             style="width: 33%">
+          Step 1 of 3
+        </div>
+      </div>
+
+      <form method="POST" enctype="multipart/form-data" id="wizardForm">
+        {{ form.hidden_tag() }}
+
+        <!-- Step 1: Details -->
+        <div class="wizard-step" id="step1">
+          <h5 class="text-primary mb-3"><i class="fas fa-book me-2"></i>Step 1: Material Details</h5>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">{{ form.title.label }}</label>
+            {{ form.title(class="form-control", placeholder="Enter material title") }}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">{{ form.assigned_class.label }}</label>
+            {{ form.assigned_class(class="form-select") }}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">{{ form.course_name.label }}</label>
+            {{ form.course_name(class="form-select") }}
+            <div id="course-loading" class="form-text text-muted d-none">
+              <i class="fas fa-spinner fa-spin me-1"></i>Loading courses...
+            </div>
+            <div id="course-help" class="form-text text-muted">Courses shown are those registered for the selected class.</div>
+          </div>
+        </div>
+
+        <!-- Step 2: Files -->
+        <div class="wizard-step d-none" id="step2">
+          <h5 class="text-info mb-3"><i class="fas fa-file-upload me-2"></i>Step 2: Upload Files</h5>
+          <div id="drop-area"
+               class="border border-2 border-dashed rounded p-4 text-center bg-light">
+            <p class="text-muted">
+              <i class="fas fa-cloud-upload-alt me-1"></i>
+              Drag & drop files here, or click to select
+            </p>
+            {{ form.files(class="form-control d-none", multiple=True, id="fileInput") }}
+            <button type="button" class="btn btn-outline-info btn-sm" id="fileSelectBtn">
+              <i class="fas fa-folder-open me-1"></i>Choose Files
+            </button>
+            <div id="fileList" class="mt-2 text-start small"></div>
+            <small class="form-text text-muted">
+              You may upload multiple files or a .zip archive containing valid files.
+            </small>
+          </div>
+        </div>
+
+        <!-- Step 3: Confirmation -->
+        <div class="wizard-step d-none" id="step3">
+          <h5 class="text-success mb-3"><i class="fas fa-check-circle me-2"></i>Step 3: Confirm & Submit</h5>
+          <p class="text-muted">Please review your details and uploaded files before submitting.</p>
+          <ul class="list-group mb-3">
+            <li class="list-group-item">
+              <strong><i class="fas fa-heading me-2"></i>Title:</strong>
+              <span id="confirmTitle"></span>
+            </li>
+            <li class="list-group-item">
+              <strong><i class="fas fa-book me-2"></i>Course:</strong>
+              <span id="confirmCourse"></span>
+            </li>
+            <li class="list-group-item">
+              <strong><i class="fas fa-users me-2"></i>Class:</strong>
+              <span id="confirmClass"></span>
+            </li>
+            <li class="list-group-item">
+              <strong><i class="fas fa-file me-2"></i>Files:</strong>
+              <div id="confirmFiles" class="small mt-1"></div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Navigation Buttons -->
+        <div class="d-flex justify-content-between mt-4">
+          <button type="button" id="prevBtn" class="btn btn-secondary d-none">
+            <i class="fas fa-arrow-left me-1"></i>Previous
+          </button>
+          <button type="button" id="nextBtn" class="btn btn-primary">
+            Next<i class="fas fa-arrow-right ms-1"></i>
+          </button>
+          <button type="submit" id="submitBtn" class="btn btn-success d-none">
+            <i class="fas fa-paper-plane me-1"></i>Submit
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<style>
+#drop-area {
+  cursor: pointer;
+  transition: 0.3s;
+}
+#drop-area.dragover {
+  background-color: #eafaf1;
+  border-color: #1cc88a;
+}
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  // Wizard setup
+  let currentStep = 1;
+  const totalSteps = 3;
+  const steps = document.querySelectorAll(".wizard-step");
+  const progressBar = document.getElementById("progressBar");
+  const prevBtn = document.getElementById("prevBtn");
+  const nextBtn = document.getElementById("nextBtn");
+  const submitBtn = document.getElementById("submitBtn");
+
+  // File inputs
+  const fileInput = document.getElementById("fileInput");
+  const fileSelectBtn = document.getElementById("fileSelectBtn");
+  const fileList = document.getElementById("fileList");
+
+  function showStep(step) {
+    steps.forEach((s, i) => s.classList.toggle("d-none", i !== step - 1));
+    prevBtn.classList.toggle("d-none", step === 1);
+    nextBtn.classList.toggle("d-none", step === totalSteps);
+    submitBtn.classList.toggle("d-none", step !== totalSteps);
+    progressBar.style.width = (step / totalSteps) * 100 + "%";
+    progressBar.innerText = `Step ${step} of ${totalSteps}`;
+  }
+
+  nextBtn.addEventListener("click", () => {
+    if (currentStep < totalSteps) {
+      currentStep++;
+      if (currentStep === 3) fillConfirmation();
+      showStep(currentStep);
+    }
+  });
+  prevBtn.addEventListener("click", () => {
+    if (currentStep > 1) {
+      currentStep--;
+      showStep(currentStep);
+    }
+  });
+
+  // Drag & Drop
+  const dropArea = document.getElementById("drop-area");
+  dropArea.addEventListener("dragover", e => {
+    e.preventDefault();
+    dropArea.classList.add("dragover");
+  });
+  dropArea.addEventListener("dragleave", () => dropArea.classList.remove("dragover"));
+  dropArea.addEventListener("drop", e => {
+    e.preventDefault();
+    dropArea.classList.remove("dragover");
+    fileInput.files = e.dataTransfer.files;
+    showFiles(fileInput.files);
+  });
+  fileSelectBtn.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => showFiles(fileInput.files));
+
+  function showFiles(files) {
+    fileList.innerHTML = "";
+    Array.from(files).forEach(file => {
+      fileList.innerHTML += `<div><i class="fas fa-file-alt me-1 text-secondary"></i>${file.name}</div>`;
+    });
+  }
+
+  // --- Dynamic course loading (from DB) ---
+  const classSelect = document.querySelector("[name='assigned_class']");
+  const courseSelect = document.querySelector("[name='course_name']");
+  const courseLoading = document.getElementById("course-loading");
+
+  // preserve initial selections (useful on validation error reload)
+  const initialClass = "{{ form.assigned_class.data | default('') }}";
+  const initialCourse = "{{ form.course_name.data | default('') }}";
+
+  function loadCoursesForClass(selectedClass, preselectCourse = "") {
+    if (!selectedClass) {
+      courseSelect.innerHTML = '<option value="">Select a class first</option>';
+      return;
+    }
+
+    courseLoading.classList.remove("d-none");
+    courseSelect.innerHTML = '<option value="">Loading...</option>';
+
+    fetch(`/admin/get_courses/${encodeURIComponent(selectedClass)}`)
+      .then(res => {
+        if (!res.ok) throw new Error('Network response was not ok');
+        return res.json();
+      })
+      .then(data => {
+        courseSelect.innerHTML = "";
+        if (data.length > 0) {
+          // optional placeholder
+          const placeholder = document.createElement("option");
+          placeholder.value = "";
+          placeholder.textContent = "Select course";
+          placeholder.disabled = true;
+          placeholder.selected = true;
+          courseSelect.appendChild(placeholder);
+
+          data.forEach(c => {
+            // value is course name (server expects name string in CourseMaterial.course_name)
+            const opt = document.createElement("option");
+            opt.value = c.name;
+            opt.textContent = c.name;
+            courseSelect.appendChild(opt);
+          });
+
+          // if there's a preselected course (e.g. after validation error), select it
+          if (preselectCourse) {
+            const match = Array.from(courseSelect.options).find(o => o.value === preselectCourse);
+            if (match) {
+              match.selected = true;
+            } else {
+              // if not exact match, try partial match by name
+              const found = Array.from(courseSelect.options).find(o => o.textContent.includes(preselectCourse));
+              if (found) found.selected = true;
+            }
+          }
+        } else {
+          const opt = document.createElement("option");
+          opt.textContent = "No courses available for this class";
+          opt.disabled = true;
+          courseSelect.appendChild(opt);
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching courses:', err);
+        courseSelect.innerHTML = '<option value="">Error loading courses</option>';
+      })
+      .finally(() => courseLoading.classList.add("d-none"));
+  }
+
+  classSelect.addEventListener("change", function () {
+    loadCoursesForClass(this.value);
+  });
+
+  // If a class was already selected on page load (edit/validation-return), load its courses
+  if (initialClass) {
+    // set the class select if needed (works if WTForms already set it)
+    // call loader and pass initialCourse to preselect it
+    loadCoursesForClass(initialClass, initialCourse);
+  } else {
+    // ensure course select has a helpful default
+    courseSelect.innerHTML = '<option value="">Select a class first</option>';
+  }
+
+  // Confirmation step fill
+  function fillConfirmation() {
+    document.getElementById("confirmTitle").innerText =
+      document.querySelector("[name='title']").value || '(no title)';
+    document.getElementById("confirmCourse").innerText =
+      document.querySelector("[name='course_name']").value || '(no course)';
+    document.getElementById("confirmClass").innerText =
+      document.querySelector("[name='assigned_class']").value || '(no class)';
+
+    const files = fileInput.files;
+    const confirmFiles = document.getElementById("confirmFiles");
+    confirmFiles.innerHTML = files.length
+      ? Array.from(files)
+          .map(f => `<i class="fas fa-file-alt me-1 text-secondary"></i>${f.name}`)
+          .join("<br>")
+      : "No files selected";
+  }
+
+  showStep(currentStep);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,327 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Edit Question | {{ exam.title }}{% endblock %}
+
+{% block content %}
+<div class="container py-1">
+  <h2 class="mb-4">Edit Question in: <span class="text-primary">{{ exam.title }}</span></h2>
+
+  <form method="POST" id="question-form"
+      data-initial-options='{{ initial_options|tojson|safe }}'
+      data-initial-math='{{ initial_math|tojson|safe }}'
+      data-tf-choice='{{ tf_choice|e }}'
+      data-rubric='{{ rubric|tojson|safe }}'>
+    {{ form.hidden_tag() }}
+
+    <!-- Question Details -->
+    <div class="card mb-4 shadow-sm">
+      <div class="card-header fw-bold">Question Details</div>
+      <div class="card-body">
+        <div class="mb-3">
+          {{ form.question_text.label(class="form-label") }}
+          {{ form.question_text(class="form-control", rows="4", placeholder="Enter the question here...") }}
+          {% for err in form.question_text.errors %}
+            <div class="text-danger small">{{ err }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            {{ form.question_type.label(class="form-label") }}
+            {{ form.question_type(class="form-select", id="question-type-select") }}
+            {% for err in form.question_type.errors %}
+              <div class="text-danger small">{{ err }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="col-md-6 mb-3">
+            {{ form.marks.label(class="form-label") }}
+            {{ form.marks(class="form-control", min="0", placeholder="e.g. 5") }}
+            {% for err in form.marks.errors %}
+              <div class="text-danger small">{{ err }}</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dynamic area that switches by question type -->
+    <div id="dynamic-area">
+
+      <!-- MCQ Editor -->
+      <div class="card mb-4 shadow-sm" id="mcq-editor" style="display:none;">
+        <div class="card-header fw-bold">Multiple Choice — Options</div>
+        <div class="card-body">
+          <p class="text-muted mb-3">Provide at least 2 options. Check the correct option(s).</p>
+
+          <div id="mcq-options" class="row">
+            <!-- JS will populate existing options here from initial_options -->
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="button" id="btn-add-option" class="btn btn-outline-primary btn-sm">+ Add Option</button>
+            <button type="button" id="btn-reset-options" class="btn btn-outline-secondary btn-sm">Reset to 2</button>
+            <div class="form-text ms-3">Tip: keep 4 options for best UX.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- True / False (auto) -->
+      <div class="card mb-4 shadow-sm" id="tf-editor" style="display:none;">
+        <div class="card-header fw-bold">True / False</div>
+        <div class="card-body">
+          <p class="text-muted mb-2">Select the correct answer below.</p>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="tf_correct" id="tf_true" value="true">
+            <label class="form-check-label" for="tf_true">True</label>
+            <input type="hidden" name="tf_true_label" value="True" />
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="tf_correct" id="tf_false" value="false">
+            <label class="form-check-label" for="tf_false">False</label>
+            <input type="hidden" name="tf_false_label" value="False" />
+          </div>
+          <div class="form-text mt-2">On submit, backend converts selection to options (True/False).</div>
+        </div>
+      </div>
+
+      <!-- Subjective -->
+      <div class="card mb-4 shadow-sm" id="subj-editor" style="display:none;">
+        <div class="card-header fw-bold">Subjective / Long Answer</div>
+        <div class="card-body">
+          <p class="text-muted mb-2">Provide an optional expected answer or rubric to help graders.</p>
+          <textarea name="subjective_rubric" id="subjective-rubric" class="form-control" rows="4" placeholder="Suggested answer / grading rubric (optional)"></textarea>
+          <div class="form-text mt-2">Students will enter free text when answering this question.</div>
+        </div>
+      </div>
+
+      <!-- Math / Numeric -->
+      <div class="card mb-4 shadow-sm" id="math-editor" style="display:none;">
+        <div class="card-header fw-bold">Mathematics — Numeric Answer</div>
+        <div class="card-body">
+          <p class="text-muted mb-2">Enter numeric answer(s). Add more if the answer has multiple parts.</p>
+
+          <div id="math-answers" class="row">
+            <!-- JS will populate existing math answers here -->
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="button" id="btn-add-math" class="btn btn-outline-primary btn-sm">+ Add Numeric Part</button>
+            <button type="button" id="btn-reset-math" class="btn btn-outline-secondary btn-sm">Reset to 1</button>
+          </div>
+        </div>
+      </div>
+
+    </div> <!-- /dynamic-area -->
+
+    <!-- Actions -->
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-success px-4">💾 Save Question</button>
+      <a href="{{ url_for('admin.exam_sets', exam_id=exam.id) }}" class="btn btn-secondary px-4">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+(function(){
+  // read initial payload from the form dataset
+  const formEl = document.getElementById('question-form');
+  if (!formEl) return;
+
+  let initialOptions = [];
+  let initialMath = [];
+  let tfChoice = 'true';
+  let rubric = '';
+
+  try {
+    initialOptions = JSON.parse(formEl.dataset.initialOptions || '[]');
+  } catch (err) { initialOptions = []; console.warn('initialOptions parse error', err); }
+
+  try {
+    initialMath = JSON.parse(formEl.dataset.initialMath || '[]');
+  } catch (err) { initialMath = []; console.warn('initialMath parse error', err); }
+
+  if (formEl.dataset.tfChoice) {
+    tfChoice = formEl.dataset.tfChoice;
+  }
+  if (formEl.dataset.rubric) {
+    try { rubric = JSON.parse(formEl.dataset.rubric); } catch(e){ rubric = formEl.dataset.rubric; }
+  }
+
+  // Elements
+  const typeSelect = document.getElementById('question-type-select');
+  const mcqEditor = document.getElementById('mcq-editor');
+  const tfEditor = document.getElementById('tf-editor');
+  const subjEditor = document.getElementById('subj-editor');
+  const mathEditor = document.getElementById('math-editor');
+
+  const mcqOptionsContainer = document.getElementById('mcq-options');
+  const mathContainer = document.getElementById('math-answers');
+
+  // counters
+  let mcqIndex = 0;
+  let mathIndex = 0;
+
+  function showEditorFor(type){
+    if(mcqEditor) mcqEditor.style.display = (type === 'mcq') ? 'block' : 'none';
+    if(tfEditor) tfEditor.style.display = (type === 'true_false') ? 'block' : 'none';
+    if(subjEditor) subjEditor.style.display = (type === 'subjective') ? 'block' : 'none';
+    if(mathEditor) mathEditor.style.display = (type === 'math') ? 'block' : 'none';
+  }
+
+  function addMcqOption(text='', checked=false){
+    if(!mcqOptionsContainer) return;
+    const idx = mcqIndex++;
+    const col = document.createElement('div');
+    col.className = 'col-md-6 mb-3 mcq-option-row';
+    col.innerHTML = `
+      <div class="input-group">
+        <input name="options-${idx}-text" class="form-control" placeholder="Option text" value="${escapeHtml(text)}" />
+        <span class="input-group-text">
+          <input type="checkbox" name="options-${idx}-is_correct" class="form-check-input mt-0" ${checked ? 'checked' : ''} />
+        </span>
+        <button type="button" class="btn btn-outline-danger btn-sm ms-2 btn-remove-option">Remove</button>
+      </div>
+    `;
+    mcqOptionsContainer.appendChild(col);
+  }
+
+  function ensureMinMcqOptions(min){
+    if(!mcqOptionsContainer) return;
+    const current = mcqOptionsContainer.querySelectorAll('.mcq-option-row').length;
+    for(let i=current;i<min;i++) addMcqOption();
+  }
+
+  function addMathAnswer(val=''){
+    if(!mathContainer) return;
+    const idx = mathIndex++;
+    const col = document.createElement('div');
+    col.className = 'col-md-4 mb-3 math-answer-row';
+    col.innerHTML = `
+      <div class="input-group">
+        <input type="number" step="any" name="math_answer-${idx}" class="form-control" placeholder="Numeric answer #${idx+1}" value="${escapeHtml(val)}" />
+        <button type="button" class="btn btn-outline-danger btn-sm ms-2 btn-remove-math">Remove</button>
+      </div>
+    `;
+    mathContainer.appendChild(col);
+  }
+
+  // delegation for remove buttons
+  if(mcqOptionsContainer){
+    mcqOptionsContainer.addEventListener('click', function(e){
+      if(e.target && (e.target.classList.contains('btn-remove-option') || e.target.closest('.btn-remove-option'))){
+        const btn = e.target.closest('.btn-remove-option');
+        const row = btn.closest('.mcq-option-row');
+        if(row) row.remove();
+      }
+    });
+  }
+  if(mathContainer){
+    mathContainer.addEventListener('click', function(e){
+      if(e.target && (e.target.classList.contains('btn-remove-math') || e.target.closest('.btn-remove-math'))){
+        const btn = e.target.closest('.btn-remove-math');
+        const row = btn.closest('.math-answer-row');
+        if(row) row.remove();
+      }
+    });
+  }
+
+  // wire add/reset buttons (safe guards if elements missing)
+  const btnAddOpt = document.getElementById('btn-add-option');
+  if(btnAddOpt) btnAddOpt.addEventListener('click', () => addMcqOption());
+  const btnResetOpt = document.getElementById('btn-reset-options');
+  if(btnResetOpt) btnResetOpt.addEventListener('click', () => {
+    if(!mcqOptionsContainer) return;
+    mcqOptionsContainer.querySelectorAll('.mcq-option-row').forEach(n => n.remove());
+    mcqIndex = 0;
+    addMcqOption(); addMcqOption();
+  });
+  const btnAddMath = document.getElementById('btn-add-math');
+  if(btnAddMath) btnAddMath.addEventListener('click', () => addMathAnswer());
+  const btnResetMath = document.getElementById('btn-reset-math');
+  if(btnResetMath) btnResetMath.addEventListener('click', () => {
+    if(!mathContainer) return;
+    mathContainer.querySelectorAll('.math-answer-row').forEach(n => n.remove());
+    mathIndex = 0;
+    addMathAnswer();
+  });
+
+  // type select change
+  if(typeSelect){
+    typeSelect.addEventListener('change', function(){
+      showEditorFor(this.value);
+    });
+  }
+
+  // form submit hook for TF hidden inputs
+  if(formEl){
+    formEl.addEventListener('submit', function(e){
+      const type = (typeSelect && typeSelect.value) ? typeSelect.value : 'mcq';
+      if(type === 'true_false'){
+        document.querySelectorAll('input[name^="options-tf-"]').forEach(n => n.remove());
+        const choice = document.querySelector('input[name="tf_correct"]:checked')?.value || 'true';
+        const hiddenTrue = document.createElement('input'); hiddenTrue.type='hidden';
+        hiddenTrue.name='options-tf-0-text'; hiddenTrue.value='True';
+        const hiddenTrueCorrect = document.createElement('input'); hiddenTrueCorrect.type='hidden';
+        hiddenTrueCorrect.name='options-tf-0-is_correct'; hiddenTrueCorrect.value = (choice==='true') ? 'y' : '';
+        const hiddenFalse = document.createElement('input'); hiddenFalse.type='hidden';
+        hiddenFalse.name='options-tf-1-text'; hiddenFalse.value='False';
+        const hiddenFalseCorrect = document.createElement('input'); hiddenFalseCorrect.type='hidden';
+        hiddenFalseCorrect.name='options-tf-1-is_correct'; hiddenFalseCorrect.value = (choice==='false') ? 'y' : '';
+        formEl.appendChild(hiddenTrue); formEl.appendChild(hiddenTrueCorrect);
+        formEl.appendChild(hiddenFalse); formEl.appendChild(hiddenFalseCorrect);
+      }
+    });
+  }
+
+  function escapeHtml(unsafe) {
+    if(unsafe === undefined || unsafe === null) return '';
+    return String(unsafe).replace(/[&<"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','"':'&quot;',"'":'&#039;'})[m]; });
+  }
+
+  // initialize UI with server data
+  function init(){
+    const type = (typeSelect && typeSelect.value) ? typeSelect.value : 'mcq';
+    showEditorFor(type);
+
+    if(mcqOptionsContainer){
+      mcqOptionsContainer.querySelectorAll('.mcq-option-row').forEach(n => n.remove());
+      mcqIndex = 0;
+      if (initialOptions && initialOptions.length > 0){
+        initialOptions.forEach(opt => addMcqOption(opt.text, !!opt.is_correct));
+      } else {
+        addMcqOption(); addMcqOption();
+      }
+      ensureMinMcqOptions(2);
+    }
+
+    if(tfChoice === 'true' && document.getElementById('tf_true')) {
+      document.getElementById('tf_true').checked = true;
+    } else if(document.getElementById('tf_false')) {
+      document.getElementById('tf_false').checked = true;
+    }
+
+    if(rubric && document.getElementById('subjective-rubric')) {
+      document.getElementById('subjective-rubric').value = rubric;
+    }
+
+    if(mathContainer){
+      mathContainer.querySelectorAll('.math-answer-row').forEach(n => n.remove());
+      mathIndex = 0;
+      if(initialMath && initialMath.length > 0){
+        initialMath.forEach(a => addMathAnswer(a));
+      } else {
+        addMathAnswer();
+      }
+    }
+  }
+
+  init();
+
+})();
+</script>
+<style>
+  .mcq-option-row .input-group .btn-remove-option { display: inline-block; }
+  .math-answer-row .input-group .btn-remove-math { display: inline-block; }
+</style>
+
+{% endblock %}

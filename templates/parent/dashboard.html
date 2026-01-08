@@ -1,0 +1,176 @@
+{% extends "parent/base_parent.html" %}
+{% block title %}Parent Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-1">
+
+  <!-- Header -->
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+    <div>
+      <h1 class="fw-bold mb-1">Welcome back, {{ current_user.first_name }} 👋</h1>
+      <p class="text-muted mb-0">Here’s an overview of your children and recent updates.</p>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="d-flex flex-wrap gap-3 mt-1 mt-md-0">
+      <div class="stat-card shadow-sm">
+        <div class="d-flex align-items-center gap-2">
+          <i class="fas fa-user-graduate text-primary fs-4"></i>
+          <div>
+            <div class="stat-label">Children</div>
+            <div class="stat-value">{{ total_children }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="stat-card shadow-sm">
+        <div class="d-flex align-items-center gap-2">
+          <i class="fas fa-bell text-warning fs-4"></i>
+          <div>
+            <div class="stat-label">Unread Notifications</div>
+            <div class="stat-value">{{ unread_notifications_count or 0 }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="stat-card shadow-sm">
+        <div class="d-flex align-items-center gap-2">
+          <i class="fas fa-calendar-alt text-success fs-4"></i>
+          <div>
+            <div class="stat-label">Upcoming Items</div>
+            <div class="stat-value">{{ upcoming_count or 0 }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Actions -->
+  <div class="row mb-4 align-items-center">
+    <div class="col-md-6">
+      <div class="input-group shadow-sm">
+        <span class="input-group-text bg-light"><i class="fas fa-search"></i></span>
+        <input id="childSearch" class="form-control" placeholder="Search by name or class..." type="search">
+      </div>
+    </div>
+    <div class="col-md-6 text-md-end mt-3 mt-md-0">
+      <a href="{{ url_for('parent.view_children') }}" class="btn btn-primary btn-sm"><i class="fas fa-link me-1"></i>Link Child</a>
+      <a href="{{ url_for('parent.reports_list') }}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-file-alt me-1"></i>Pending Requests</a>
+    </div>
+  </div>
+
+  <!-- Children Grid -->
+  {% if children %}
+  <div id="childrenGrid" class="row g-4">
+    {% for student_profile, user in children %}
+    <div class="col-12 col-sm-6 col-lg-4 child-card"
+         data-name="{{ user.full_name | lower }}"
+         data-class="{{ (student_profile.current_class or '') | lower }}">
+
+      <div class="card child-item h-100 border-0 shadow-sm">
+        <div class="card-body d-flex gap-3 align-items-center">
+          <!-- Avatar -->
+          <img src="{{ user.profile_picture_url }}" alt="{{ user.full_name }}"
+               class="rounded-circle border border-2"
+               style="width:70px; height:70px; object-fit:cover;">
+
+          <!-- Info -->
+          <div class="flex-grow-1">
+            <h5 class="mb-1 fw-semibold">{{ user.full_name }}</h5>
+            <div class="small text-muted">
+              {{ student_profile.current_class or 'No class assigned' }} • ID: {{ student_profile.id }}
+            </div>
+            <div class="mt-2 small">
+              <span class="text-muted">Age:</span>
+              <strong>
+                {% if student_profile.dob %}
+                  {{ ((utcnow().date() - student_profile.dob).days // 365) }} yrs
+                {% else %}
+                  N/A
+                {% endif %}
+              </strong>
+            </div>
+          </div>
+
+          <!-- Status -->
+          <span class="badge rounded-pill {% if not student_profile.is_graduated %}bg-success{% else %}bg-secondary{% endif %}">
+            {{ "Active" if not student_profile.is_graduated else "Graduated" }}
+          </span>
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="card-footer bg-light border-0 d-flex justify-content-between align-items-center">
+          <div class="btn-group btn-group-sm" role="group">
+            <a class="btn btn-outline-primary" href="{{ url_for('parent.view_child_detail', child_id=student_profile.id) }}"><i class="fas fa-user"></i></a>
+            <a class="btn btn-outline-success" href="{{ url_for('parent.view_student_report', child_id=student_profile.id) }}"><i class="fas fa-chart-line"></i></a>
+            <a class="btn btn-outline-warning" href="{{ url_for('parent.view_attendance', child_id=student_profile.id) }}"><i class="fas fa-calendar-check"></i></a>
+          </div>
+          <small class="text-muted">
+            <i class="fas fa-bell me-1"></i> {{ student_profile.notifications_count or 0 }}
+          </small>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="alert alert-info text-center shadow-sm mt-5">
+    <i class="fas fa-info-circle me-1"></i> No children linked to your account. 
+    <a href="{{ url_for('parent.link_child') }}" class="alert-link">Link a child</a> to get started.
+  </div>
+  {% endif %}
+</div>
+
+<!-- Search Filter -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('childSearch');
+  if (!input) return;
+  input.addEventListener('input', function () {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('#childrenGrid .child-card').forEach(card => {
+      const name = card.dataset.name || '';
+      const cls = card.dataset.class || '';
+      card.style.display = (!q || name.includes(q) || cls.includes(q)) ? '' : 'none';
+    });
+  });
+});
+</script>
+
+<!-- Custom Styles -->
+<style>
+.stat-card {
+  background: #fff;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  transition: all .2s ease-in-out;
+}
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.stat-label {
+  font-size: 0.85rem;
+  color: #6c757d;
+  margin-bottom: 0;
+}
+.stat-value {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #2b2d42;
+}
+.child-item {
+  transition: all .25s ease-in-out;
+}
+.child-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+}
+.btn-group .btn {
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+</style>
+{% endblock %}

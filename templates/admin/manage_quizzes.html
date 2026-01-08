@@ -1,0 +1,173 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Manage Quizzes{% endblock %}
+
+{% block head_extra %}
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-2">
+
+  <!-- Header + Actions -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0">📘 Manage Quizzes</h5>
+    <a href="{{ url_for('admin.add_quiz') }}" class="btn btn-primary btn-sm">
+      ➕ Add New Quiz
+    </a>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="row mb-3">
+    <div class="col-md-2 col-6">
+      <div class="card text-center shadow-sm border-0">
+        <div class="card-body p-2">
+          <small class="text-muted d-block">Total Quizzes</small>
+          <span class="fw-bold fs-6">{{ quizzes|length }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2 col-6">
+      <div class="card text-center shadow-sm border-0">
+        <div class="card-body p-2">
+          <small class="text-muted d-block">Upcoming</small>
+          <span class="fw-bold fs-6">{{ upcoming_count }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2 col-6">
+      <div class="card text-center shadow-sm border-0">
+        <div class="card-body p-2">
+          <small class="text-muted d-block">Ongoing</small>
+          <span class="fw-bold fs-6">{{ ongoing_count }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2 col-6">
+      <div class="card text-center shadow-sm border-0">
+        <div class="card-body p-2">
+          <small class="text-muted d-block">Past</small>
+          <span class="fw-bold fs-6">{{ past_count }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div class="input-group mb-3 w-50">
+    <span class="input-group-text">🔍</span>
+    <input type="text" id="quizSearch" class="form-control form-control-sm" placeholder="Search quizzes...">
+  </div>
+
+  <!-- Quiz Table -->
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle small" id="quizTable">
+      <thead class="table-light sticky-top small">
+        <tr>
+          <th>Title</th>
+          <th>Subject</th>
+          <th>Start</th>
+          <th>End</th>
+          <th>Duration</th>
+          <th class="text-center">Status</th>
+          <th class="text-center">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for quiz in quizzes %}
+        {% set sd = quiz.start_datetime %}
+        {% set ed = quiz.end_datetime %}
+        <tr data-id="{{ quiz.id }}">
+          <td class="fw-semibold">{{ quiz.title }}</td>
+          <td>{{ quiz.subject }}</td>
+          <td>
+            {% if sd %}
+              {{ sd.strftime('%Y-%m-%d %H:%M') }}
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if ed %}
+              {{ ed.strftime('%Y-%m-%d %H:%M') }}
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td>{{ quiz.duration_minutes }} mins</td>
+          <td class="text-center">
+            {% if sd and ed %}
+              {% if sd > now %}
+                <span class="badge bg-success small">Upcoming</span>
+              {% elif sd <= now and now < ed %}
+                <span class="badge bg-info text-dark small">Ongoing</span>
+              {% else %}
+                <span class="badge bg-secondary small">Past</span>
+              {% endif %}
+            {% else %}
+              <span class="badge bg-warning small">No schedule</span>
+            {% endif %}
+          </td>
+          <td class="text-center">
+            <div class="btn-group btn-group-sm">
+              <a href="{{ url_for('admin.edit_quiz', quiz_id=quiz.id) }}"
+                 class="btn btn-outline-info" title="Edit Quiz">✏️</a>
+              <button class="btn btn-outline-danger delete-btn"
+                      data-url="{{ url_for('admin.delete_quiz', quiz_id=quiz.id) }}"
+                      title="Delete Quiz">🗑️</button>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted small">No quizzes found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<style>
+.table th, .table td { padding: .4rem .6rem; font-size: 0.85rem; }
+.sticky-top { background-color: #fff; }
+.card .fw-bold.fs-6 { font-size: 1rem !important; }
+h5 { font-size: 1.1rem; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const searchInput = document.getElementById('quizSearch');
+  searchInput.addEventListener('input', () => {
+    const filter = searchInput.value.toLowerCase();
+    document.querySelectorAll('#quizTable tbody tr').forEach(row => {
+      row.style.display = row.innerText.toLowerCase().includes(filter) ? '' : 'none';
+    });
+  });
+
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+  document.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!confirm("Are you sure you want to delete this quiz?")) return;
+      fetch(btn.dataset.url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrfToken
+        },
+        body: JSON.stringify({})
+      }).then(res => {
+        if (res.ok) {
+          btn.closest('tr').remove();
+        } else {
+          res.text().then(t => alert("Failed to delete quiz: " + t));
+        }
+      }).catch(err => {
+        console.error(err);
+        alert("Failed to delete quiz (network error).");
+      });
+    });
+  });
+});
+</script>
+{% endblock %}

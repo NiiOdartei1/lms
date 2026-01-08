@@ -1,0 +1,152 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Manage Courses | Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container py-1">
+
+  <!-- Page Header -->
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="fw-bold text-primary">
+      <i class="fas fa-book-open"></i> Manage Courses
+    </h2>
+    <a href="{{ url_for('admin.add_course') }}" class="btn btn-success shadow-sm">
+      <i class="fas fa-plus-circle"></i> Add Course
+    </a>
+  </div>
+
+  <!-- Registration Window -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-gradient text-white"
+         style="background: linear-gradient(90deg, #1d4ed8, #22c55e);">
+      <i class="fas fa-calendar-alt"></i> Course Registration Window
+    </div>
+    <div class="card-body">
+      <form method="POST" class="row g-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        
+        <div class="col-md-5">
+          <label class="form-label fw-bold text-primary">Start</label>
+          <input type="datetime-local"
+                 name="registration_start"
+                 class="form-control"
+                 value="{{ registration_start.strftime('%Y-%m-%dT%H:%M') if registration_start else '' }}"
+                 required>
+        </div>
+
+        <div class="col-md-5">
+          <label class="form-label fw-bold text-danger">End</label>
+          <input type="datetime-local"
+                 name="registration_end"
+                 class="form-control"
+                 value="{{ registration_end.strftime('%Y-%m-%dT%H:%M') if registration_end else '' }}"
+                 required>
+        </div>
+
+        <div class="col-md-2 d-grid">
+          <button type="submit" class="btn btn-primary mt-4">
+            <i class="fas fa-sync-alt"></i> Update
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Search + Filters -->
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-2">
+    <input type="text" id="courseSearch" class="form-control w-100 w-md-50"
+           placeholder="🔍 Search courses by name or code...">
+    <select id="filterType" class="form-select w-100 w-md-25">
+      <option value="">Filter by Type</option>
+      <option value="Mandatory">Mandatory</option>
+      <option value="Optional">Optional</option>
+    </select>
+  </div>
+
+  <!-- Courses Table -->
+  <div class="table-responsive shadow-sm">
+    <table class="table table-striped table-hover align-middle">
+      <thead class="table-dark">
+        <tr>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Class</th>
+          <th>Semester</th>
+          <th>Credit Hours</th>
+          <th>Year</th>
+          <th>Type</th>
+          <th class="text-center">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="courseTable">
+        {% for c in courses %}
+        <tr>
+          <td><span class="fw-bold text-primary">{{ c.code }}</span></td>
+          <td>{{ c.name }}</td>
+          <td><span class="badge bg-secondary">{{ c.assigned_class }}</span></td>
+          <td><span class="badge bg-info">{{ c.semester }}</span></td>
+          <td><span class="badge bg-primary">{{ c.credit_hours }}</span></td>
+          <td>{{ c.academic_year }}</td>
+          <td>
+            {% if c.is_mandatory %}
+              <span class="badge bg-danger"><i class="fas fa-lock"></i> Mandatory</span>
+            {% else %}
+              <span class="badge bg-success"><i class="fas fa-unlock"></i> Optional</span>
+            {% endif %}
+          </td>
+          <td class="text-center">
+            <a href="{{ url_for('admin.edit_course', course_id=c.id) }}"
+               class="btn btn-sm btn-warning" data-bs-toggle="tooltip" title="Edit Course">
+              <i class="fas fa-edit"></i>
+            </a>
+            <form method="POST"
+                  action="{{ url_for('admin.delete_course', course_id=c.id) }}"
+                  style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit"
+                      class="btn btn-sm btn-danger"
+                      onclick="return confirm('Remove course?')"
+                      data-bs-toggle="tooltip" title="Delete Course">
+                <i class="fas fa-trash-alt"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" class="text-center text-muted">No courses found.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Script: Search + Filter -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const searchInput = document.getElementById("courseSearch");
+  const filterType = document.getElementById("filterType");
+  const rows = document.querySelectorAll("#courseTable tr");
+
+  function filterCourses() {
+    const search = searchInput.value.toLowerCase();
+    const type = filterType.value;
+    rows.forEach(row => {
+      const code = row.children[0]?.innerText.toLowerCase() || "";
+      const name = row.children[1]?.innerText.toLowerCase() || "";
+      const typeText = row.children[5]?.innerText || "";
+      const matchSearch = code.includes(search) || name.includes(search);
+      const matchType = !type || typeText.includes(type);
+      row.style.display = matchSearch && matchType ? "" : "none";
+    });
+  }
+
+  searchInput.addEventListener("input", filterCourses);
+  filterType.addEventListener("change", filterCourses);
+
+  // Bootstrap tooltips
+  const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+  tooltipTriggerList.map(el => new bootstrap.Tooltip(el));
+});
+</script>
+{% endblock %}

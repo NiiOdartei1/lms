@@ -1,0 +1,215 @@
+{% extends "admin/layout.html" %}
+{% block title %}Edit Parent{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+      <h2 class="mb-0">Edit Parent</h2>
+      <small class="text-muted">Add or remove children associated with this parent.</small>
+    </div>
+    <div class="text-end">
+      <span class="badge bg-primary-subtle text-primary border border-primary">Admin</span>
+    </div>
+  </div>
+
+  <!-- form posts to the same edit_record route for parents -->
+  <form id="editParentForm" method="POST" action="{{ url_for('admin.edit_record', model='parents', record_id=parent.id) }}" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <!-- ====== SELECT CLASS (fetch students) ====== -->
+    <div class="card shadow-sm mb-3">
+      <div class="card-header"><strong>Filter Students by Class</strong></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <select id="classSelect" class="form-select form-select-sm" aria-label="Select class">
+              <option value="">— Select Class —</option>
+              {% for value, label in classes %}
+                <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text small">Choose a class to list students you can add as children.</div>
+          </div>
+
+          <div class="col-md-6">
+            <div id="fetchStatus" class="small text-muted">Current children shown on the right.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== AVAILABLE STUDENTS (from selected class) ====== -->
+    <div class="card shadow-sm mb-3" id="availableCard" style="display:none;">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Students in selected class</strong>
+        <small class="text-muted" id="availableCount">0</small>
+      </div>
+      <div class="card-body">
+        <div id="availableStudents" class="list-group list-group-flush"></div>
+      </div>
+    </div>
+
+    <!-- ====== CHILDREN MANAGEMENT (selected children for this parent) ====== -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Children assigned to this parent</strong>
+      </div>
+      <div class="card-body">
+        <div id="childrenContainer" class="mb-2">
+          {% for link in parent.children_links %}
+            {% set s = link.student %}
+            <div class="d-flex align-items-center mb-2 child-row" data-student-id="{{ s.id }}">
+              <input type="hidden" name="child_student_ids[]" value="{{ s.id }}">
+              <div class="flex-grow-1 me-2">
+                <input type="text" class="form-control form-control-sm" value="{{ s.user.full_name if s.user is defined else (s.full_name if s.full_name is defined else 'Student #' ~ s.id) }}" readonly>
+              </div>
+              <div>
+                <button type="button" class="btn btn-sm btn-outline-danger removeChildBtn">Remove</button>
+              </div>
+            </div>
+          {% else %}
+            <p class="text-muted mb-0">No children assigned yet.</p>
+          {% endfor %}
+        </div>
+
+        <div class="form-text">Click "Add" next to a student in the left panel to assign them. Remove to unassign.</div>
+      </div>
+    </div>
+
+    <!-- ====== ACTIONS ====== -->
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-success">Save Changes</button>
+      <a href="{{ url_for('admin.view_database', model='parents') }}" class="btn btn-secondary">Back</a>
+    </div>
+  </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const classSelect = document.getElementById('classSelect');
+  const availableCard = document.getElementById('availableCard');
+  const availableStudents = document.getElementById('availableStudents');
+  const availableCount = document.getElementById('availableCount');
+  const childrenContainer = document.getElementById('childrenContainer');
+  const fetchStatus = document.getElementById('fetchStatus');
+
+  // helper: check if a student id is already present in children container
+  function hasStudentId(id) {
+    return !!childrenContainer.querySelector(`[data-student-id="${id}"]`);
+  }
+
+  // helper: create a child row in the childrenContainer (with hidden input child_student_ids[])
+  function addChildRow(student) {
+    if (hasStudentId(student.id)) {
+      // already added
+      return false;
+    }
+    const row = document.createElement('div');
+    row.className = 'd-flex align-items-center mb-2 child-row';
+    row.dataset.studentId = student.id;
+    row.innerHTML = `
+      <input type="hidden" name="child_student_ids[]" value="${student.id}">
+      <div class="flex-grow-1 me-2">
+        <input type="text" class="form-control form-control-sm" value="${escapeHtml(student.name)}" readonly>
+      </div>
+      <div>
+        <button type="button" class="btn btn-sm btn-outline-danger removeChildBtn">Remove</button>
+      </div>
+    `;
+    childrenContainer.appendChild(row);
+    return true;
+  }
+
+  // helper: simple text escape for insertion into HTML
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // remove child via delegation
+  childrenContainer.addEventListener('click', (e) => {
+    if (e.target.classList.contains('removeChildBtn')) {
+      const row = e.target.closest('.child-row');
+      if (row) row.remove();
+    }
+  });
+
+  // When class changes, fetch students and render available list
+  classSelect.addEventListener('change', async () => {
+    const className = classSelect.value;
+    if (!className) {
+      availableCard.style.display = 'none';
+      availableStudents.innerHTML = '';
+      availableCount.textContent = '0';
+      fetchStatus.textContent = 'Current children shown on the right.';
+      return;
+    }
+
+    fetchStatus.textContent = 'Loading students…';
+    try {
+      const res = await fetch(`/admin/get-students-by-class/${encodeURIComponent(className)}`, { credentials: 'same-origin' });
+      if (!res.ok) throw new Error('Network error fetching students');
+      const data = await res.json();
+
+      // show available students list
+      availableStudents.innerHTML = '';
+      if (!data.students || data.students.length === 0) {
+        availableStudents.innerHTML = '<div class="text-muted">No students found in this class.</div>';
+        availableCount.textContent = '0';
+        availableCard.style.display = '';
+        fetchStatus.textContent = 'No students in this class.';
+        return;
+      }
+
+      data.students.forEach(s => {
+        const item = document.createElement('div');
+        item.className = 'list-group-item d-flex align-items-center justify-content-between';
+        item.innerHTML = `
+          <div class="me-3">
+            <div class="fw-semibold small">${escapeHtml(s.name)}</div>
+            <div class="small text-muted">ID: ${s.id}</div>
+          </div>
+          <div>
+            <button type="button" class="btn btn-sm btn-outline-primary addStudentBtn" data-student-id="${s.id}" data-student-name="${escapeHtml(s.name)}">Add</button>
+          </div>
+        `;
+        availableStudents.appendChild(item);
+      });
+
+      availableCount.textContent = data.students.length;
+      availableCard.style.display = '';
+      fetchStatus.textContent = `Showing ${data.students.length} students for ${className}.`;
+    } catch (err) {
+      console.error(err);
+      availableStudents.innerHTML = '<div class="text-danger">Error loading students.</div>';
+      availableCard.style.display = '';
+      availableCount.textContent = '0';
+      fetchStatus.textContent = 'Error loading students.';
+    }
+  });
+
+  // delegate for Add buttons in availableStudents
+  availableStudents.addEventListener('click', (e) => {
+    if (e.target.classList.contains('addStudentBtn')) {
+      const id = e.target.dataset.studentId;
+      const name = e.target.dataset.studentName;
+      if (!id) return;
+      // convert id to number for comparison
+      const numericId = String(id);
+      if (hasStudentId(numericId)) {
+        // optionally show a small message
+        e.target.textContent = 'Added';
+        e.target.setAttribute('disabled', 'disabled');
+        return;
+      }
+      const added = addChildRow({ id: numericId, name });
+      if (added) {
+        e.target.textContent = 'Added';
+        e.target.setAttribute('disabled', 'disabled');
+      }
+    }
+  });
+
+});
+</script>
+{% endblock %}

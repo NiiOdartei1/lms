@@ -1,0 +1,86 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Edit Exam | {{ exam.title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h2>Edit Exam: {{ exam.title }}</h2>
+
+  <form method="POST">
+    {{ form.hidden_tag() }}
+
+    <div class="mb-3">
+      {{ form.title.label(class="form-label") }}
+      {{ form.title(class="form-control") }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.subject.label(class="form-label") }}
+      {{ form.subject(class="form-control") }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.assigned_class.label(class="form-label") }}
+      {{ form.assigned_class(class="form-select") }}
+    </div>
+
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        {{ form.start_datetime.label(class="form-label") }}
+        {{ form.start_datetime(class="form-control", type="datetime-local") }}
+      </div>
+      <div class="col-md-6 mb-3">
+        {{ form.end_datetime.label(class="form-label") }}
+        {{ form.end_datetime(class="form-control", type="datetime-local") }}
+      </div>
+    </div>
+
+    <div class="mb-3">
+      {{ form.duration_minutes.label(class="form-label") }}
+      {{ form.duration_minutes(class="form-control") }}
+    </div>
+
+    <!-- Assignment Mode -->
+    <div class="mb-3">
+      {{ form.assignment_mode.label(class="form-label") }}
+      {{ form.assignment_mode(class="form-select", id="assignment_mode") }}
+      <small class="form-text text-muted">
+        <strong>Random:</strong> Each student gets a random set.<br>
+        <strong>Hash:</strong> Deterministic set assignment based on student.<br>
+        <strong>Choice:</strong> Students choose their set manually.
+      </small>
+    </div>
+
+    <!-- Assignment Seed (only for hash) -->
+    <div class="mb-3" id="assignment-seed-group" style="display: none;">
+      {{ form.assignment_seed.label(class="form-label") }}
+      {{ form.assignment_seed(class="form-control") }}
+      <small class="form-text text-muted">Optional: Used only in <strong>Hash</strong> mode to make assignments reproducible.</small>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-success">Save Changes</button>
+      <a href="{{ url_for('admin.manage_exams') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<!-- Script to toggle assignment seed -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const modeSelect = document.getElementById("assignment_mode");
+  const seedGroup = document.getElementById("assignment-seed-group");
+
+  function toggleSeedField() {
+    if (modeSelect.value === "hash") {
+      seedGroup.style.display = "block";
+    } else {
+      seedGroup.style.display = "none";
+    }
+  }
+
+  // Run on load and on change
+  toggleSeedField();
+  modeSelect.addEventListener("change", toggleSeedField);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,127 @@
+{% extends 'admin/layout.html' %}
+{% block title %}{{ course and 'Edit' or 'Add' }} Course | Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="card shadow-lg border-0">
+
+    <!-- Header -->
+    <div class="card-header text-white"
+         style="background: linear-gradient(90deg, #36b9cc, #4e73df);">
+      <h3 class="mb-0">
+        <i class="fas fa-book-open"></i>
+        {{ course and 'Edit Course' or 'Add New Course' }}
+      </h3>
+    </div>
+
+    <div class="card-body">
+      <form method="POST">
+        {{ form.hidden_tag() }}
+
+        <!-- Course Code -->
+        <div class="mb-3">
+          <label class="form-label fw-bold">
+            <i class="fas fa-barcode text-primary"></i> {{ form.code.label }}
+          </label>
+          {{ form.code(class="form-control", placeholder="Enter course code (e.g., CSC101)") }}
+          {% for err in form.code.errors %}
+            <div class="text-danger small">{{ err }}</div>
+          {% endfor %}
+        </div>
+
+        <!-- Course Name -->
+        <div class="mb-3">
+          <label class="form-label fw-bold">
+            <i class="fas fa-book text-info"></i> {{ form.name.label }}
+          </label>
+          {{ form.name(class="form-control", placeholder="Enter course name") }}
+          {% for err in form.name.errors %}
+            <div class="text-danger small">{{ err }}</div>
+          {% endfor %}
+        </div>
+
+        <!-- Assigned Class -->
+        <div class="mb-3">
+          <label class="form-label fw-bold">
+            <i class="fas fa-users text-success"></i> {{ form.assigned_class.label }}
+          </label>
+          {{ form.assigned_class(class="form-select") }}
+          {% for err in form.assigned_class.errors %}
+            <div class="text-danger small">{{ err }}</div>
+          {% endfor %}
+        </div>
+
+        <!-- Semester -->
+        <div class="mb-3">
+          <label class="form-label fw-bold">
+            <i class="fas fa-calendar-alt text-warning"></i> {{ form.semester.label }}
+          </label>
+          {{ form.semester(class="form-select") }}
+          {% for err in form.semester.errors %}
+            <div class="text-danger small">{{ err }}</div>
+          {% endfor %}
+        </div>
+
+        <!-- Credit Hours (NEW) -->
+        <div class="mb-3">
+          <label class="form-label fw-bold">
+            <i class="fas fa-clock text-primary"></i> {{ form.credit_hours.label }}
+          </label>
+          {{ form.credit_hours(class="form-control", min="1", max="6") }}
+          <small class="text-muted">Typical range: 1 – 6 credit units</small>
+          {% for err in form.credit_hours.errors %}
+            <div class="text-danger small">{{ err }}</div>
+          {% endfor %}
+        </div>
+
+        <!-- Academic Year -->
+        <div class="mb-3">
+          <label class="form-label fw-bold">
+            <i class="fas fa-graduation-cap text-danger"></i> {{ form.academic_year.label }}
+          </label>
+          {{ form.academic_year(class="form-control", placeholder="e.g. 2024/2025") }}
+          {% for err in form.academic_year.errors %}
+            <div class="text-danger small">{{ err }}</div>
+          {% endfor %}
+        </div>
+
+        <!-- Mandatory -->
+        <div class="form-check mb-3">
+          {{ form.is_mandatory(class="form-check-input") }}
+          <label class="form-check-label fw-bold text-dark">
+            <i class="fas fa-check-circle text-success"></i>
+            {{ form.is_mandatory.label.text }}
+          </label>
+        </div>
+
+        <!-- Buttons -->
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-success">
+            <i class="fas fa-save"></i> {{ form.submit.label }}
+          </button>
+          <a href="{{ url_for('admin.manage_courses') }}"
+             class="btn btn-outline-secondary">
+            <i class="fas fa-times"></i> Cancel
+          </a>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Extra Styling -->
+<style>
+  .form-control:focus, .form-select:focus {
+    border-color: #4e73df;
+    box-shadow: 0 0 0 0.25rem rgba(78,115,223,0.25);
+  }
+  .btn-success {
+    background: linear-gradient(90deg, #1cc88a, #17a673);
+    border: none;
+  }
+  .btn-success:hover {
+    background: linear-gradient(90deg, #17a673, #13855c);
+  }
+</style>
+{% endblock %}

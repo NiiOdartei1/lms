@@ -1,0 +1,462 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Add Question | {{ exam.title }}{% endblock %}
+
+{% block content %}
+<div class="container py-1">
+  <h2 class="mb-4">Add Question to: <span class="text-primary">{{ exam.title }}</span></h2>
+
+  <form method="POST" id="question-form">
+    {{ form.hidden_tag() }}
+
+    <!-- Question Details -->
+    <div class="card mb-4 shadow-sm">
+      <div class="card-header fw-bold">Question Details</div>
+      <div class="card-body">
+        <div class="mb-3">
+          {{ form.question_text.label(class="form-label") }}
+          {{ form.question_text(class="form-control", rows="4", placeholder="Enter the question here...") }}
+          {% for err in form.question_text.errors %}
+            <div class="text-danger small">{{ err }}</div>
+          {% endfor %}
+        </div>
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            {{ form.question_type.label(class="form-label") }}
+            {{ form.question_type(class="form-select", id="question-type-select") }}
+            {% for err in form.question_type.errors %}
+              <div class="text-danger small">{{ err }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="col-md-6 mb-3">
+            {{ form.marks.label(class="form-label") }}
+            {{ form.marks(class="form-control", min="0", placeholder="e.g. 5") }}
+            {% for err in form.marks.errors %}
+              <div class="text-danger small">{{ err }}</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dynamic area that switches by question type -->
+    <div id="dynamic-area">
+
+      <!-- MCQ Editor -->
+      <div class="card mb-4 shadow-sm" id="mcq-editor" style="display:none;">
+        <div class="card-header fw-bold">Multiple Choice — Options</div>
+        <div class="card-body">
+          <p class="text-muted mb-3">Provide at least 2 options. Check the correct option(s).</p>
+
+          <div id="mcq-options" class="row">
+            {# Render existing WTForms option entries if provided #}
+            {% if form.options and form.options|length > 0 %}
+              {% for subform in form.options %}
+                <div class="col-md-6 mb-3 mcq-option-row">
+                  <div class="input-group">
+                    {{ subform.text(class="form-control", placeholder="Option text") }}
+                    <span class="input-group-text">
+                      {{ subform.is_correct(class="form-check-input mt-0") }}
+                    </span>
+                    <button type="button" class="btn btn-outline-danger btn-sm ms-2 btn-remove-option">Remove</button>
+                  </div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <!-- Fallback: two empty option inputs -->
+              <div class="col-md-6 mb-3 mcq-option-row">
+                <div class="input-group">
+                  <input name="options-0-text" class="form-control" placeholder="Option text" />
+                  <span class="input-group-text"><input type="checkbox" name="options-0-is_correct" class="form-check-input mt-0" /></span>
+                  <button type="button" class="btn btn-outline-danger btn-sm ms-2 btn-remove-option">Remove</button>
+                </div>
+              </div>
+              <div class="col-md-6 mb-3 mcq-option-row">
+                <div class="input-group">
+                  <input name="options-1-text" class="form-control" placeholder="Option text" />
+                  <span class="input-group-text"><input type="checkbox" name="options-1-is_correct" class="form-check-input mt-0" /></span>
+                  <button type="button" class="btn btn-outline-danger btn-sm ms-2 btn-remove-option">Remove</button>
+                </div>
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="button" id="btn-add-option" class="btn btn-outline-primary btn-sm">+ Add Option</button>
+            <button type="button" id="btn-reset-options" class="btn btn-outline-secondary btn-sm">Reset to 2</button>
+            <div class="form-text ms-3">Tip: keep 4 options for best UX.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- True / False (auto) -->
+<div class="card mb-4 shadow-sm" id="tf-editor" style="display:none;">
+  <div class="card-header fw-bold">True / False</div>
+  <div class="card-body">
+    <p class="text-muted mb-2">Select the correct answer below.</p>
+    <div class="form-check">
+      <input class="form-check-input" type="radio" name="tf_correct" id="tf_true" value="true">
+      <label class="form-check-label" for="tf_true">True</label>
+    </div>
+    <div class="form-check">
+      <input class="form-check-input" type="radio" name="tf_correct" id="tf_false" value="false">
+      <label class="form-check-label" for="tf_false">False</label>
+    </div>
+    <!-- hidden MCQ-style fields -->
+    <input type="hidden" name="options-0-text" value="True">
+    <input type="hidden" name="options-1-text" value="False">
+    <input type="hidden" name="options-0-is_correct" id="hidden-true-correct" value="">
+    <input type="hidden" name="options-1-is_correct" id="hidden-false-correct" value="">
+  </div>
+</div>
+
+
+      <!-- Subjective -->
+      <div class="card mb-4 shadow-sm" id="subj-editor" style="display:none;">
+        <div class="card-header fw-bold">Subjective / Long Answer</div>
+        <div class="card-body">
+          <p class="text-muted mb-2">Provide an optional expected answer or rubric to help graders.</p>
+          <textarea id="subjective-rubric" name="subjective_rubric" class="form-control"></textarea>
+          <div class="form-text mt-2">Students will enter free text when answering this question.</div>
+        </div>
+      </div>
+
+      <!-- Math / Numeric -->
+      <div class="card mb-4 shadow-sm" id="math-editor" style="display:none;">
+        <div class="card-header fw-bold">Mathematics — Numeric Answer</div>
+        <div class="card-body">
+          <p class="text-muted mb-2">Enter the numeric answer(s). Each box is a numeric part — you can add more if the answer has multiple parts.</p>
+
+          <div id="math-answers" class="row">
+            <div class="col-md-4 mb-3 math-answer-row">
+              <div class="input-group">
+                <input type="number" step="any" name="math_answer-0" class="form-control" placeholder="Numeric answer #1" />
+                <button type="button" class="btn btn-outline-danger btn-sm ms-2 btn-remove-math">Remove</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="button" id="btn-add-math" class="btn btn-outline-primary btn-sm">+ Add Numeric Part</button>
+            <button type="button" id="btn-reset-math" class="btn btn-outline-secondary btn-sm">Reset to 1</button>
+          </div>
+        </div>
+      </div>
+
+    </div> <!-- /dynamic-area -->
+
+    <!-- Actions -->
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-success px-4">💾 Save Question</button>
+      <a href="{{ url_for('admin.exam_sets', exam_id=exam.id) }}" class="btn btn-secondary px-4">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+(function(){
+  // ELEMENTS
+  const typeSelect = document.getElementById('question-type-select');
+  const mcqEditor = document.getElementById('mcq-editor');
+  const tfEditor = document.getElementById('tf-editor');
+  const subjEditor = document.getElementById('subj-editor');
+  const mathEditor = document.getElementById('math-editor');
+
+  const mcqOptionsContainer = document.getElementById('mcq-options');
+  const mathContainer = document.getElementById('math-answers');
+  const form = document.getElementById('question-form');
+
+  // Determine initial mcqIndex from existing inputs (next free index)
+  let mcqIndex = (function(){
+    const inputs = mcqOptionsContainer.querySelectorAll('input[name^="options-"][name$="-text"]');
+    let max = -1;
+    inputs.forEach(i => {
+      const m = i.name.match(/options-(\d+)-text/);
+      if(m) max = Math.max(max, parseInt(m[1],10));
+    });
+    return max + 1;
+  })();
+
+  // Determine mathIndex
+  let mathIndex = (function(){
+    const inputs = mathContainer.querySelectorAll('input[name^="math_answer-"]');
+    let max = -1;
+    inputs.forEach(i => {
+      const m = i.name.match(/math_answer-(\d+)/);
+      if(m) max = Math.max(max, parseInt(m[1],10));
+    });
+    return max + 1;
+  })();
+
+  // Helper: escape html for value insertion
+  function escapeHtml(unsafe) {
+    if(!unsafe) return '';
+    return unsafe.replace(/[&<"']/g, function(m){
+      return ({'&':'&amp;','<':'&lt;','"':'&quot;',"'":'&#039;'})[m];
+    });
+  }
+
+  // Show only the selected editor
+  function showEditorFor(type){
+    mcqEditor.style.display = (type === 'mcq') ? 'block' : 'none';
+    tfEditor.style.display = (type === 'true_false') ? 'block' : 'none';
+    subjEditor.style.display = (type === 'subjective') ? 'block' : 'none';
+    mathEditor.style.display = (type === 'math') ? 'block' : 'none';
+  }
+
+  // Add MCQ option row (keeps names using options-{idx}-text / is_correct)
+  function addMcqOption(text='', checked=false){
+    const idx = mcqIndex++;
+    const col = document.createElement('div');
+    col.className = 'col-md-6 mb-3 mcq-option-row';
+    col.innerHTML = `
+      <div class="input-group">
+        <input name="options-${idx}-text" class="form-control" placeholder="Option text" value="${escapeHtml(text)}" />
+        <span class="input-group-text">
+          <input type="checkbox" name="options-${idx}-is_correct" class="form-check-input mt-0" ${checked ? 'checked' : ''} />
+        </span>
+        <button type="button" class="btn btn-outline-danger btn-sm ms-2 btn-remove-option">Remove</button>
+      </div>
+    `;
+    mcqOptionsContainer.appendChild(col);
+  }
+
+  function ensureMinMcqOptions(min){
+    const current = mcqOptionsContainer.querySelectorAll('.mcq-option-row').length;
+    for(let i=current;i<min;i++) addMcqOption();
+  }
+
+  // Remove MCQ rows (delegated)
+  mcqOptionsContainer.addEventListener('click', function(e){
+    const btn = e.target.closest('.btn-remove-option');
+    if(btn){
+      const row = btn.closest('.mcq-option-row');
+      if(row) row.remove();
+    }
+  });
+
+  // Add/Reset MCQ UI controls
+  document.getElementById('btn-add-option').addEventListener('click', function(){
+    addMcqOption();
+  });
+  document.getElementById('btn-reset-options').addEventListener('click', function(){
+    mcqOptionsContainer.querySelectorAll('.mcq-option-row').forEach(n => n.remove());
+    mcqIndex = 0;
+    addMcqOption(); addMcqOption();
+  });
+
+  // Math handlers
+  mathContainer.addEventListener('click', function(e){
+    const btn = e.target.closest('.btn-remove-math');
+    if(btn){
+      const row = btn.closest('.math-answer-row');
+      if(row) row.remove();
+    }
+  });
+  document.getElementById('btn-add-math').addEventListener('click', function(){
+    const idx = mathIndex++;
+    const col = document.createElement('div');
+    col.className = 'col-md-4 mb-3 math-answer-row';
+    col.innerHTML = `
+      <div class="input-group">
+        <input type="number" step="any" name="math_answer-${idx}" class="form-control" placeholder="Numeric answer #${idx+1}" />
+        <button type="button" class="btn btn-outline-danger btn-sm ms-2 btn-remove-math">Remove</button>
+      </div>
+    `;
+    mathContainer.appendChild(col);
+  });
+  document.getElementById('btn-reset-math').addEventListener('click', function(){
+    mathContainer.querySelectorAll('.math-answer-row').forEach(n => n.remove());
+    mathIndex = 0;
+    const col = document.createElement('div');
+    col.className = 'col-md-4 mb-3 math-answer-row';
+    col.innerHTML = `
+      <div class="input-group">
+        <input type="number" step="any" name="math_answer-0" class="form-control" placeholder="Numeric answer #1" />
+        <button type="button" class="btn btn-outline-danger btn-sm ms-2 btn-remove-math">Remove</button>
+      </div>
+    `;
+    mathContainer.appendChild(col);
+    mathIndex = 1;
+  });
+
+  // === TRUE/FALSE handling approach ===
+  // We'll create TF hidden inputs (MCQ-named) once and keep them in tfEditor.
+  // When switching to TF: disable/rename MCQ inputs so they don't submit, and show TF hidden inputs.
+  // When switching back to MCQ: remove TF hidden inputs and restore MCQ inputs.
+
+  // Create TF hidden inputs and place them inside tfEditor (but they will only matter when TF mode active)
+  function ensureTfHiddenInputs(){
+    // if already created, return
+    if(tfEditor.querySelector('input[name="options-0-text"]')) return;
+
+    const hiddenTrueText = document.createElement('input');
+    hiddenTrueText.type = 'hidden';
+    hiddenTrueText.name = 'options-0-text';
+    hiddenTrueText.value = 'True';
+
+    const hiddenTrueCorrect = document.createElement('input');
+    hiddenTrueCorrect.type = 'hidden';
+    hiddenTrueCorrect.name = 'options-0-is_correct';
+    hiddenTrueCorrect.id = 'hidden-true-correct';
+    hiddenTrueCorrect.value = ''; // will be 'y' if selected
+
+    const hiddenFalseText = document.createElement('input');
+    hiddenFalseText.type = 'hidden';
+    hiddenFalseText.name = 'options-1-text';
+    hiddenFalseText.value = 'False';
+
+    const hiddenFalseCorrect = document.createElement('input');
+    hiddenFalseCorrect.type = 'hidden';
+    hiddenFalseCorrect.name = 'options-1-is_correct';
+    hiddenFalseCorrect.id = 'hidden-false-correct';
+    hiddenFalseCorrect.value = '';
+
+    tfEditor.appendChild(hiddenTrueText);
+    tfEditor.appendChild(hiddenTrueCorrect);
+    tfEditor.appendChild(hiddenFalseText);
+    tfEditor.appendChild(hiddenFalseCorrect);
+  }
+
+  function removeTfHiddenInputs(){
+    ['options-0-text','options-0-is_correct','options-1-text','options-1-is_correct'].forEach(n => {
+      const el = tfEditor.querySelector(`input[name="${n}"]`);
+      if(el) el.remove();
+    });
+  }
+
+  // When TF selected, disable existing MCQ inputs by renaming them to avoid submission.
+  // We'll prefix their name with "__disabled__" so we can restore easily.
+  function disableMcqInputs(){
+    const inputs = mcqOptionsContainer.querySelectorAll('input[name^="options-"]');
+    inputs.forEach(i => {
+      if (!i.dataset.disabledName) {
+        i.dataset.disabledName = i.name; // save original
+        i.name = '__disabled__' + i.name;
+        i.disabled = true;
+      }
+    });
+  }
+
+  function restoreMcqInputs(){
+    const inputs = mcqOptionsContainer.querySelectorAll('input');
+    inputs.forEach(i => {
+      if (i.dataset.disabledName) {
+        i.name = i.dataset.disabledName;
+        delete i.dataset.disabledName;
+        i.disabled = false;
+      }
+    });
+  }
+
+  // Keep TF hidden inputs' is_correct values in sync with radio selection
+  function syncTfHiddenCorrectFlags(){
+    const trueHidden = tfEditor.querySelector('#hidden-true-correct');
+    const falseHidden = tfEditor.querySelector('#hidden-false-correct');
+    if(!trueHidden || !falseHidden) return;
+
+    const checked = document.querySelector('input[name="tf_correct"]:checked');
+    if(checked && checked.value === 'true'){
+      trueHidden.value = 'y';
+      falseHidden.value = '';
+    } else if(checked && checked.value === 'false'){
+      trueHidden.value = '';
+      falseHidden.value = 'y';
+    } else {
+      trueHidden.value = '';
+      falseHidden.value = '';
+    }
+  }
+
+  // When type changes: toggle editors and handle TF <-> MCQ state
+  typeSelect.addEventListener('change', function(){
+    const val = this.value;
+    showEditorFor(val);
+
+    if(val === 'true_false'){
+      // prepare tf hidden fields and disable MCQ inputs (they remain in UI but won't submit)
+      ensureTfHiddenInputs();
+      disableMcqInputs();
+      // set initial TF flags based on selection
+      syncTfHiddenCorrectFlags();
+    } else {
+      // if leaving TF mode remove TF hidden fields and restore MCQ inputs
+      removeTfHiddenInputs();
+      restoreMcqInputs();
+    }
+  });
+
+  // When TF radio changes, update hidden flags immediately
+  tfEditor.addEventListener('change', function(e){
+    if(e.target && e.target.name === 'tf_correct'){
+      syncTfHiddenCorrectFlags();
+    }
+  });
+
+  // FORM SUBMIT: no special TF create logic required (hidden inputs are present and MCQ inputs disabled when TF active)
+  // But we still ensure that if TF is active and no radio is checked we default to 'true' (or show a client side alert)
+  form.addEventListener('submit', function(e){
+  const type = typeSelect.value;
+
+  // === TRUE/FALSE VALIDATION ===
+  if(type === 'true_false'){
+    const checked = document.querySelector('input[name="tf_correct"]:checked');
+    if(!checked){
+      e.preventDefault();
+      alert('Please select True or False before saving the question.');
+      return false;
+    }
+    syncTfHiddenCorrectFlags();
+  }
+
+  // === MCQ VALIDATION ===
+  if(type === 'mcq'){
+    const postedOptions = Array.from(mcqOptionsContainer.querySelectorAll('input[name^="options-"][name$="-text"]'))
+                              .filter(i => !i.disabled);
+    if(postedOptions.length < 2){
+      e.preventDefault();
+      alert('Please provide at least two options for MCQ.');
+      return false;
+    }
+  }
+
+  // === ENSURE SUBJECTIVE CONTENT IS ALWAYS SUBMITTED ===
+  if(type === 'subjective'){
+    const subjTextarea = document.getElementById('subjective-rubric');
+    // if it's hidden, temporarily enable it to ensure submission
+    if(subjTextarea.disabled){
+      subjTextarea.disabled = false;
+    }
+  }
+
+  // form submits normally after this
+});
+
+
+  // delegated handler for remove option buttons is already set above; ensure init sets editors
+  function init(){
+    const startType = typeSelect.value || 'mcq';
+    showEditorFor(startType);
+    ensureMinMcqOptions(2);
+
+    // If page preselected TF, ensure TF hidden inputs exist and MCQ inputs disabled
+    if(startType === 'true_false'){
+      ensureTfHiddenInputs();
+      disableMcqInputs();
+      syncTfHiddenCorrectFlags();
+    }
+  }
+
+  // initialize
+  init();
+
+})();
+</script>
+
+<style>
+  /* tiny polish */
+  .mcq-option-row .input-group .btn-remove-option { display: inline-block; }
+  .math-answer-row .input-group .btn-remove-math { display: inline-block; }
+</style>
+{% endblock %}

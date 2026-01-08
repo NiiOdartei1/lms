@@ -1,0 +1,543 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Assign Student Fees{% endblock %}
+
+{% block head_extra %}
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+{% endblock %}
+
+{% block content %}
+<div class="container mt-3 compact-fees" style="max-width:1100px; font-size:0.9rem;">
+
+  <!-- Header -->
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+      <h4 class="mb-0 fw-bold">🎓 Assign Fees to Students</h4>
+      <div class="small text-muted">Create class-level fees quickly — compact mode for admins.</div>
+    </div>
+
+    <div class="d-flex gap-2 align-items-center">
+      <button id="toggleCompact" class="btn btn-sm btn-outline-secondary" title="Toggle compact mode">
+        <i class="fas fa-compress"></i> Compact
+      </button>
+    </div>
+  </div>
+
+  <!-- Form Card -->
+  <div class="card mb-4 shadow-sm border-0">
+    <div class="card-header py-2" style="background:linear-gradient(90deg,#ff7e5f,#feb47b);">
+      <div class="d-flex align-items-center justify-content-between">
+        <div class="text-white small fw-semibold"><i class="fas fa-money-bill-wave me-2"></i> Assign New Fee</div>
+        <div class="text-white small">Fields marked <span class="text-warning">*</span> are required</div>
+      </div>
+    </div>
+
+    <div class="card-body py-3">
+      <form id="feeForm" method="POST" class="row gy-2 gx-2 align-items-end">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="col-md-3 col-6">
+          <label for="class_level" class="form-label small fw-semibold">Class Level <span class="text-warning">*</span></label>
+          <select name="class_level" id="class_level" class="form-select form-select-sm" required>
+            <option value="">-- Select --</option>
+            {% for level in ['Primary 1','Primary 2','Primary 3','Primary 4','Primary 5','Primary 6',
+                             'JHS 1','JHS 2','JHS 3','SHS 1','SHS 2','SHS 3'] %}
+              <option value="{{ level }}">{{ level }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-3 col-6">
+          <label for="academic_year" class="form-label small fw-semibold">Academic Year <span class="text-warning">*</span></label>
+          <input id="academic_year" type="text" name="academic_year" class="form-control form-control-sm" placeholder="e.g. 2025/2026" required>
+        </div>
+
+        <div class="col-md-3 col-6">
+          <label for="semester" class="form-label small fw-semibold">Semester <span class="text-warning">*</span></label>
+          <select id="semester" name="semester" class="form-select form-select-sm" required>
+            <option value="">-- Select --</option>
+            <option value="First">First</option>
+            <option value="Second">Second</option>
+          </select>
+        </div>
+
+        <div class="col-md-3 col-6 text-end">
+          <button id="previewFeesBtn" type="button" class="btn btn-sm btn-outline-primary" title="Preview fees">
+            <i class="fas fa-eye"></i> Preview
+          </button>
+        </div>
+
+        <hr class="my-2">
+
+        <div class="col-12">
+          <h6 class="small text-secondary mb-2">📌 Fee items</h6>
+
+          <div id="feeItemsContainer" class="d-grid gap-2">
+            <div class="row g-2 fee-item align-items-center">
+              <div class="col-md-6 col-7">
+                <input type="text" name="description[]" class="form-control form-control-sm" placeholder="Fee description (e.g. Tuition)" required>
+              </div>
+              <div class="col-md-3 col-3">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">GHS</span>
+                  <input type="number" name="amount[]" class="form-control form-control-sm amount-input" step="0.01" min="0" placeholder="0.00" required>
+                </div>
+              </div>
+
+              <div class="col-md-3 col-2 d-flex gap-1 justify-content-end">
+                <button type="button" class="btn btn-sm btn-success add-item" title="Add item" aria-label="Add item">
+                  <i class="fas fa-plus"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-danger remove-item" title="Remove item" aria-label="Remove item">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mt-2">
+            <div class="small text-muted">Tip: Use the + to add more fee rows.</div>
+            <div class="small">
+              <strong>Total:</strong> GHS <span id="feesTotal">0.00</span>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="col-12 mt-3 d-grid">
+          <button type="submit" class="btn btn-sm btn-success fw-semibold" style="background:linear-gradient(90deg,#11998e,#38ef7d); color:#fff;">
+            <i class="fas fa-paper-plane me-1"></i> Assign Fees
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Search & Assigned Fees -->
+  <div class="d-flex justify-content-between align-items-center mb-2 gap-2">
+    <div>
+      <h6 class="mb-0 small fw-semibold text-success">📋 Assigned Class Fees</h6>
+      <div class="small text-muted">Click a group to expand — totals shown per group by default.</div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <input id="searchFee" type="search" class="form-control form-control-sm" placeholder="🔍 Search groups or descriptions" style="min-width:220px;">
+      <button id="clearSearch" class="btn btn-sm btn-outline-secondary" title="Clear search"><i class="fas fa-times"></i></button>
+    </div>
+  </div>
+
+  <!-- Assigned Fees: supports pagination when `groups` is provided (server-side) -->
+  <div id="assignedFeesContainer" class="accordion">
+
+    {# If backend provides `groups` (paginated list of {class_level,year,semester,fees,total}) use that #}
+    {% if groups is defined %}
+      {% if groups %}
+        {% for g in groups %}
+          {# safe defaults in case pagination vars aren't provided by the view #}
+          {% set page_num = page|default(1) %}
+          {% set per_page_num = per_page|default(groups|length) %}
+          {% set group_id = loop.index + ((page_num - 1) * per_page_num) %}
+          <div class="accordion-item mb-3 fee-group" data-class="{{ g.class_level }}" data-year="{{ g.year }}" data-semester="{{ g.semester }}">
+            <h2 class="accordion-header" id="heading{{ group_id }}">
+              <button class="accordion-button collapsed py-2 small" type="button"
+                      data-bs-toggle="collapse" data-bs-target="#collapse{{ group_id }}" aria-expanded="false"
+                      aria-controls="collapse{{ group_id }}">
+                <div class="d-flex justify-content-between w-100 align-items-center">
+                        <div class="fw-semibold">{{ g.class_level }} • {{ g.year }} • {{ g.semester }} Sem</div>
+                        {# Normalize: support both old dict-shape (g.fees, g.total) and model-shape (items_list, amount) #}
+                        {% set fees_list = g.fees if g.fees is defined else (g.items_list if g.items_list is defined else []) %}
+                        {% set group_total = g.total if g.total is defined else (g.amount if g.amount is defined else (fees_list|sum(attribute='amount') if fees_list else 0)) %}
+                        <div class="small text-muted">Total: GHS <strong class="text-dark">{{ "%.2f"|format(group_total) }}</strong> • {{ fees_list|length }} item(s)</div>
+                      </div>
+              </button>
+            </h2>
+
+            <div id="collapse{{ group_id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ group_id }}">
+              <div class="accordion-body p-0">
+                <div class="table-responsive">
+                  <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light small">
+                      <tr>
+                        <th>Description</th>
+                        <th style="width:130px">Amount (GHS)</th>
+                        <th style="width:110px" class="text-end">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for fee in fees_list %}
+                        <tr class="align-middle small">
+                          {# description might be attribute or key depending on shape #}
+                          {% set desc = fee.description if fee.description is defined else (fee['description'] if fee['description'] is defined else '') %}
+                          {% set amt = fee.amount if fee.amount is defined else (fee['amount'] if fee['amount'] is defined else 0) %}
+                          <td class="text-truncate" style="max-width:420px;" title="{{ desc }}">
+                            <span class="badge bg-info text-dark px-2 py-1">{{ desc }}</span>
+                          </td>
+                          <td class="text-end"><strong>{{ "{:,.2f}".format(amt) }}</strong></td>
+                          <td class="text-end">
+                            {# edit/delete only available when fee has an id (DB row) #}
+                            {% if fee.id is defined %}
+                            <a href="{{ url_for('admin.edit_fee', fee_id=fee.id) }}" class="btn btn-sm btn-outline-warning me-1" title="Edit">
+                              <i class="fas fa-edit"></i>
+                            </a>
+                            <form method="POST" action="{{ url_for('admin.delete_fee', fee_id=fee.id) }}" class="d-inline" onsubmit="return confirm('Delete this fee?');">
+                              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                              <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                <i class="fas fa-trash"></i>
+                              </button>
+                            </form>
+                            {% endif %}
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                    <tfoot class="small">
+                      <tr>
+                        <td class="text-end"><strong>Group total</strong></td>
+                        <td class="text-end"><strong>GHS {{ "%.2f"|format(group_total) }}</strong></td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+
+  {# Only render pagination controls when the view provided pagination vars #}
+  {% if page is defined and total_pages is defined and per_page is defined and total_groups is defined %}
+  <!-- Pagination controls (server-side) -->
+  <nav aria-label="Assigned fees pages" class="mt-2">
+          <ul class="pagination pagination-sm">
+            <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+              <a class="page-link" href="{{ url_for('admin.assign_fees', page=page-1, per_page=per_page) }}" aria-label="Previous">&laquo;</a>
+            </li>
+
+            {# show a compact range of pages #}
+            {% set start_page = page - 2 if page - 2 > 0 else 1 %}
+            {% set end_page = page + 2 if page + 2 <= total_pages else total_pages %}
+            {% if start_page > 1 %}
+              <li class="page-item"><a class="page-link" href="{{ url_for('admin.assign_fees', page=1, per_page=per_page) }}">1</a></li>
+              {% if start_page > 2 %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+            {% endif %}
+
+            {% for pnum in range(start_page, end_page + 1) %}
+              <li class="page-item {% if pnum == page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('admin.assign_fees', page=pnum, per_page=per_page) }}">{{ pnum }}</a>
+              </li>
+            {% endfor %}
+
+            {% if end_page < total_pages %}
+              {% if end_page < total_pages - 1 %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+              <li class="page-item"><a class="page-link" href="{{ url_for('admin.assign_fees', page=total_pages, per_page=per_page) }}">{{ total_pages }}</a></li>
+            {% endif %}
+
+            <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+              <a class="page-link" href="{{ url_for('admin.assign_fees', page=page+1, per_page=per_page) }}" aria-label="Next">&raquo;</a>
+            </li>
+          </ul>
+          <div class="small text-muted">Page {{ page }} of {{ total_pages }} — {{ total_groups }} groups</div>
+        </nav>
+        {% endif %}
+
+      {% else %}
+        <div class="text-muted small">No assigned fees yet.</div>
+      {% endif %}
+
+    {# Fallback: if backend still sends grouped_fees mapping (no pagination) use that #}
+    {% else %}
+      {% if grouped_fees %}
+        {% for (class_level, year, semester), fees in grouped_fees.items() %}
+          {% set group_id = loop.index %}
+          {% set total = "%.2f"|format(fees|sum(attribute='amount')) %}
+          <div class="accordion-item mb-3 fee-group" data-class="{{ class_level }}" data-year="{{ year }}" data-semester="{{ semester }}">
+            <h2 class="accordion-header" id="heading{{ group_id }}">
+              <button class="accordion-button collapsed py-2 small" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ group_id }}" aria-expanded="false" aria-controls="collapse{{ group_id }}">
+                <div class="d-flex justify-content-between w-100 align-items-center">
+                  <div class="fw-semibold">{{ class_level }} • {{ year }} • {{ semester }} Sem</div>
+                  <div class="small text-muted">Total: GHS <strong class="text-dark">{{ total }}</strong> • {{ fees|length }} item(s)</div>
+                </div>
+              </button>
+            </h2>
+
+            <div id="collapse{{ group_id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ group_id }}">
+              <div class="accordion-body p-0">
+                <div class="table-responsive">
+                  <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light small">
+                      <tr>
+                        <th>Description</th>
+                        <th style="width:130px">Amount (GHS)</th>
+                        <th style="width:110px" class="text-end">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for fee in fees %}
+                        <tr class="align-middle small">
+                          <td class="text-truncate" style="max-width:420px;" title="{{ fee.description }}">
+                            <span class="badge bg-info text-dark px-2 py-1">{{ fee.description }}</span>
+                          </td>
+                          <td class="text-end"><strong>{{ "{:,.2f}".format(fee.amount) }}</strong></td>
+                          <td class="text-end">
+                            <a href="{{ url_for('admin.edit_fee', fee_id=fee.id) }}" class="btn btn-sm btn-outline-warning me-1" title="Edit">
+                              <i class="fas fa-edit"></i>
+                            </a>
+                            <form method="POST" action="{{ url_for('admin.delete_fee', fee_id=fee.id) }}" class="d-inline" onsubmit="return confirm('Delete this fee?');">
+                              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                              <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                <i class="fas fa-trash"></i>
+                              </button>
+                            </form>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                    <tfoot class="small">
+                      <tr>
+                        <td class="text-end"><strong>Group total</strong></td>
+                        <td class="text-end"><strong>GHS {{ total }}</strong></td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="text-muted small">No assigned fees yet.</div>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content small">
+      <div class="modal-header">
+        <h5 class="modal-title">Preview Fees</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="previewSummary" class="mb-3">
+          <!-- populated by JS -->
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0" id="previewTable">
+            <thead class="table-light small">
+              <tr><th>Description</th><th style="width:160px">Amount (GHS)</th></tr>
+            </thead>
+            <tbody></tbody>
+            <tfoot class="small">
+              <tr><td class="text-end"><strong>Total</strong></td><td class="text-end"><strong id="previewTotal">GHS 0.00</strong></td></tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="previewCancel" type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button id="previewAssign" type="button" class="btn btn-sm btn-primary">Proceed to Assign</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Reduced / compact typography */
+  .compact-fees { font-size: 0.9rem; }
+  .compact-fees h4 { font-size: 1.05rem; }
+  .card { border-radius: .5rem; }
+  .form-label.small { font-size: .82rem; }
+  .form-control-sm, .form-select-sm { font-size: .86rem; padding: .35rem .5rem; }
+  .table-sm td, .table-sm th { padding: .35rem .5rem; }
+  .accordion-button { padding: .5rem 1rem; }
+  .fee-item .btn { padding: .28rem .45rem; min-width:36px; }
+  .badge { font-size: .8rem; }
+  .accordion .table thead th { border-bottom: 1px solid rgba(0,0,0,.05); }
+  @media (max-width:768px) {
+    .compact-fees { font-size: .86rem; padding: .5rem; }
+    .fee-item .col-7 { flex: 0 0 60%; max-width:60%; }
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Helpers
+  const currency = v => Number(v || 0);
+  const format = n => Number(n).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  // DOM refs
+  const feeItemsContainer = document.getElementById('feeItemsContainer');
+  const addSelector = '.add-item';
+  const removeSelector = '.remove-item';
+  const totalEl = document.getElementById('feesTotal');
+  const searchInput = document.getElementById('searchFee');
+  const clearSearch = document.getElementById('clearSearch');
+  const toggleCompact = document.getElementById('toggleCompact');
+  const previewBtn = document.getElementById('previewFeesBtn');
+  const previewModalEl = document.getElementById('previewModal');
+  const previewModal = new bootstrap.Modal(previewModalEl);
+  const previewTableBody = document.querySelector('#previewTable tbody');
+  const previewSummary = document.getElementById('previewSummary');
+  const previewTotal = document.getElementById('previewTotal');
+  const previewAssign = document.getElementById('previewAssign');
+
+  // Init tooltips
+  document.querySelectorAll('[title]').forEach(el => { try { new bootstrap.Tooltip(el); } catch(e) {} });
+
+  // Ensure remove button disabled if only one row
+  function updateRemoveButtons() {
+    const removeBtns = feeItemsContainer.querySelectorAll(removeSelector);
+    if (removeBtns.length === 1) removeBtns[0].disabled = true;
+    else removeBtns.forEach(b => b.disabled = false);
+  }
+
+  // Recalculate total
+  function recalcTotal() {
+    const amounts = feeItemsContainer.querySelectorAll('.amount-input');
+    const total = Array.from(amounts).reduce((s, el) => s + currency(el.value), 0);
+    totalEl.innerText = format(total);
+  }
+
+  // Add / remove behavior
+  feeItemsContainer.addEventListener('click', (e) => {
+    const addBtn = e.target.closest(addSelector);
+    const removeBtn = e.target.closest(removeSelector);
+
+    if (addBtn) {
+      const row = addBtn.closest('.fee-item');
+      const clone = row.cloneNode(true);
+      // clear inputs
+      clone.querySelectorAll('input').forEach(i => i.value = '');
+      feeItemsContainer.appendChild(clone);
+      updateRemoveButtons();
+      recalcTotal();
+      clone.querySelectorAll('[title]').forEach(el => { try { new bootstrap.Tooltip(el); } catch(e){} });
+      return;
+    }
+
+    if (removeBtn) {
+      const rows = feeItemsContainer.querySelectorAll('.fee-item');
+      if (rows.length <= 1) return;
+      removeBtn.closest('.fee-item').remove();
+      updateRemoveButtons();
+      recalcTotal();
+      return;
+    }
+  });
+
+  // Recalc on manual amount change
+  feeItemsContainer.addEventListener('input', (e) => {
+    if (e.target.classList.contains('amount-input')) recalcTotal();
+  });
+
+  // Initialize once
+  updateRemoveButtons();
+  recalcTotal();
+
+  // Compact toggle (localStorage persisted)
+  if (localStorage.getItem('feesCompact') === '1') document.body.classList.add('compact-mode');
+  toggleCompact.addEventListener('click', () => {
+    document.body.classList.toggle('compact-mode');
+    const active = document.body.classList.contains('compact-mode') ? '1' : '0';
+    localStorage.setItem('feesCompact', active);
+  });
+
+  // Build preview HTML and show modal (replaces old alert)
+  previewBtn.addEventListener('click', () => {
+    // validate quickly before preview
+    const classLevel = document.getElementById('class_level').value || '(no class)';
+    const year = document.getElementById('academic_year').value || '(no year)';
+    const sem = document.getElementById('semester').value || '(no sem)';
+
+    const items = Array.from(feeItemsContainer.querySelectorAll('.fee-item')).map(r => {
+      const desc = r.querySelector('input[name="description[]"]').value.trim();
+      const amt = Number(r.querySelector('input[name="amount[]"]').value || 0);
+      return { desc: desc || '(no desc)', amt };
+    });
+
+    // simple validation for preview
+    if (!items.length) { alert('Add at least one fee item to preview.'); return; }
+
+    // populate summary section
+    previewSummary.innerHTML = `
+      <div class="small text-muted mb-2">Previewing for</div>
+      <div><strong>${classLevel}</strong> — ${year} — <em>${sem} Semester</em></div>
+    `;
+
+    // populate table
+    previewTableBody.innerHTML = '';
+    let sum = 0;
+    items.forEach(it => {
+      sum += it.amt;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td class="text-truncate" style="max-width:420px;">${it.desc}</td><td class="text-end">${format(it.amt)}</td>`;
+      previewTableBody.appendChild(tr);
+    });
+    previewTotal.innerText = 'GHS ' + format(sum);
+
+    // show modal
+    previewModal.show();
+  });
+
+  // Proceed from preview -> submit form
+  previewAssign.addEventListener('click', () => {
+    // perform same client validation as before
+    const classLevel = document.getElementById('class_level').value.trim();
+    const year = document.getElementById('academic_year').value.trim();
+    const semester = document.getElementById('semester').value.trim();
+    if (!classLevel || !year || !semester) {
+      alert('Please select class level, academic year and semester.');
+      return;
+    }
+
+    const rows = feeItemsContainer.querySelectorAll('.fee-item');
+    if (!rows.length) { alert('Add at least one fee item.'); return; }
+    for (const it of rows) {
+      const desc = it.querySelector('input[name="description[]"]').value.trim();
+      const amt = Number(it.querySelector('input[name="amount[]"]').value);
+      if (!desc || isNaN(amt) || amt <= 0) { alert('Please ensure each fee has a description and an amount greater than 0.'); return; }
+    }
+
+    // submit the form
+    document.getElementById('feeForm').submit();
+  });
+
+  // Search/filter assigned groups (works for both paginated groups and fallback grouped_fees)
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim().toLowerCase();
+    document.querySelectorAll('.fee-group').forEach(g => {
+      const text = (g.dataset.class || '') + ' ' + (g.dataset.year || '') + ' ' + (g.dataset.semester || '') + ' ' + g.textContent;
+      g.style.display = text.toLowerCase().includes(q) ? '' : 'none';
+    });
+  });
+  clearSearch.addEventListener('click', () => { searchInput.value=''; searchInput.dispatchEvent(new Event('input')); });
+
+  // Basic client-side validation before submit (keeps previous checks)
+  document.getElementById('feeForm').addEventListener('submit', (e) => {
+    const classLevel = document.getElementById('class_level').value.trim();
+    const year = document.getElementById('academic_year').value.trim();
+    const semester = document.getElementById('semester').value.trim();
+    if (!classLevel || !year || !semester) {
+      e.preventDefault();
+      alert('Please select class level, academic year and semester.');
+      return;
+    }
+    const items = feeItemsContainer.querySelectorAll('.fee-item');
+    if (!items.length) { e.preventDefault(); alert('Add at least one fee item.'); return; }
+    for (const it of items) {
+      const desc = it.querySelector('input[name="description[]"]').value.trim();
+      const amt = Number(it.querySelector('input[name="amount[]"]').value);
+      if (!desc || isNaN(amt) || amt <= 0) {
+        e.preventDefault();
+        alert('Please ensure each fee has a description and an amount greater than 0.');
+        return;
+      }
+    }
+    // normal POST will proceed
+  });
+
+});
+</script>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends 'admin/layout.html' %}
+{% block title %}Create Set for {{ exam.title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h2>Create Set for: {{ exam.title }}</h2>
+
+  <form method="POST">
+    {{ form.hidden_tag() }}
+
+    <div class="mb-3">
+      {{ form.name.label(class="form-label") }}
+      {{ form.name(class="form-control") }}
+      {% for err in form.name.errors %}
+        <div class="text-danger">{{ err }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="mb-3">
+      {{ form.access_password.label(class="form-label") }}
+      {{ form.access_password(class="form-control") }}
+      {% for err in form.access_password.errors %}
+        <div class="text-danger">{{ err }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="d-flex gap-2">
+      <button class="btn btn-primary" type="submit">Create Set</button>
+      <a class="btn btn-secondary" href="{{ url_for('admin.exam_sets', exam_id=exam.id) }}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

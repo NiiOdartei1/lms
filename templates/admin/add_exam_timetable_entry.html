@@ -1,0 +1,47 @@
+{% extends 'admin/layout.html' %}
+{% block content %}
+<h3>Add Exam Timetable Entry</h3>
+<form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="mb-2">
+    <label>Assigned Class</label>
+    <input name="assigned_class" class="form-control" required>
+  </div>
+  <div class="mb-2">
+    <label>Course</label>
+    <input name="course" class="form-control" required>
+  </div>
+  <div class="row">
+    <div class="col">
+      <label>Date</label>
+      <input type="date" name="date" class="form-control" required>
+    </div>
+    <div class="col">
+      <label>Start Time</label>
+      <input type="time" name="start_time" class="form-control" required>
+    </div>
+    <div class="col">
+      <label>End Time</label>
+      <input type="time" name="end_time" class="form-control" required>
+    </div>
+  </div>
+  <div class="mb-2">
+    <label>Room</label>
+    <input name="room" class="form-control">
+  </div>
+  <div class="mb-2">
+    <label>Building</label>
+    <input name="building" class="form-control">
+  </div>
+  <div class="mb-2">
+    <label>Floor</label>
+    <input name="floor" class="form-control">
+  </div>
+  <div class="mb-2">
+    <label>Notes</label>
+    <textarea name="notes" class="form-control"></textarea>
+  </div>
+  <button class="btn btn-success">Save</button>
+</form>
+{% endblock %}

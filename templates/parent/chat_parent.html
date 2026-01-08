@@ -1,0 +1,164 @@
+{% extends "parent/base_parent.html" %}
+{% block title %}Communication{% endblock %}
+
+{% block content %}
+<meta name="csrf-token" content="{{ csrf_token() }}">
+
+<div class="container-fluid py-4">
+  <div class="row g-3">
+    <!-- Sidebar -->
+    <div class="col-md-3">
+      <div class="card shadow-sm small">
+        <div class="card-header py-2 text-center fw-bold bg-primary text-white">
+          Teachers
+        </div>
+        <ul class="list-group list-group-flush" id="teacherList">
+          {% for t in teachers %}
+          <li class="list-group-item list-group-item-action" data-id="{{ t.user_id }}">
+            <i class="fas fa-chalkboard-teacher me-2 text-secondary"></i>{{ t.full_name }}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <!-- Chat Area -->
+    <div class="col-md-9">
+      <div class="wa-wrap shadow-sm d-flex flex-column" style="height:500px;">
+        <!-- Chat header -->
+        <div class="chat-header bg-primary text-white d-flex align-items-center justify-content-between px-3">
+          <div class="title d-flex gap-2 align-items-center">
+            <div id="chatAvatar" class="conv-avatar">--</div>
+            <div style="min-width:0">
+              <div id="chatWith" class="name fw-bold">Select a teacher to start chatting</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat body -->
+        <div id="chatBox" class="chat-body flex-grow-1 overflow-auto px-3 py-2" style="background:#e5ddd5;"></div>
+
+        <!-- Input area -->
+        <div class="chat-input d-flex gap-2 p-2 bg-white border-top">
+          <input type="text" id="messageInput" class="form-control" placeholder="Type a message...">
+          <button class="send btn btn-primary" id="sendBtn"><i class="fas fa-paper-plane"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+:root{
+  --bubble-self: #DCF8C6;
+  --bubble-other: #ffffff;
+  --muted: #7a7a7a;
+}
+.wa-wrap { display:flex; flex-direction:column; border-radius:12px; overflow:hidden; background:#fff; }
+.chat-header { padding:10px 15px; }
+.chat-body { display:flex; flex-direction:column; gap:10px; }
+.conv-avatar { width:36px; height:36px; border-radius:50%; background:#dfe; display:flex; align-items:center; justify-content:center; font-weight:700; color:#444; flex-shrink:0; }
+.bubble { display:inline-block; padding:8px 12px; border-radius:14px; font-size:0.9rem; line-height:1.3; max-width:75%; word-wrap:break-word; box-shadow:0 2px 0 rgba(0,0,0,.03); }
+.bubble.self { align-self:flex-end; background:var(--bubble-self); border-radius:14px 14px 0 14px; }
+.bubble.other { align-self:flex-start; background:var(--bubble-other); border-radius:14px 14px 14px 0; }
+.meta-line { display:block; font-size:0.7rem; color:var(--muted); margin-top:4px; text-align:right; }
+.day-sep { text-align:center; font-size:0.75rem; color:var(--muted); margin:8px 0; }
+.chat-input input { border-radius:20px; padding:8px 12px; }
+.chat-input .send { border-radius:50%; width:38px; height:38px; display:flex; align-items:center; justify-content:center; }
+</style>
+
+<script>
+const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+let activeTeacher = null;
+let editingMsgId = null;
+
+// Select teacher
+document.querySelectorAll('#teacherList li').forEach(li=>{
+  li.addEventListener('click',()=>{
+    activeTeacher = li.dataset.id;
+    const name = li.textContent.trim();
+    document.getElementById('chatWith').innerText='Chat with '+name;
+    document.getElementById('chatAvatar').textContent=name.split(' ').map(x=>x[0]||'').slice(0,2).join('').toUpperCase();
+    loadMessages();
+  });
+});
+
+// Render message bubble
+let lastMessageDate = null;
+function renderMessage(m){
+  const box = document.getElementById('chatBox');
+  const isSelf = m.sender_id=='{{ current_user.user_id }}';
+  const msgDate = new Date(m.timestamp).toDateString();
+
+  // Insert date separator only if date is different
+  if(lastMessageDate !== msgDate){
+    const dayDiv = document.createElement('div');
+    dayDiv.className = 'day-sep';
+    dayDiv.textContent = msgDate;
+    box.appendChild(dayDiv);
+    lastMessageDate = msgDate;
+  }
+
+  const div = document.createElement('div');
+  div.className='bubble '+(isSelf?'self':'other');
+  div.dataset.id=m.id||Date.now();
+
+  const timeStr = new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  div.innerHTML = `
+    <div>${m.message}</div>
+    <span class="meta-line">${timeStr}${m.edited ? ' <span class="edited-tag">(edited)</span>' : ''}</span>
+  `;
+
+  if(isSelf){
+    div.addEventListener('contextmenu', e=>{
+      e.preventDefault();
+      editingMsgId = m.id;
+      document.getElementById('messageInput').value = m.message;
+    });
+  }
+
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+// Load messages
+function loadMessages(){
+  if(!activeTeacher)return;
+  lastMessageDate = null; // reset date tracking
+  fetch(`/chat/messages/${activeTeacher}`)
+    .then(r=>r.json())
+    .then(data=>{
+      const box=document.getElementById('chatBox');
+      box.innerHTML='';
+      data.forEach(renderMessage);
+    });
+}
+
+// Send / Edit
+document.getElementById('sendBtn').addEventListener('click',()=>{
+  const input=document.getElementById('messageInput');
+  const msgText=input.value.trim();
+  if(!msgText || !activeTeacher)return;
+
+  if(editingMsgId){
+    fetch(`/chat/edit/${editingMsgId}`,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json','X-CSRFToken':csrfToken},
+      body:JSON.stringify({message:msgText})
+    }).then(()=>{ editingMsgId=null; input.value=''; loadMessages(); });
+    return;
+  }
+
+  const newMsg={sender_id:'{{ current_user.user_id }}',message:msgText,timestamp:new Date().toISOString()};
+  renderMessage(newMsg);
+
+  fetch('/chat/send',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-CSRFToken':csrfToken},
+    body:JSON.stringify({message:msgText,receiver_id:activeTeacher})
+  });
+
+  input.value='';
+});
+</script>
+{% endblock %}

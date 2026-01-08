@@ -1,0 +1,226 @@
+{% extends "parent/base_parent.html" %}
+{% block title %}My Children{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/feather-icons/4.28.0/feather.min.css">
+
+<style>
+  :root{
+    --accent:#6f42c1;
+    --accent-2:#8a4dce;
+    --muted:#6c757d;
+    --card-radius:12px;
+  }
+
+  .children-hero {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:1rem;
+    margin:1.25rem 0;
+  }
+  .children-hero h1 {
+    font-size:1.4rem;
+    margin:0;
+    font-weight:700;
+    color:var(--accent);
+  }
+  .children-hero .sub {
+    color:var(--muted);
+    font-size:.95rem;
+  }
+
+  .children-grid {
+    --g:1.25rem;
+    display:grid;
+    grid-template-columns:repeat(1, 1fr);
+    gap:var(--g);
+  }
+  @media(min-width:700px){ .children-grid{ grid-template-columns:repeat(2,1fr); } }
+  @media(min-width:1100px){ .children-grid{ grid-template-columns:repeat(3,1fr); } }
+
+  .child-card{
+    background:linear-gradient(180deg,#fff 0%, #fbfbff 100%);
+    border-radius:var(--card-radius);
+    padding:1rem;
+    box-shadow:0 6px 18px rgba(32,32,60,0.06);
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+    transition:transform .18s ease, box-shadow .18s ease;
+    border-left:6px solid var(--accent);
+    min-height:220px;
+  }
+  .child-card:hover{
+    transform:translateY(-6px);
+    box-shadow:0 14px 34px rgba(32,32,60,0.12);
+  }
+
+  .child-top {
+    display:flex;
+    gap:1rem;
+    align-items:center;
+  }
+  .avatar {
+    width:72px;
+    height:72px;
+    border-radius:10px;
+    object-fit:cover;
+    border:2px solid rgba(111,66,193,0.12);
+    background:linear-gradient(135deg,var(--accent) 0%, var(--accent-2) 100%);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#fff;
+    font-weight:700;
+    font-size:1.2rem;
+  }
+
+  .child-meta {
+    flex:1;
+    min-width:0;
+  }
+  .child-name {
+    font-weight:700;
+    margin:0 0 .15rem 0;
+    font-size:1.05rem;
+    color:#222;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .child-sub {
+    font-size:.88rem;
+    color:var(--muted);
+  }
+
+  .badges {
+    margin-top:.45rem;
+    display:flex;
+    gap:.5rem;
+    flex-wrap:wrap;
+  }
+  .badge-pill {
+    font-size:.78rem;
+    padding:.28rem .5rem;
+    border-radius:999px;
+    background:#eef2ff;
+    color:var(--accent);
+    border:1px solid rgba(111,66,193,0.06);
+  }
+
+  .card-body-brief {
+    margin-top:.85rem;
+    color:var(--muted);
+    font-size:.95rem;
+    flex:1;
+  }
+
+  .card-actions{
+    display:flex;
+    gap:.5rem;
+    margin-top:1rem;
+  }
+  .btn-compact {
+    flex:1;
+    padding:.5rem .6rem;
+    font-size:.9rem;
+    border-radius:8px;
+  }
+  .btn-primary-fill {
+    background:linear-gradient(90deg,var(--accent), var(--accent-2));
+    color:#fff;
+    border:none;
+  }
+  .btn-outline {
+    background:transparent;
+    border:1px solid #e7e7ef;
+    color:#333;
+  }
+
+  .muted-small { font-size:.82rem; color:var(--muted); }
+
+</style>
+
+<div class="container py-2">
+  <div class="children-hero">
+    <div>
+      <h1>My Children</h1>
+      <div class="sub">Quick access to fee payments, reports and profiles</div>
+    </div>
+
+    <div class="text-end">
+      <a href="{{ url_for('parent.dashboard') }}" class="btn btn-sm btn-outline-secondary">Back to Dashboard</a>
+    </div>
+  </div>
+
+  {% if children %}
+  <div class="children-grid">
+    {% for child in children %}
+    {# resolve profile and avatar safely #}
+    {% set profile = child.student_profile if child.student_profile is defined else child %}
+    {% set avatar = (child.user.profile_picture_url if child.user is defined and child.user.profile_picture_url else (profile.profile_picture_url if profile is defined and profile.profile_picture_url else url_for('static', filename='img/default_profile.png'))) %}
+    <div class="child-card" role="article" aria-label="Child {{ child.first_name }} {{ child.last_name }}">
+      <div class="child-top">
+        {% if avatar and 'default_profile.png' not in avatar %}
+          <img src="{{ avatar }}" alt="Avatar for {{ child.first_name }}" class="avatar" style="border-radius:10px;">
+        {% else %}
+          <div class="avatar" aria-hidden="true">{{ (child.first_name[:1] ~ child.last_name[:1])|upper }}</div>
+        {% endif %}
+
+        <div class="child-meta">
+          <div class="child-name">{{ child.first_name }} {{ child.last_name }}</div>
+          <div class="child-sub muted-small">
+            {{ profile.current_class if profile is defined and profile.current_class else 'Class not assigned' }}
+            &middot;
+            Academic year: {{ profile.academic_year if profile is defined and profile.academic_year else 'N/A' }}
+          </div>
+
+          <div class="badges" aria-hidden="true">
+            <span class="badge-pill">ID: {{ child.id }}</span>
+            {% if profile and profile.gender %}<span class="badge-pill">{{ profile.gender }}</span>{% endif %}
+            {% if profile and profile.blood_group %}<span class="badge-pill">{{ profile.blood_group }}</span>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body-brief">
+        <div class="muted-small">
+          <strong>DOB:</strong>
+          {{ profile.dob.strftime('%b %d, %Y') if profile is defined and profile.dob else 'N/A' }}
+        </div>
+        <div class="muted-small" style="margin-top:.35rem;">
+          <strong>Guardian:</strong>
+          {{ profile.guardian_name if profile is defined and profile.guardian_name else 'N/A' }}
+        </div>
+      </div>
+
+      <div class="card-actions">
+        <a href="{{ url_for('parent.parent_pay_fees', student_id=child.id) }}"
+           class="btn btn-compact btn-primary-fill" title="Pay fees for {{ child.first_name }}">
+          <i data-feather="credit-card" style="height:16px;width:16px;vertical-align:middle;margin-right:.4rem;"></i>Pay Fees
+        </a>
+
+        <a href="{{ url_for('parent.view_student_report', child_id=child.id) }}"
+           class="btn btn-compact btn-outline" title="View reports for {{ child.first_name }}">
+          <i data-feather="file-text" style="height:16px;width:16px;vertical-align:middle;margin-right:.4rem;"></i>Reports
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="alert alert-info">
+    You don't have any children linked to your account yet.
+  </div>
+  {% endif %}
+</div>
+
+<script src="https://unpkg.com/feather-icons"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    if (window.feather) feather.replace();
+  });
+</script>
+{% endblock %}
