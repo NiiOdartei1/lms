@@ -1,4 +1,4 @@
-# app.py  — rewritten to use server-side filesystem sessions and robust CSRF handling
+# app.py  — Minimal startup, deferred imports to avoid context errors
 import os
 import logging
 from datetime import datetime
@@ -8,18 +8,24 @@ from flask import (
 )
 from werkzeug.utils import secure_filename
 
-# Extensions & security
-from flask_login import LoginManager, login_user, login_required, logout_user, current_user
+# Extensions & security (these don't require app context)
+from flask_login import LoginManager, login_required, logout_user, current_user
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect, CSRFError, generate_csrf
 from flask_session import Session
-from utils.extensions import db, mail, socketio
 
-# your project imports
+# DO NOT import db, mail, socketio yet — initialize them first
+from utils.extensions import db, mail, socketio
 from config import Config
 
 # -------------------------
-# App factory-ish setup
+# Basic setup
+# -------------------------
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# -------------------------
+# Flask app creation
 # -------------------------
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -36,71 +42,38 @@ app.config.setdefault('PAYMENT_PROOF_FOLDER', os.path.join(app.instance_path, 'p
 app.config.setdefault('RECEIPT_FOLDER', os.path.join(app.instance_path, 'receipts'))
 app.config.setdefault('PROFILE_PICS_FOLDER', os.path.join(app.instance_path, 'profile_pics'))
 
-# ensure instance & session dirs exist
-os.makedirs(app.instance_path, exist_ok=True)
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs(app.config['MATERIALS_FOLDER'], exist_ok=True)
-os.makedirs(app.config['PAYMENT_PROOF_FOLDER'], exist_ok=True)
-os.makedirs(app.config['RECEIPT_FOLDER'], exist_ok=True)
-os.makedirs(app.config['PROFILE_PICS_FOLDER'], exist_ok=True)
+# Ensure directories exist
+for folder in [
+    app.instance_path,
+    app.config['UPLOAD_FOLDER'],
+    app.config['MATERIALS_FOLDER'],
+    app.config['PAYMENT_PROOF_FOLDER'],
+    app.config['RECEIPT_FOLDER'],
+    app.config['PROFILE_PICS_FOLDER'],
+]:
+    os.makedirs(folder, exist_ok=True)
 
-# initialize extensions (before importing models/blueprints)
+logger.info("App instance path: %s", app.instance_path)
+
+# -------------------------
+# Initialize extensions (BEFORE any model/blueprint imports)
+# -------------------------
 db.init_app(app)
 mail.init_app(app)
 migrate = Migrate(app, db)
 csrf = CSRFProtect(app)
 socketio.init_app(app, async_mode="threading", manage_session=False)
-
-# Flask-Session for server-side filesystem sessions
 sess = Session(app)
 
-# login manager
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'select_portal'
 
-# basic logging to console
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-logger.info("App instance path: %s", app.instance_path)
-
 # -------------------------
-# Import models and blueprints AFTER extensions are ready
-# -------------------------
-from models import (
-    PasswordResetToken, TeacherAssessmentPeriod, User, Admin, SchoolClass, StudentProfile,
-    TeacherProfile, ParentProfile, Exam, Quiz, ExamSet, PasswordResetRequest
-)
-
-# Import call_window BEFORE registering blueprints (so SocketIO handlers are registered)
-import call_window
-
-# blueprints
-from admin_routes import admin_bp
-from teacher_routes import teacher_bp
-from student_routes import student_bp
-from parent_routes import parent_bp
-from utils.auth_routes import auth_bp
-from exam_routes import exam_bp
-from vclass_routes import vclass_bp
-from chat_routes import chat_bp
-
-# Register blueprints
-app.register_blueprint(admin_bp, url_prefix="/admin")
-app.register_blueprint(teacher_bp, url_prefix="/teacher")
-app.register_blueprint(student_bp, url_prefix="/student")
-app.register_blueprint(parent_bp, url_prefix="/parent")
-app.register_blueprint(auth_bp)  # no prefix
-app.register_blueprint(exam_bp, url_prefix="/exam")
-app.register_blueprint(vclass_bp, url_prefix="/vclass")
-app.register_blueprint(chat_bp, url_prefix="/chat")
-
-# -------------------------
-# Context processors (these run per-request, no app context issues)
+# Context processors
 # -------------------------
 @app.context_processor
 def inject_csrf():
-    from flask_wtf.csrf import generate_csrf
     return dict(csrf_token=generate_csrf)
 
 @app.context_processor
@@ -111,29 +84,14 @@ def inject_now():
 def inject_active_assessment_period():
     def get_active_period():
         try:
+            from models import TeacherAssessmentPeriod
             return TeacherAssessmentPeriod.query.filter_by(is_active=True).first()
         except Exception:
             return None
     return {'active_assessment_period': get_active_period}
 
 # -------------------------
-# Login loader
-# -------------------------
-@login_manager.user_loader
-def load_user(user_id):
-    try:
-        if isinstance(user_id, str) and user_id.startswith("admin:"):
-            uid = user_id.split(":", 1)[1]
-            return Admin.query.filter_by(public_id=uid).first()
-        elif isinstance(user_id, str) and user_id.startswith("user:"):
-            uid = user_id.split(":", 1)[1]
-            return User.query.filter_by(public_id=uid).first()
-    except Exception as e:
-        logger.exception("user_loader error: %s", e)
-    return None
-
-# -------------------------
-# Error handlers
+# Error handlers (before imports)
 # -------------------------
 @app.errorhandler(CSRFError)
 def handle_csrf(e):
@@ -146,15 +104,70 @@ def set_headers(response):
     return response
 
 # -------------------------
-# DB initialization on startup (using @app.before_request is too late)
-# This runs ONCE when the app starts
+# Flag to track if we've done startup initialization
 # -------------------------
-def _init_db():
-    """Initialize database — call this in app_context"""
+_startup_complete = False
+
+def _do_startup_init():
+    """
+    Run ALL initialization that requires app context.
+    This is called once on first request, not at module load time.
+    """
+    global _startup_complete
+    if _startup_complete:
+        return
+    
     try:
+        # NOW import models, blueprints (they can safely use db, etc.)
+        logger.info("Importing models...")
+        from models import (
+            PasswordResetToken, TeacherAssessmentPeriod, User, Admin, SchoolClass, 
+            StudentProfile, TeacherProfile, ParentProfile, Exam, Quiz, ExamSet, 
+            PasswordResetRequest
+        )
+        
+        logger.info("Importing call_window handlers...")
+        import call_window
+        
+        logger.info("Importing blueprints...")
+        from admin_routes import admin_bp
+        from teacher_routes import teacher_bp
+        from student_routes import student_bp
+        from parent_routes import parent_bp
+        from utils.auth_routes import auth_bp
+        from exam_routes import exam_bp
+        from vclass_routes import vclass_bp
+        from chat_routes import chat_bp
+        
+        # Register blueprints
+        app.register_blueprint(admin_bp, url_prefix="/admin")
+        app.register_blueprint(teacher_bp, url_prefix="/teacher")
+        app.register_blueprint(student_bp, url_prefix="/student")
+        app.register_blueprint(parent_bp, url_prefix="/parent")
+        app.register_blueprint(auth_bp)
+        app.register_blueprint(exam_bp, url_prefix="/exam")
+        app.register_blueprint(vclass_bp, url_prefix="/vclass")
+        app.register_blueprint(chat_bp, url_prefix="/chat")
+        
+        # Setup login loader (NOW that User/Admin models exist)
+        @login_manager.user_loader
+        def load_user(user_id):
+            try:
+                if isinstance(user_id, str) and user_id.startswith("admin:"):
+                    uid = user_id.split(":", 1)[1]
+                    return Admin.query.filter_by(public_id=uid).first()
+                elif isinstance(user_id, str) and user_id.startswith("user:"):
+                    uid = user_id.split(":", 1)[1]
+                    return User.query.filter_by(public_id=uid).first()
+            except Exception as e:
+                logger.exception("user_loader error: %s", e)
+            return None
+        
+        # Database initialization
+        logger.info("Creating database tables...")
         db.create_all()
         
-        # Create default super admin if missing
+        # Create default super admin
         super_admin = Admin.query.filter_by(username='SuperAdmin').first()
         if not super_admin:
             admin = Admin(username='SuperAdmin', admin_id='ADM001')
@@ -163,7 +176,7 @@ def _init_db():
             db.session.commit()
             logger.info("SuperAdmin created.")
         
-        # Ensure default classes exist
+        # Create default classes
         try:
             from utils.helpers import get_class_choices
             existing = {c.name for c in SchoolClass.query.all()}
@@ -174,8 +187,20 @@ def _init_db():
             logger.info("Default classes initialized.")
         except Exception as e:
             logger.exception("Failed to populate default classes: %s", e)
+        
+        _startup_complete = True
+        logger.info("Startup initialization complete!")
+        
     except Exception as e:
-        logger.exception("Error initializing database: %s", e)
+        logger.exception("FATAL: Startup initialization failed: %s", e)
+        raise
+
+# -------------------------
+# Hook to ensure startup happens before first request
+# -------------------------
+@app.before_request
+def ensure_startup():
+    _do_startup_init()
 
 # -------------------------
 # Routes
@@ -226,18 +251,6 @@ def list_routes():
     for rule in app.url_map.iter_rules():
         lines.append(f"{rule.endpoint:30s} → {unquote(str(rule))}")
     return "<pre>" + "\n".join(sorted(lines)) + "</pre>"
-
-# -------------------------
-# Run initialization ONCE at startup (before request handling)
-# -------------------------
-_init_db_done = False
-
-@app.before_request
-def ensure_db_init():
-    global _init_db_done
-    if not _init_db_done:
-        _init_db()
-        _init_db_done = True
 
 # -------------------------
 # Run
