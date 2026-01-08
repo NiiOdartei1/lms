@@ -1,14 +1,14 @@
-# app.py  — FINAL FIX: Defer ALL imports and DB access
+# app.py  — BULLETPROOF FIX: Delay ALL blueprint imports
 import os
 import logging
 from datetime import datetime
 from flask import (
-    Flask, current_app, render_template, redirect, url_for,
+    Flask, render_template, redirect, url_for,
     flash, request, abort, jsonify, send_from_directory
 )
 from werkzeug.utils import secure_filename
 
-# ===== CRITICAL: Only import Flask extensions and config =====
+# ===== CRITICAL: Only import extensions and config =====
 from flask_login import LoginManager, login_required, logout_user, current_user
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect, CSRFError, generate_csrf
@@ -16,7 +16,7 @@ from flask_session import Session
 from utils.extensions import db, mail, socketio
 from config import Config
 
-# ===== Setup logging EARLY =====
+# ===== Setup logging =====
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ for folder in [
 
 logger.info("App instance path: %s", app.instance_path)
 
-# ===== Initialize extensions (safe—no DB queries) =====
+# ===== Initialize extensions =====
 db.init_app(app)
 mail.init_app(app)
 migrate = Migrate(app, db)
@@ -62,7 +62,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'select_portal'
 
-# ===== Context processors (deferred execution) =====
+# ===== Context processors =====
 @app.context_processor
 def inject_csrf():
     return dict(csrf_token=generate_csrf)
@@ -81,7 +81,7 @@ def inject_active_assessment_period():
             return None
     return {'active_assessment_period': get_active_period}
 
-# ===== Error handlers (safe) =====
+# ===== Error handlers =====
 @app.errorhandler(CSRFError)
 def handle_csrf(e):
     return jsonify({'error': 'CSRF token missing or invalid', 'reason': e.description}), 400
@@ -92,56 +92,95 @@ def set_headers(response):
     response.headers.setdefault('Cache-Control', 'no-store')
     return response
 
-# ===== CRITICAL: Flag to prevent re-init =====
+# ===== Startup flag =====
 _startup_done = False
 
-# ===== CRITICAL: ONE-TIME startup on first request =====
+# ===== ONE-TIME initialization (must be FIRST before_request) =====
 @app.before_request
 def initialize_app_once():
     global _startup_done
     if _startup_done:
         return
     
-    logger.info("=" * 60)
+    logger.info("=" * 70)
     logger.info("STARTING ONE-TIME APP INITIALIZATION")
-    logger.info("=" * 60)
+    logger.info("=" * 70)
     
     try:
-        # ===== Step 1: Import models =====
-        logger.info("Step 1: Importing models...")
+        # Step 1: Import models
+        logger.info("[1/8] Importing models...")
         from models import (
             PasswordResetToken, TeacherAssessmentPeriod, User, Admin, SchoolClass,
             StudentProfile, TeacherProfile, ParentProfile, Exam, Quiz, ExamSet,
             PasswordResetRequest
         )
-        logger.info("✓ Models imported")
+        logger.info("      ✓ Models imported successfully")
         
-        # ===== Step 2: Import call_window (SocketIO handlers) =====
-        logger.info("Step 2: Importing call_window...")
+        # Step 2: Import call_window (SocketIO)
+        logger.info("[2/8] Importing call_window (SocketIO handlers)...")
         import call_window
-        logger.info("✓ call_window imported")
+        logger.info("      ✓ call_window imported successfully")
         
-        # ===== Step 3: Import blueprints =====
-        logger.info("Step 3: Importing blueprints...")
-        from admin_routes import admin_bp
-        logger.info("  ✓ admin_routes")
-        from teacher_routes import teacher_bp
-        logger.info("  ✓ teacher_routes")
-        from student_routes import student_bp
-        logger.info("  ✓ student_routes")
-        from parent_routes import parent_bp
-        logger.info("  ✓ parent_routes")
-        from utils.auth_routes import auth_bp
-        logger.info("  ✓ auth_routes")
-        from exam_routes import exam_bp
-        logger.info("  ✓ exam_routes")
-        from vclass_routes import vclass_bp
-        logger.info("  ✓ vclass_routes")
-        from chat_routes import chat_bp
-        logger.info("  ✓ chat_routes")
+        # Step 3: Import blueprints (MUST happen after models)
+        logger.info("[3/8] Importing blueprints...")
+        try:
+            from admin_routes import admin_bp
+            logger.info("      ✓ admin_bp imported")
+        except Exception as e:
+            logger.exception("      ✗ admin_bp failed: %s", e)
+            raise
         
-        # ===== Step 4: Register blueprints =====
-        logger.info("Step 4: Registering blueprints...")
+        try:
+            from teacher_routes import teacher_bp
+            logger.info("      ✓ teacher_bp imported")
+        except Exception as e:
+            logger.exception("      ✗ teacher_bp failed: %s", e)
+            raise
+        
+        try:
+            from student_routes import student_bp
+            logger.info("      ✓ student_bp imported")
+        except Exception as e:
+            logger.exception("      ✗ student_bp failed: %s", e)
+            raise
+        
+        try:
+            from parent_routes import parent_bp
+            logger.info("      ✓ parent_bp imported")
+        except Exception as e:
+            logger.exception("      ✗ parent_bp failed: %s", e)
+            raise
+        
+        try:
+            from utils.auth_routes import auth_bp
+            logger.info("      ✓ auth_bp imported")
+        except Exception as e:
+            logger.exception("      ✗ auth_bp failed: %s", e)
+            raise
+        
+        try:
+            from exam_routes import exam_bp
+            logger.info("      ✓ exam_bp imported")
+        except Exception as e:
+            logger.exception("      ✗ exam_bp failed: %s", e)
+            raise
+        
+        try:
+            from vclass_routes import vclass_bp
+            logger.info("      ✓ vclass_bp imported")
+        except Exception as e:
+            logger.exception("      ✗ vclass_bp failed: %s", e)
+            raise
+        
+        try:
+            from chat_routes import chat_bp
+            logger.info("      ✓ chat_bp imported")
+        except Exception as e:
+            logger.exception("      ✗ chat_bp failed: %s", e)
+            raise
+        
+        # Step 4: Register blueprints
+        logger.info("[4/8] Registering blueprints...")
         app.register_blueprint(admin_bp, url_prefix="/admin")
         app.register_blueprint(teacher_bp, url_prefix="/teacher")
         app.register_blueprint(student_bp, url_prefix="/student")
@@ -150,10 +189,10 @@ def initialize_app_once():
         app.register_blueprint(exam_bp, url_prefix="/exam")
         app.register_blueprint(vclass_bp, url_prefix="/vclass")
         app.register_blueprint(chat_bp, url_prefix="/chat")
-        logger.info("✓ Blueprints registered")
+        logger.info("      ✓ Blueprints registered successfully")
         
-        # ===== Step 5: Setup login loader =====
-        logger.info("Step 5: Setting up login manager...")
+        # Step 5: Setup login loader
+        logger.info("[5/8] Setting up login manager...")
         @login_manager.user_loader
         def load_user(user_id):
             try:
@@ -166,27 +205,27 @@ def initialize_app_once():
             except Exception as e:
                 logger.exception("user_loader error: %s", e)
             return None
-        logger.info("✓ Login manager setup")
+        logger.info("      ✓ Login manager setup complete")
         
-        # ===== Step 6: Database initialization =====
-        logger.info("Step 6: Initializing database...")
+        # Step 6: Database initialization
+        logger.info("[6/8] Initializing database...")
         db.create_all()
-        logger.info("✓ Database tables created")
+        logger.info("      ✓ Database tables created/verified")
         
-        # ===== Step 7: Create default admin =====
-        logger.info("Step 7: Setting up default admin...")
+        # Step 7: Create default admin
+        logger.info("[7/8] Setting up default admin...")
         super_admin = Admin.query.filter_by(username='SuperAdmin').first()
         if not super_admin:
             admin = Admin(username='SuperAdmin', admin_id='ADM001')
             admin.set_password('Password123')
             db.session.add(admin)
             db.session.commit()
-            logger.info("✓ SuperAdmin created")
+            logger.info("      ✓ SuperAdmin created")
         else:
-            logger.info("✓ SuperAdmin already exists")
+            logger.info("      ✓ SuperAdmin already exists")
         
-        # ===== Step 8: Create default classes =====
-        logger.info("Step 8: Setting up default classes...")
+        # Step 8: Create default classes
+        logger.info("[8/8] Setting up default classes...")
         try:
             from utils.helpers import get_class_choices
             existing = {c.name for c in SchoolClass.query.all()}
@@ -197,25 +236,24 @@ def initialize_app_once():
                     created += 1
             if created:
                 db.session.commit()
-                logger.info(f"✓ Created {created} default classes")
+                logger.info(f"      ✓ Created {created} default classes")
             else:
-                logger.info("✓ All default classes already exist")
+                logger.info("      ✓ All default classes already exist")
         except Exception as e:
-            logger.exception("Failed to populate default classes: %s", e)
+            logger.exception("      ⚠ Class setup warning (non-fatal): %s", e)
         
-        logger.info("=" * 60)
-        logger.info("✓✓✓ APP INITIALIZATION COMPLETE ✓✓✓")
-        logger.info("=" * 60)
+        logger.info("=" * 70)
+        logger.info("✓✓✓ APP INITIALIZATION COMPLETE - READY TO SERVE REQUESTS ✓✓✓")
+        logger.info("=" * 70)
         _startup_done = True
         
     except Exception as e:
-        logger.exception("=" * 60)
-        logger.exception("✗✗✗ FATAL: APP INITIALIZATION FAILED ✗✗✗")
-        logger.exception("Error: %s", e)
-        logger.exception("=" * 60)
+        logger.exception("=" * 70)
+        logger.exception("✗✗✗ FATAL ERROR DURING INITIALIZATION ✗✗✗")
+        logger.exception("=" * 70)
         raise
 
-# ===== Routes (simple, no DB queries) =====
+# ===== Routes =====
 @app.route('/')
 def home():
     try:
@@ -253,7 +291,7 @@ def logout():
 @login_required
 def uploaded_file(filename):
     filename = secure_filename(filename)
-    return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 @app.route('/routes')
 def list_routes():
