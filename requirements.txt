@@ -40,4 +40,5 @@ werkzeug==3.1.4
 wsproto==1.2.0
 wtforms==3.2.1
 zipp==3.23.0
-
+gunicorn==21.2.0
+eventlet==0.33.3
