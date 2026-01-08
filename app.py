@@ -77,12 +77,15 @@ def inject_now():
 
 @app.context_processor
 def inject_active_assessment_period():
-    try:
-        return {
-            'active_assessment_period': TeacherAssessmentPeriod.query.filter_by(is_active=True).first()
-        }
-    except Exception:
-        return {'active_assessment_period': None}
+    def get_active_period():
+        try:
+            return TeacherAssessmentPeriod.query.filter_by(is_active=True).first()
+        except Exception:
+            return None
+
+    return {
+        'active_assessment_period': get_active_period
+    }
 
 # -------------------------
 # Import models and blueprints AFTER extensions are ready
@@ -112,9 +115,6 @@ app.register_blueprint(auth_bp)  # no prefix
 app.register_blueprint(exam_bp, url_prefix="/exam")
 app.register_blueprint(vclass_bp, url_prefix="/vclass")
 app.register_blueprint(chat_bp, url_prefix="/chat")
-
-# socket event modules (LAST)
-import call_window
 
 # -------------------------
 # Login loader (adjust to your user id format)
