@@ -1,4 +1,4 @@
-# app.py  — Minimal startup, deferred imports to avoid context errors
+# app.py  — FINAL FIX: Defer ALL imports and DB access
 import os
 import logging
 from datetime import datetime
@@ -8,28 +8,23 @@ from flask import (
 )
 from werkzeug.utils import secure_filename
 
-# Extensions & security (these don't require app context)
+# ===== CRITICAL: Only import Flask extensions and config =====
 from flask_login import LoginManager, login_required, logout_user, current_user
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect, CSRFError, generate_csrf
 from flask_session import Session
-
-# DO NOT import db, mail, socketio yet — initialize them first
 from utils.extensions import db, mail, socketio
 from config import Config
 
-# -------------------------
-# Basic setup
-# -------------------------
+# ===== Setup logging EARLY =====
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# -------------------------
-# Flask app creation
-# -------------------------
+# ===== Create Flask app =====
 app = Flask(__name__)
 app.config.from_object(Config)
 
+# ===== Configure paths =====
 app.config.setdefault('SQLALCHEMY_DATABASE_URI', 'sqlite:///lms.db')
 app.config.setdefault('SESSION_TYPE', 'sqlalchemy')
 app.config['SESSION_SQLALCHEMY'] = db
@@ -55,9 +50,7 @@ for folder in [
 
 logger.info("App instance path: %s", app.instance_path)
 
-# -------------------------
-# Initialize extensions (BEFORE any model/blueprint imports)
-# -------------------------
+# ===== Initialize extensions (safe—no DB queries) =====
 db.init_app(app)
 mail.init_app(app)
 migrate = Migrate(app, db)
@@ -69,9 +62,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'select_portal'
 
-# -------------------------
-# Context processors
-# -------------------------
+# ===== Context processors (deferred execution) =====
 @app.context_processor
 def inject_csrf():
     return dict(csrf_token=generate_csrf)
@@ -90,9 +81,7 @@ def inject_active_assessment_period():
             return None
     return {'active_assessment_period': get_active_period}
 
-# -------------------------
-# Error handlers (before imports)
-# -------------------------
+# ===== Error handlers (safe) =====
 @app.errorhandler(CSRFError)
 def handle_csrf(e):
     return jsonify({'error': 'CSRF token missing or invalid', 'reason': e.description}), 400
@@ -103,43 +92,56 @@ def set_headers(response):
     response.headers.setdefault('Cache-Control', 'no-store')
     return response
 
-# -------------------------
-# Flag to track if we've done startup initialization
-# -------------------------
-_startup_complete = False
+# ===== CRITICAL: Flag to prevent re-init =====
+_startup_done = False
 
-def _do_startup_init():
-    """
-    Run ALL initialization that requires app context.
-    This is called once on first request, not at module load time.
-    """
-    global _startup_complete
-    if _startup_complete:
+# ===== CRITICAL: ONE-TIME startup on first request =====
+@app.before_request
+def initialize_app_once():
+    global _startup_done
+    if _startup_done:
         return
     
+    logger.info("=" * 60)
+    logger.info("STARTING ONE-TIME APP INITIALIZATION")
+    logger.info("=" * 60)
+    
     try:
-        # NOW import models, blueprints (they can safely use db, etc.)
-        logger.info("Importing models...")
+        # ===== Step 1: Import models =====
+        logger.info("Step 1: Importing models...")
         from models import (
-            PasswordResetToken, TeacherAssessmentPeriod, User, Admin, SchoolClass, 
-            StudentProfile, TeacherProfile, ParentProfile, Exam, Quiz, ExamSet, 
+            PasswordResetToken, TeacherAssessmentPeriod, User, Admin, SchoolClass,
+            StudentProfile, TeacherProfile, ParentProfile, Exam, Quiz, ExamSet,
             PasswordResetRequest
         )
+        logger.info("✓ Models imported")
         
-        logger.info("Importing call_window handlers...")
+        # ===== Step 2: Import call_window (SocketIO handlers) =====
+        logger.info("Step 2: Importing call_window...")
         import call_window
+        logger.info("✓ call_window imported")
         
-        logger.info("Importing blueprints...")
+        # ===== Step 3: Import blueprints =====
+        logger.info("Step 3: Importing blueprints...")
         from admin_routes import admin_bp
+        logger.info("  ✓ admin_routes")
         from teacher_routes import teacher_bp
+        logger.info("  ✓ teacher_routes")
         from student_routes import student_bp
+        logger.info("  ✓ student_routes")
         from parent_routes import parent_bp
+        logger.info("  ✓ parent_routes")
         from utils.auth_routes import auth_bp
+        logger.info("  ✓ auth_routes")
         from exam_routes import exam_bp
+        logger.info("  ✓ exam_routes")
         from vclass_routes import vclass_bp
+        logger.info("  ✓ vclass_routes")
         from chat_routes import chat_bp
+        logger.info("  ✓ chat_routes")
         
-        # Register blueprints
+        # ===== Step 4: Register blueprints =====
+        logger.info("Step 4: Registering blueprints...")
         app.register_blueprint(admin_bp, url_prefix="/admin")
         app.register_blueprint(teacher_bp, url_prefix="/teacher")
         app.register_blueprint(student_bp, url_prefix="/student")
@@ -148,8 +150,10 @@ def _do_startup_init():
         app.register_blueprint(exam_bp, url_prefix="/exam")
         app.register_blueprint(vclass_bp, url_prefix="/vclass")
         app.register_blueprint(chat_bp, url_prefix="/chat")
+        logger.info("✓ Blueprints registered")
         
-        # Setup login loader (NOW that User/Admin models exist)
+        # ===== Step 5: Setup login loader =====
+        logger.info("Step 5: Setting up login manager...")
         @login_manager.user_loader
         def load_user(user_id):
             try:
@@ -162,49 +166,56 @@ def _do_startup_init():
             except Exception as e:
                 logger.exception("user_loader error: %s", e)
             return None
+        logger.info("✓ Login manager setup")
         
-        # Database initialization
-        logger.info("Creating database tables...")
+        # ===== Step 6: Database initialization =====
+        logger.info("Step 6: Initializing database...")
         db.create_all()
+        logger.info("✓ Database tables created")
         
-        # Create default super admin
+        # ===== Step 7: Create default admin =====
+        logger.info("Step 7: Setting up default admin...")
         super_admin = Admin.query.filter_by(username='SuperAdmin').first()
         if not super_admin:
             admin = Admin(username='SuperAdmin', admin_id='ADM001')
             admin.set_password('Password123')
             db.session.add(admin)
             db.session.commit()
-            logger.info("SuperAdmin created.")
+            logger.info("✓ SuperAdmin created")
+        else:
+            logger.info("✓ SuperAdmin already exists")
         
-        # Create default classes
+        # ===== Step 8: Create default classes =====
+        logger.info("Step 8: Setting up default classes...")
         try:
             from utils.helpers import get_class_choices
             existing = {c.name for c in SchoolClass.query.all()}
+            created = 0
             for name, _ in get_class_choices():
                 if name not in existing:
                     db.session.add(SchoolClass(name=name))
-            db.session.commit()
-            logger.info("Default classes initialized.")
+                    created += 1
+            if created:
+                db.session.commit()
+                logger.info(f"✓ Created {created} default classes")
+            else:
+                logger.info("✓ All default classes already exist")
         except Exception as e:
             logger.exception("Failed to populate default classes: %s", e)
         
-        _startup_complete = True
-        logger.info("Startup initialization complete!")
+        logger.info("=" * 60)
+        logger.info("✓✓✓ APP INITIALIZATION COMPLETE ✓✓✓")
+        logger.info("=" * 60)
+        _startup_done = True
         
     except Exception as e:
-        logger.exception("FATAL: Startup initialization failed: %s", e)
+        logger.exception("=" * 60)
+        logger.exception("✗✗✗ FATAL: APP INITIALIZATION FAILED ✗✗✗")
+        logger.exception("Error: %s", e)
+        logger.exception("=" * 60)
         raise
 
-# -------------------------
-# Hook to ensure startup happens before first request
-# -------------------------
-@app.before_request
-def ensure_startup():
-    _do_startup_init()
-
-# -------------------------
-# Routes
-# -------------------------
+# ===== Routes (simple, no DB queries) =====
 @app.route('/')
 def home():
     try:
@@ -252,10 +263,9 @@ def list_routes():
         lines.append(f"{rule.endpoint:30s} → {unquote(str(rule))}")
     return "<pre>" + "\n".join(sorted(lines)) + "</pre>"
 
-# -------------------------
-# Run
-# -------------------------
+# ===== Run =====
 if __name__ == "__main__":
     logger.info("Starting LMS app on 0.0.0.0:5000")
     logger.info("SESSION_TYPE=%s", app.config['SESSION_TYPE'])
     socketio.run(app, host="0.0.0.0", port=int(os.environ.get('PORT', 5000)), debug=app.debug)
+    
