@@ -50,7 +50,7 @@ db.init_app(app)
 mail.init_app(app)
 migrate = Migrate(app, db)
 csrf = CSRFProtect(app)
-socketio.init_app(app)
+socketio.init_app(app, manage_session=False)
 
 # Flask-Session for server-side filesystem sessions
 sess = Session(app)
@@ -137,6 +137,7 @@ def load_user(user_id):
 
 # -------------------------
 with app.app_context():
+    import call_window
     db.create_all()
 
     # create default super admin
