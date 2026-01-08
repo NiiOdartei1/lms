@@ -1,0 +1,17 @@
+{% extends "exam/base_exam.html" %}
+{% block title %}Exams Welcome{% endblock %}
+
+{% block exam_title %}Welcome to Exams{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <div class="card shadow-lg border-0 rounded-4 p-5 text-center"
+       style="background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); color: white;">
+    <h1 class="mb-3">🎓 Welcome to the Exams Portal</h1>
+    <p class="mb-4 fs-5">You are now entering the exams area. Please login to access your exams.</p>
+    <a href="{{ url_for('exam.exam_login') }}" class="btn btn-light btn-lg fw-bold shadow-sm">
+      Login to Exams <i class="fas fa-arrow-right ms-2"></i>
+    </a>
+  </div>
+</div>
+{% endblock %}

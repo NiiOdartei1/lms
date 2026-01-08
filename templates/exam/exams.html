@@ -1,0 +1,53 @@
+{% extends 'exam/base_exam.html' %}
+{% block title %}Exams{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">My Exams</h2>
+
+    {% if exams %}
+        <table class="table table-bordered table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Title</th>
+                    <th>Subject</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for exam in exams %}
+                <tr>
+                    <td>{{ exam.title }}</td>
+                    <td>{{ exam.subject }}</td>
+                    <td>{{ exam.start_datetime.strftime("%Y-%m-%d %H:%M") }}</td>
+                    <td>{{ exam.end_datetime.strftime("%Y-%m-%d %H:%M") }}</td>
+                    <td>
+                        {% if exam.status == 'Ongoing' %}
+                            {% if exam.assignment_mode == 'choice' %}
+                                <a href="{{ url_for('exam.select_exam_set', exam_id=exam.id) }}" class="btn btn-sm btn-primary">Choose Set</a>
+                            {% else %}
+                                <a href="{{ url_for('exam.exam_instructions', exam_id=exam.id) }}" class="btn btn-sm btn-success">Start</a>
+                            {% endif %}
+                        {% else %}
+                            <button class="btn btn-sm btn-secondary" disabled>Unavailable</button>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if exam.status == 'Ongoing' %}
+                            <a href="{{ url_for('exam.exam_instructions', exam_id=exam.id) }}" class="btn btn-sm btn-success">Start</a>
+                        {% else %}
+                            <button class="btn btn-sm btn-secondary" disabled>Unavailable</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="alert alert-info">No exams available.</p>
+    {% endif %}
+</div>
+{% endblock %}

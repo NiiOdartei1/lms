@@ -1,0 +1,17 @@
+<!-- student/choose_exam_set.html -->
+{% extends 'exam/base_exam.html' %}
+{% block content %}
+<div class="container">
+    <h3>Select Your Exam Set for {{ exam.title }}</h3>
+    <ul class="list-group">
+        {% for s in exam.sets %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            {{ s.name }}
+            <form method="POST" action="{{ url_for('student.choose_set', exam_id=exam.id, set_id=s.id) }}">
+                <button class="btn btn-sm btn-primary">Choose</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

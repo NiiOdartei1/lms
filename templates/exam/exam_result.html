@@ -1,0 +1,259 @@
+{% extends 'exam/base_exam.html' %}
+{% block title %}Exam Result{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-3">Exam Result</h2>
+
+    <div class="card shadow-sm p-3 position-relative overflow-hidden">
+        <p><strong>Exam:</strong> {{ exam.title }}</p>
+        <p><strong>Subject:</strong> {{ exam.subject }}</p>
+
+        {% if set_name %}
+            <p><strong>Set:</strong> {{ set_name }}</p>
+        {% endif %}
+
+        <p>
+            <strong>Your Score:</strong>
+            {{ submission.score if submission.score is not none else "N/A" }} /
+            {{ max_score|float|round(2) }}
+        </p>
+
+        <p>
+            <strong>Date Submitted:</strong>
+            {% if submission.submitted_at %}
+                {{ submission.submitted_at.strftime("%Y-%m-%d %H:%M") }}
+            {% else %}
+                Not submitted
+            {% endif %}
+        </p>
+
+        {% if submission.score is not none %}
+            {% if max_score > 0 and submission.score >= (max_score * pass_percent) %}
+                <!-- PASS MESSAGE -->
+                <div id="pass-message" class="text-success fw-bold fs-5 text-center my-3">
+                    🎉 You passed!
+                </div>
+            {% elif max_score > 0 %}
+                <!-- FAIL MESSAGE -->
+                <div id="fail-container" class="text-center my-3">
+                  <div id="fail-badge" class="mx-auto mb-3" role="img" aria-label="Failed" title="Failed">
+                    <svg width="96" height="96" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="12" cy="12" r="10" fill="#f8d7da"/>
+                      <path d="M8 8 L16 16 M16 8 L8 16" stroke="#c82333" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </div>
+
+                  <div class="alert alert-danger mb-2">❌ You did not pass this exam.</div>
+
+                  <div class="small text-muted">
+                    If you believe a question is wrong, use the flagging mechanism to report it to the instructor.
+                  </div>
+                </div>
+
+                <!-- Canvas overlay for falling red crosses (animation) -->
+                <canvas id="fail-canvas" style="position: absolute; inset: 0; pointer-events: none;"></canvas>
+            {% else %}
+                <div class="alert alert-warning">⚠️ Max score is 0 — cannot determine pass/fail.</div>
+            {% endif %}
+        {% else %}
+            <div class="alert alert-warning">⚠️ This attempt has not been graded yet.</div>
+        {% endif %}
+
+        <!-- Back to dashboard button (students' exams listing used as dashboard) -->
+        <div class="d-flex justify-content-center mt-4">
+          <a href="{{ url_for('exam.exam_dashboard') }}" class="btn btn-outline-primary">
+            <i class="bi bi-house-door-fill me-1"></i> Back to Dashboard
+          </a>
+        </div>
+    </div>
+</div>
+
+<!-- PASS: confetti -->
+{% if submission.score is not none and max_score > 0 and submission.score >= (max_score * pass_percent) %}
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<script>
+    function fireConfetti() {
+        const duration = 2000;
+        const end = Date.now() + duration;
+
+        (function frame() {
+            confetti({ particleCount: 6, angle: 60, spread: 55, origin: { x: 0 } });
+            confetti({ particleCount: 6, angle: 120, spread: 55, origin: { x: 1 } });
+
+            if (Date.now() < end) {
+                requestAnimationFrame(frame);
+            }
+        }());
+    }
+
+    window.addEventListener('load', fireConfetti);
+</script>
+{% endif %}
+
+<!-- FAIL: animated badge + canvas particle effect -->
+{% if submission.score is not none and max_score > 0 and submission.score < (max_score * pass_percent) %}
+<style>
+  /* Badge animation: pulse + shake */
+  @keyframes fail-pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.06); opacity: 0.98; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes fail-shake {
+    0% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+    100% { transform: translateX(0); }
+  }
+
+  #fail-badge {
+    width: 96px;
+    height: 96px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fail-pulse 900ms ease-in-out 0s 3, fail-shake 700ms ease-in-out 0s 1;
+  }
+
+  /* Small accessible text style */
+  #fail-container .alert-danger {
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+</style>
+
+<script>
+(function() {
+  // Simple falling red-X particle animation on a canvas
+  const canvas = document.getElementById('fail-canvas');
+  if (!canvas) return;
+
+  // Make canvas size match container
+  function fitCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * devicePixelRatio;
+    canvas.height = rect.height * devicePixelRatio;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  }
+
+  const ctx = canvas.getContext('2d');
+  let particles = [];
+  const colors = ['#ff6b6b', '#e63946', '#ff8fa3'];
+
+  function rand(min, max) { return Math.random() * (max - min) + min; }
+
+  // Particle structure: { x, y, vx, vy, size, rot, vrot, life, ttl }
+  function spawnParticle() {
+    const w = canvas.width / devicePixelRatio;
+    const h = canvas.height / devicePixelRatio;
+    const x = rand(0, w);
+    const y = -10;
+    const size = rand(10, 20);
+    particles.push({
+      x, y,
+      vx: rand(-20, 20) / 60,
+      vy: rand(30, 80) / 60,
+      size,
+      rot: rand(0, Math.PI * 2),
+      vrot: rand(-0.1, 0.1),
+      color: colors[Math.floor(rand(0, colors.length))],
+      ttl: rand(1.0, 2.0),
+      life: 0
+    });
+  }
+
+  function drawX(p, alpha=1) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = Math.max(2, p.size * 0.12);
+    ctx.strokeStyle = p.color;
+    ctx.beginPath();
+    ctx.moveTo(-p.size/2, -p.size/2);
+    ctx.lineTo(p.size/2, p.size/2);
+    ctx.moveTo(p.size/2, -p.size/2);
+    ctx.lineTo(-p.size/2, p.size/2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  let last = performance.now();
+  let animFrame;
+  let spawned = 0;
+
+  function step(now) {
+    const dt = Math.min(0.04, (now - last) / 1000);
+    last = now;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // spawn particles for ~1.5s
+    if (spawned < 60) { // cap spawn count
+      if (Math.random() < 0.6) { spawnParticle(); spawned++; }
+    }
+
+    // update & draw
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life += dt;
+      p.x += p.vx * 60 * dt;
+      p.y += p.vy * 60 * dt;
+      p.rot += p.vrot;
+      // fade near end
+      const alpha = Math.max(0, 1 - (p.life / p.ttl));
+      drawX(p, alpha);
+      if (p.life > p.ttl || p.y > (canvas.height / devicePixelRatio + 40)) {
+        particles.splice(i, 1);
+      }
+    }
+
+    // continue until no particles remain and we spawned enough
+    if (particles.length > 0 || spawned < 60) {
+      animFrame = requestAnimationFrame(step);
+    } else {
+      // Fade-out canvas quickly
+      let fade = 1.0;
+      const fadeInterval = setInterval(() => {
+        fade -= 0.12;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => drawX(p, fade));
+        if (fade <= 0) {
+          clearInterval(fadeInterval);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          cancelAnimationFrame(animFrame);
+        }
+      }, 60);
+    }
+  }
+
+  // kickoff: size, then animate for a short burst
+  function start() {
+    fitCanvas();
+    last = performance.now();
+    spawned = 0;
+    particles = [];
+    animFrame = requestAnimationFrame(step);
+  }
+
+  // handle resizes (throttle)
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      fitCanvas();
+    }, 150);
+  });
+
+  // Start a couple of moments after page load so the badge animation runs first
+  window.addEventListener('load', () => {
+    setTimeout(start, 350); // small delay so badge animation is visible first
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

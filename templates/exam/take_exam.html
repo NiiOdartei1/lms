@@ -1,0 +1,640 @@
+{% extends 'exam/base_exam.html' %}
+{% block title %}Take Exam – {{ exam_json.title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 id="exam-title">{{ exam_json.title }}</h4>
+    <div>
+      <strong>Time Left:</strong>
+      <span id="timer" class="text-danger fw-bold fs-5">--:--</span>
+    </div>
+  </div>
+
+  <form id="exam-form"
+        method="POST"
+        action="{{ url_for('exam.submit_exam', exam_id=exam_json.id, attempt_id=attempt.id) }}">
+    <!-- Proper hidden CSRF input -->
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="row">
+      <!-- Main question area -->
+      <div class="col-lg-8">
+        <div id="questions-container"></div>
+
+        <nav class="mt-4" aria-label="Exam Navigation">
+          <ul class="pagination justify-content-center" id="pagination"></ul>
+        </nav>
+
+        <div id="submit-container" class="text-end mt-3" style="display: none;">
+          <button type="submit" class="btn btn-success">Submit Exam</button>
+        </div>
+      </div>
+
+      <!-- Right sidebar: KNUST-style palette + stats -->
+      <div class="col-lg-4">
+        <div class="card mb-3 shadow-sm">
+          <div class="card-body">
+            <h6 class="mb-2">Question Palette</h6>
+
+            <!-- Progress bar -->
+            <div class="progress mb-2" style="height:18px;">
+              <div id="exam-progress" 
+                   class="progress-bar" 
+                   role="progressbar" 
+                   style="width: 0%; background-color:#006400;"
+                   aria-valuenow="0" 
+                   aria-valuemin="0" 
+                   aria-valuemax="100">0%</div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-2 small">
+              <div><strong>Total:</strong> <span id="pal-total">0</span></div>
+              <div><strong>Answered:</strong> <span id="pal-answered">0</span></div>
+              <div><strong>Unanswered:</strong> <span id="pal-unanswered">0</span></div>
+            </div>
+
+            <div id="palette-legend" class="mb-2 small">
+  <span class="badge me-2" style="background:#6c757d"> &nbsp; </span> Unanswered
+  <span class="badge bg-success ms-3 me-2"> &nbsp; </span> Answered
+  <span class="badge bg-primary ms-3 me-2"> &nbsp; </span> Current
+  <span class="badge" style="background:#fd7e14; margin-left:1rem;"> &nbsp; </span> Flagged
+</div>
+
+
+            <!-- Palette grid -->
+            <div id="question-palette" class="d-flex flex-wrap gap-2" 
+                 style="max-height:380px; overflow:auto; padding-right:6px;">
+            </div>
+
+            <div class="mt-3 small text-muted">
+              Click any number to jump to that question.
+            </div>
+          </div>
+        </div>
+
+        <!-- optional small exam info card -->
+        <div class="card shadow-sm">
+          <div class="card-body small">
+            <div><strong>Duration:</strong> {{ exam_json.duration_minutes }} minutes</div>
+            <div class="mt-1"><strong>Total Questions:</strong> <span id="info-total">{{ exam_json.questions|length }}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- embed exam data safely -->
+<script id="exam-data" type="application/json">
+{{ exam_json | tojson }}
+</script>
+
+{# pass the attempt.start_time (ISO) from server for a reliable source of truth #}
+<script type="application/json" id="attempt-data">
+{
+  "attempt_id": {{ attempt.id }},
+  "attempt_start": "{{ attempt.start_time.isoformat() if attempt.start_time else '' }}",
+  "attempt_submitted": {{ 'true' if attempt.submitted else 'false' }}
+}
+</script>
+
+<style>
+/* small palette button style (square) */
+.palette-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+}
+.palette-btn.unanswered { background: #6c757d; color: #fff; } /* gray */
+.palette-btn.answered { background: #198754; color: #fff; }   /* green */
+.palette-btn.current  { background: #0d6efd; color: #fff; }   /* blue */
+.palette-btn:focus { outline: 2px solid rgba(13,110,253,0.25); box-shadow: none; }
+
+/* smooth progress animation */
+#exam-progress {
+  transition: width 300ms ease, background-color 200ms ease, color 200ms ease;
+}
+.palette-btn.flagged { background: #fd7e14 !important; color: #fff; } /* orange */
+.palette-btn.flagged.current { background: #ff5722 !important; } /* stronger orange if current */
+.flag-btn {
+  font-size: 0.85rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.flag-btn.flagged {
+  background-color: #fd7e14;
+  color: white;
+}
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  // --- parse embedded data ---
+  const exam       = JSON.parse(document.getElementById("exam-data").textContent);
+  const attemptObj = JSON.parse(document.getElementById("attempt-data").textContent);
+  const attemptId  = attemptObj.attempt_id;
+  const attemptStartIso = attemptObj.attempt_start || null;
+  const attemptSubmitted = attemptObj.attempt_submitted === 'true';
+
+  // config
+  const examId     = exam.id;
+  const duration   = Number(exam.duration_minutes) * 60; // seconds
+  const perPage    = 5;
+  const totalQs    = exam.questions.length;
+  const totalPages = Math.max(1, Math.ceil(totalQs / perPage));
+
+  // localStorage key helper
+  const storageKey = () => `exam_${examId}_attempt_${attemptId}_answers`;
+
+  // DOM refs
+  const timerEl            = document.getElementById("timer");
+  const questionsContainer = document.getElementById("questions-container");
+  const paginationEl       = document.getElementById("pagination");
+  const submitContainer    = document.getElementById("submit-container");
+  const form               = document.getElementById("exam-form");
+  const paletteContainer   = document.getElementById("question-palette");
+  const palTotalEl         = document.getElementById("pal-total");
+  const palAnsweredEl      = document.getElementById("pal-answered");
+  const palUnansweredEl    = document.getElementById("pal-unanswered");
+
+  const csrfTokenEl        = document.querySelector('input[name="csrf_token"]');
+  const csrfToken          = csrfTokenEl ? csrfTokenEl.value : null;
+  window.csrfToken = csrfToken; // convenience for other calls (autosave)
+
+  // state
+  let currentPage = 1;
+  let answers = {};               // keyed by question id -> selected option id
+  let countdownTimerId = null;
+  let autoSubmitting = false;
+  let flagged = {}; // question_id -> true/false
+
+  // parse attempt start time (server-side truth). If missing, do NOT auto-start timer.
+  let startTime = null;
+  if (attemptStartIso) {
+    const parsed = new Date(attemptStartIso);
+    if (!isNaN(parsed.getTime())) startTime = parsed;
+  }
+
+  if (attemptSubmitted) {
+    alert("This attempt has already been submitted. Redirecting to exams.");
+    window.location.href = "{{ url_for('exam.exams') }}";
+    return;
+  }
+
+  // -------- localStorage helpers ----------
+  function saveAnswersToStorage() {
+    try {
+      localStorage.setItem(storageKey(), JSON.stringify(answers));
+    } catch (e) {
+      console.warn("[TakeExam] could not save answers to storage:", e);
+    }
+  }
+
+  function loadAnswersFromStorage() {
+    try {
+      const raw = localStorage.getItem(storageKey());
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        // parsed may have string keys; ensure numeric keys are used consistently
+        answers = Object.assign({}, parsed);
+        console.info("[TakeExam] restored answers from localStorage:", answers);
+      }
+    } catch (e) {
+      console.warn("[TakeExam] could not load answers from storage:", e);
+    }
+  }
+
+  function clearAnswersFromStorage() {
+    try {
+      localStorage.removeItem(storageKey());
+    } catch (e) {
+      console.warn("[TakeExam] could not clear answers from storage:", e);
+    }
+  }
+
+  // Load saved answers from localStorage (so reloads restore)
+  loadAnswersFromStorage();
+
+  // Load saved flags (so flagged status shows up in palette after reload)
+  loadFlagsFromStorage();
+
+  // initialize UI
+  renderPalette();
+  renderQuestions(currentPage);
+  renderPagination();
+  updateSubmitVisibility();
+  updatePaletteCounts();
+
+
+  if (startTime) startCountdown();
+  else timerEl.textContent = formatTime(duration);
+
+  // ---- rendering / pagination / handlers ----
+  function renderQuestions(page) {
+    currentPage = page;
+    questionsContainer.innerHTML = "";
+
+    const start = (page - 1) * perPage;
+    const end = Math.min(start + perPage, exam.questions.length);
+
+    for (let i = start; i < end; i++) {
+      const q = exam.questions[i];
+      // wrapper -- include data-index (0-based position in exam), and data-qid
+      const block = document.createElement("div");
+      block.className = "mb-4 p-3 border rounded";
+      block.id = `q-block-${i}`;          // index-based id for palette navigation
+      block.dataset.idx = i;
+      block.dataset.qid = q.id;
+
+      // question header
+      const header = document.createElement("div");
+      header.className = "d-flex justify-content-between align-items-center";
+      header.innerHTML = `<strong>Question ${i+1}:</strong>`;
+
+      // 🚩 flag button
+      const flagBtn = document.createElement("button");
+      flagBtn.type = "button";
+      flagBtn.className = "btn btn-sm btn-outline-secondary flag-btn";
+      flagBtn.textContent = flagged[q.id] ? "🚩 Flagged" : "Flag";
+      if (flagged[q.id]) flagBtn.classList.add("flagged");
+
+      flagBtn.addEventListener("click", () => {
+        flagged[q.id] = !flagged[q.id];
+        saveFlagsToStorage();
+        flagBtn.textContent = flagged[q.id] ? "🚩 Flagged" : "Flag";
+        flagBtn.classList.toggle("flagged", flagged[q.id]);
+        updatePaletteForQuestionIndex(i);
+      }); 
+
+      header.appendChild(flagBtn);
+      block.append(header);
+
+      // question body (text)
+      const body = document.createElement("div");
+      body.className = "mt-2 mb-2";
+      body.innerHTML = q.question_text;
+
+      block.append(header, body);
+
+      // options
+      q.options.forEach(opt => {
+        const optId = `q${q.id}_o${opt.id}`;
+        const radioWrap = document.createElement("div");
+        radioWrap.className = "form-check";
+
+        const radio = document.createElement("input");
+        radio.type = "radio";
+        radio.name = `answers[${q.id}]`;
+        radio.id = optId;
+        radio.value = opt.id;
+        radio.className = "form-check-input me-2";
+
+        // restore previously chosen answer (from answers object which was loaded)
+        if (answers[q.id] && String(answers[q.id]) === String(opt.id)) radio.checked = true;
+
+        radio.addEventListener("change", () => {
+          answers[q.id] = opt.id;
+          // persist locally immediately
+          saveAnswersToStorage();
+          // still autosave to server
+          autosave(q.id, opt.id);
+          updatePaletteForQuestionIndex(i);
+          updatePaletteCounts();
+          updateSubmitVisibility();
+        });
+
+        const label = document.createElement("label");
+        label.htmlFor = optId;
+        label.className = "form-check-label";
+        label.textContent = opt.text;
+
+        radioWrap.append(radio, label);
+        block.appendChild(radioWrap);
+      });
+
+      questionsContainer.appendChild(block);
+    }
+
+    // after rendering questions, update pagination active state and palette current highlight
+    renderPagination();
+    highlightCurrentPaletteRange();
+  }
+
+  // flag management
+  function saveFlagsToStorage() {
+    try {
+      localStorage.setItem(`flags_${examId}_${attemptId}`, JSON.stringify(flagged));
+    } catch (e) { console.warn("Could not save flags:", e); }
+  }
+  function loadFlagsFromStorage() {
+    try {
+      const raw = localStorage.getItem(`flags_${examId}_${attemptId}`);
+      if (!raw) return;
+      flagged = JSON.parse(raw) || {};
+    } catch (e) { console.warn("Could not load flags:", e); }
+  }
+  function clearFlagsFromStorage() {
+    try { localStorage.removeItem(`flags_${examId}_${attemptId}`); } catch {}
+  }
+
+  function renderPagination() {
+    paginationEl.innerHTML = "";
+    const makeBtn = (num, txt, disabled = false, active = false) => {
+      const li = document.createElement("li");
+      li.className = "page-item" + (disabled ? " disabled" : "") + (active ? " active" : "");
+      const a = document.createElement("a");
+      a.className = "page-link";
+      a.href = "#";
+      a.textContent = txt || num;
+      a.addEventListener("click", e => {
+        e.preventDefault();
+        if (!disabled) {
+          renderQuestions(num);
+          // smooth scroll to top of questions
+          window.scrollTo({ top: document.getElementById('questions-container').offsetTop - 20, behavior: 'smooth' });
+        }
+      });
+      li.appendChild(a);
+      return li;
+    };
+
+    paginationEl.append(
+      makeBtn(currentPage - 1, "« Prev", currentPage === 1),
+      ...Array.from({ length: totalPages }, (_, i) =>
+        makeBtn(i + 1, null, false, currentPage === i + 1)
+      ),
+      makeBtn(currentPage + 1, "Next »", currentPage === totalPages)
+    );
+  }
+
+  function updateSubmitVisibility() {
+    submitContainer.style.display = (currentPage === totalPages) ? "block" : "none";
+  }
+
+  // ---- palette rendering ----
+  function renderPalette() {
+    paletteContainer.innerHTML = "";
+    for (let i = 0; i < totalQs; i++) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "palette-btn unanswered";
+      btn.dataset.idx = i; // zero-based index in exam.questions array
+      btn.innerText = i + 1;
+      btn.addEventListener("click", (e) => {
+        const targetIndex = Number(e.currentTarget.dataset.idx);
+        // compute page and local index
+        const page = Math.floor(targetIndex / perPage) + 1;
+        renderQuestions(page);
+        // small delay to allow rendering
+        setTimeout(() => {
+          scrollToQuestionIndex(targetIndex);
+          // highlight the clicked button as current
+          updatePaletteForQuestionIndex(targetIndex);
+        }, 80);
+      });
+      paletteContainer.appendChild(btn);
+    }
+    updatePaletteCounts();
+    highlightCurrentPaletteRange();
+  }
+
+  function updatePaletteCounts() {
+    const answeredCount = Object.keys(answers).length;
+    palTotalEl.textContent = totalQs;
+    palAnsweredEl.textContent = answeredCount;
+    palUnansweredEl.textContent = Math.max(0, totalQs - answeredCount);
+
+    // update palette button classes
+    for (let i = 0; i < totalQs; i++) {
+      updatePaletteForQuestionIndex(i, /*noCountsUpdate*/ true);
+    }
+
+    // update progress bar
+    const percent = totalQs > 0 ? Math.round((answeredCount / totalQs) * 100) : 0;
+    const progressEl = document.getElementById("exam-progress");
+    if (progressEl) {
+      progressEl.style.width = percent + "%";
+      progressEl.setAttribute("aria-valuenow", percent);
+      progressEl.textContent = percent + "%";
+
+      // change color based on % (red <40, yellow 40–70, green >70)
+      if (percent < 40) {
+        progressEl.style.backgroundColor = "#dc3545"; // red
+        progressEl.style.color = "#fff";
+      } else if (percent < 70) {
+        progressEl.style.backgroundColor = "#ffc107"; // yellow
+        progressEl.style.color = "#000";
+      } else {
+        progressEl.style.backgroundColor = "#198754"; // green
+        progressEl.style.color = "#fff";
+      }
+    }
+  }
+
+  function updatePaletteForQuestionIndex(index, noCountsUpdate=false) {
+    const q = exam.questions[index];
+    const btn = paletteContainer.querySelector(`button[data-idx="${index}"]`);
+    if (!btn) return;
+
+    // answered if answers has entry for this q.id
+    if (answers[q.id]) {
+      btn.classList.remove("unanswered");
+      btn.classList.add("answered");
+      btn.classList.remove("current");
+    } else {
+      btn.classList.remove("answered");
+      btn.classList.add("unanswered");
+      btn.classList.remove("current");
+    }
+
+    // mark current-range questions (those on current page) as 'current' style overlay
+    const startIndex = (currentPage - 1) * perPage;
+    const endIndex = Math.min(startIndex + perPage - 1, totalQs - 1);
+    if (index >= startIndex && index <= endIndex) {
+      btn.classList.add("current");
+    } else {
+      btn.classList.remove("current");
+    }
+
+    // ✅ add this part for flags
+    if (flagged[q.id]) {
+      btn.classList.add("flagged");
+    } else {
+      btn.classList.remove("flagged");
+    }
+
+    if (!noCountsUpdate) updatePaletteCounts();
+  }
+
+  function highlightCurrentPaletteRange() {
+    // ensure palette reflects current page
+    for (let i = 0; i < totalQs; i++) {
+      updatePaletteForQuestionIndex(i, true);
+    }
+  }
+
+  function scrollToQuestionIndex(index) {
+    const el = document.getElementById(`q-block-${index}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      // also focus first input within the question
+      const input = el.querySelector('input[type="radio"], input[type="text"], textarea');
+      if (input) input.focus({ preventScroll: true });
+    }
+  }
+
+  // ---- countdown / submission (unchanged except small integration) ----
+  function startCountdown() {
+    if (!startTime || isNaN(startTime.getTime())) {
+      console.error("[TakeExam] cannot start countdown: invalid startTime");
+      return;
+    }
+    if (countdownTimerId) clearTimeout(countdownTimerId);
+    tickCountdown();
+  }
+
+  function tickCountdown() {
+    const now = new Date();
+    const elapsed = Math.floor((now - startTime) / 1000);
+    let left = duration - elapsed;
+
+    // enforce exam hard end (server-provided exam.end_datetime)
+    const examEnd = new Date(exam.end_datetime);
+    const hardClose = Math.floor((examEnd - now) / 1000);
+    if (hardClose < left) left = hardClose;
+
+    if (left <= 0) {
+      timerEl.textContent = "00:00";
+      disableInputs();
+      if (!autoSubmitting) {
+        autoSubmitting = true;
+        // clear storage then submit so reload won't resurrect answers
+        clearAnswersFromStorage();
+        injectAnswers();
+        ensureCsrf();
+        setTimeout(() => {
+          try { form.submit(); } catch (err) { console.error("[TakeExam] auto-submit failed:", err); }
+        }, 250);
+      }
+      return;
+    }
+
+    timerEl.textContent = formatTime(left);
+    countdownTimerId = setTimeout(tickCountdown, 1000);
+  }
+
+  function formatTime(sec) {
+    const m = String(Math.floor(sec / 60)).padStart(2, "0");
+    const s = String(sec % 60).padStart(2, "0");
+    return `${m}:${s}`;
+  }
+
+  function disableInputs() {
+    document.querySelectorAll("#questions-container input, #questions-container button").forEach(el => el.disabled = true);
+  }
+
+  // ---- form helpers / autosave ----
+  function injectAnswers() {
+    document.querySelectorAll('input[name^="answers["][data-injected="true"]').forEach(n => n.remove());
+    Object.entries(answers).forEach(([qid, oid]) => {
+      const hidden = document.createElement("input");
+      hidden.type = "hidden";
+      hidden.name = `answers[${qid}]`;
+      hidden.value = oid;
+      hidden.setAttribute("data-injected", "true");
+      form.appendChild(hidden);
+    });
+    Object.entries(flagged).forEach(([qid, isFlagged]) => {
+      if (isFlagged) {
+        const hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.name = `flags[${qid}]`;
+        hidden.value = "1";
+        hidden.setAttribute("data-injected", "true");
+        form.appendChild(hidden);
+      }
+    });
+  }
+
+  function ensureCsrf() {
+    if (!csrfToken) return;
+    let csrf = document.querySelector('input[name="csrf_token"]');
+    if (!csrf) {
+      csrf = document.createElement("input");
+      csrf.type = "hidden";
+      csrf.name = "csrf_token";
+      csrf.value = csrfToken;
+      form.appendChild(csrf);
+    }
+  }
+
+  function autosave(qid, oid) {
+    try {
+      fetch("/student/autosave_exam_answer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": csrfToken || ""
+        },
+        body: JSON.stringify({
+          exam_id: examId,
+          attempt_id: attemptId,
+          question_id: qid,
+          selected_option_id: oid
+        })
+      }).catch(e => console.warn("[TakeExam] autosave error:", e));
+    } catch (err) {
+      console.error("[TakeExam] autosave exception:", err);
+    }
+  }
+
+  // final submission
+  let isSubmitting = false;
+  form.addEventListener("submit", function (e) {
+    injectAnswers();
+    ensureCsrf();
+
+    if (Object.keys(answers).length === 0 && !confirm("You have not answered any questions. Submit anyway?")) {
+      e.preventDefault();
+      return false;
+    }
+
+    // clear local storage so selections don't persist after a final submit
+    clearAnswersFromStorage();
+    isSubmitting = true;
+  });
+
+  // warn on page unload
+  window.addEventListener("beforeunload", function (e) {
+    if (!autoSubmitting && !isSubmitting && Object.keys(answers).length > 0) {
+      e.preventDefault();
+      e.returnValue = "You have unsaved answers — leaving will lose progress.";
+      return e.returnValue;
+    }
+  });
+
+  // Expose a small API to prefill answers (in case server returns previously-saved answers via AJAX)
+  window.takeExam = window.takeExam || {};
+  window.takeExam.setAnswers = function(initialAnswers) {
+    // initialAnswers expected as { question_id: option_id, ... }
+    answers = Object.assign({}, answers, initialAnswers);
+    saveAnswersToStorage();
+    // refresh UI
+    renderQuestions(currentPage);
+    updatePaletteCounts();
+  };
+
+});
+</script>
+{% endblock %}

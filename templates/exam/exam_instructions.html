@@ -1,0 +1,61 @@
+{% extends 'exam/base_exam.html' %}
+{% block title %}Exam Instructions{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h2 class="mb-0">{{ exam.title }}</h2>
+        </div>
+
+        <div class="card-body">
+            <p><strong>Subject:</strong> {{ exam.subject }}</p>
+            <p><strong>Start Time:</strong> {{ exam.start_datetime.strftime("%Y-%m-%d %H:%M") }}</p>
+            <p><strong>End Time:</strong> {{ exam.end_datetime.strftime("%Y-%m-%d %H:%M") }}</p>
+            <p><strong>Duration:</strong> {{ exam.duration_minutes }} minutes</p>
+
+            <hr>
+            <h5 class="mb-3">Instructions</h5>
+            <ul class="list-group mb-3">
+                <li class="list-group-item">This is a one-time attempt. Once you submit, you cannot retake the exam.</li>
+                <li class="list-group-item">Your answers will be saved automatically as you select them.</li>
+                <li class="list-group-item">Make sure you have a stable internet connection before starting.</li>
+            </ul>
+
+            {% if not can_attempt %}
+                <div class="alert alert-danger">You have already taken this exam.</div>
+            {% else %}
+
+                {% if preview_set %}
+                    <div class="mb-3">
+                        <strong>Selected Set:</strong>
+                        <div class="card mt-2 p-2">
+                            <div><strong>{{ preview_set.name }}</strong></div>
+                            {% if preview_set.description %}
+                                <div class="small text-muted">{{ preview_set.description }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% elif exam.assignment_mode == 'choice' %}
+                    <div class="alert alert-info">
+                        This exam requires you to choose a set before starting.
+                        <a href="{{ url_for('student.select_exam_set', exam_id=exam.id) }}" class="btn btn-sm btn-primary ms-2">Choose Set</a>
+                    </div>
+                {% else %}
+                    <div class="mb-3">
+                        <small class="text-muted">A set will be selected for you when you click <strong>Start Exam</strong>.</small>
+                    </div>
+                {% endif %}
+
+                <!-- Start Exam: POST to this page to create the attempt and redirect -->
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-lg btn-success">Start Exam</button>
+                    <a href="{{ url_for('exam.exams') }}" class="btn btn-secondary ms-2">Cancel</a>
+                </form>
+
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
