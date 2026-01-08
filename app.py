@@ -246,4 +246,3 @@ if __name__ == "__main__":
     logger.info("Starting LMS app on 0.0.0.0:5000")
     logger.info("SESSION_TYPE=%s", app.config['SESSION_TYPE'])
     socketio.run(app, host="0.0.0.0", port=int(os.environ.get('PORT', 5000)), debug=app.debug)
-    
