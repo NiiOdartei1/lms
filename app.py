@@ -77,9 +77,12 @@ def inject_now():
 
 @app.context_processor
 def inject_active_assessment_period():
-    return {
-        'active_assessment_period': TeacherAssessmentPeriod.query.filter_by(is_active=True).first()
-    }
+    try:
+        return {
+            'active_assessment_period': TeacherAssessmentPeriod.query.filter_by(is_active=True).first()
+        }
+    except Exception:
+        return {'active_assessment_period': None}
 
 # -------------------------
 # Import models and blueprints AFTER extensions are ready
@@ -133,6 +136,29 @@ def load_user(user_id):
     return None
 
 # -------------------------
+with app.app_context():
+    db.create_all()
+
+    # create default super admin
+    super_admin = Admin.query.filter_by(username='SuperAdmin').first()
+    if not super_admin:
+        admin = Admin(username='SuperAdmin', admin_id='ADM001')
+        admin.set_password('Password123')
+        db.session.add(admin)
+        db.session.commit()
+
+    # create default classes
+    try:
+        from utils.helpers import get_class_choices
+        existing = {c.name for c in SchoolClass.query.all()}
+        for name, _ in get_class_choices():
+            if name not in existing:
+                db.session.add(SchoolClass(name=name))
+        db.session.commit()
+    except Exception:
+        pass
+
+# -------------------------
 # Error handlers
 # -------------------------
 @app.errorhandler(CSRFError)
@@ -151,29 +177,29 @@ def set_headers(response):
 # DB initialization — run once per server start (not on every request)
 # -------------------------
 @app.before_request
-def initialize_database_once():
-    try:
-        db.create_all()
-        # create a default super admin if missing
-        super_admin = Admin.query.filter_by(username='SuperAdmin').first()
-        if not super_admin:
-            admin = Admin(username='SuperAdmin', admin_id='ADM001')
-            admin.set_password('Password123')
-            db.session.add(admin)
-            db.session.commit()
-            logger.info("SuperAdmin created.")
-        # ensure default classes exist, using your helper
-        try:
-            from utils.helpers import get_class_choices
-            existing = {c.name for c in SchoolClass.query.all()}
-            for name, _ in get_class_choices():
-                if name not in existing:
-                    db.session.add(SchoolClass(name=name))
-            db.session.commit()
-        except Exception:
-            logger.exception("Failed to populate default classes (helper error)")
-    except Exception:
-        logger.exception("Error creating database/tables")
+#def initialize_database_once():
+#    try:
+#        db.create_all()
+#        # create a default super admin if missing
+#        super_admin = Admin.query.filter_by(username='SuperAdmin').first()
+#        if not super_admin:
+#            admin = Admin(username='SuperAdmin', admin_id='ADM001')
+#            admin.set_password('Password123')
+#            db.session.add(admin)
+#            db.session.commit()
+#            logger.info("SuperAdmin created.")
+#        # ensure default classes exist, using your helper
+#        try:
+#            from utils.helpers import get_class_choices
+#            existing = {c.name for c in SchoolClass.query.all()}
+#            for name, _ in get_class_choices():
+#                if name not in existing:
+#                    db.session.add(SchoolClass(name=name))
+#            db.session.commit()
+#        except Exception:
+#            logger.exception("Failed to populate default classes (helper error)")
+#    except Exception:
+#        logger.exception("Error creating database/tables")
 
 # -------------------------
 # Routes (kept small — move heavy routes to blueprints)
