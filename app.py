@@ -50,7 +50,7 @@ db.init_app(app)
 mail.init_app(app)
 migrate = Migrate(app, db)
 csrf = CSRFProtect(app)
-socketio.init_app(app, manage_session=False)
+socketio.init_app(app, async_mode="threading", manage_session=False)
 
 # Flask-Session for server-side filesystem sessions
 sess = Session(app)
