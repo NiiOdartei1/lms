@@ -1,8 +1,16 @@
+"""
+Teacher Blueprint
+All database queries happen inside route handlers, not at import time.
+"""
 from flask import Blueprint, render_template, abort, flash, redirect, url_for, request, jsonify, current_app
 from flask_login import login_required, current_user, login_user
-import requests
-from admin_routes import is_admin_or_teacher
-from models import CourseAssessmentScheme, Meeting, QuizAttempt, db, TeacherProfile, Course, StudentCourseRegistration, TeacherCourseAssignment, AttendanceRecord, User, StudentProfile, AcademicCalendar, AcademicYear, AppointmentBooking, AppointmentSlot, Assignment, SchoolClass, Quiz, StudentQuizSubmission, Exam, ExamSubmission, AssignmentSubmission, GradingScale
+from models import (
+    CourseAssessmentScheme, Meeting, QuizAttempt, db, TeacherProfile, Course,
+    StudentCourseRegistration, TeacherCourseAssignment, AttendanceRecord, User,
+    StudentProfile, AcademicCalendar, AcademicYear, AppointmentBooking,
+    AppointmentSlot, Assignment, SchoolClass, Quiz, StudentQuizSubmission,
+    Exam, ExamSubmission, AssignmentSubmission, GradingScale
+)
 from forms import AssignmentForm, ChangePasswordForm, MeetingForm, TeacherLoginForm
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta, date
@@ -11,8 +19,6 @@ from sqlalchemy.orm import joinedload
 from collections import defaultdict
 from utils.notifications import create_assignment_notification
 import os, uuid
-from utils.helpers import get_class_choices
-
 
 teacher_bp = Blueprint("teacher", __name__, url_prefix="/teacher")
 
@@ -28,7 +34,7 @@ def teacher_login():
         if user and user.username.lower() == username.lower() and user.check_password(password):
             login_user(user)
             flash(f"Welcome back, {user.first_name}!", "success")
-            return redirect(url_for('teacher.dashboard'))  # adjust dashboard endpoint
+            return redirect(url_for('teacher.dashboard'))
         flash("Invalid teacher credentials.", "danger")
 
     return render_template('teacher/login.html', form=form)
@@ -39,7 +45,6 @@ def dashboard():
     if current_user.role != 'teacher':
         abort(403)
     return render_template('teacher/dashboard.html', user=current_user)
-
 
 @teacher_bp.route('/classes', methods=['GET', 'POST'])
 @login_required
@@ -57,7 +62,7 @@ def classes():
     all_courses = Course.query.order_by(Course.assigned_class, Course.name).all()
 
     # 3) Which ones this teacher has already signed up for?
-    assigned = { a.course_id for a in profile.assignments }
+    assigned = {a.course_id for a in profile.assignments}
 
     # 4) Handle form submission (register / unregister)
     if request.method == 'POST':
@@ -83,16 +88,14 @@ def classes():
     display = []
     for c in all_courses:
         display.append({
-            'id':        c.id,
-            'class':     c.assigned_class,
-            'name':      c.name,
+            'id': c.id,
+            'class': c.assigned_class,
+            'name': c.name,
             'registered': (c.id in assigned)
         })
 
-    return render_template('teacher/classes.html',
-                           courses=display)
+    return render_template('teacher/classes.html', courses=display)
 
-from flask import jsonify
 
 @teacher_bp.route('/courses_for_class/<assigned_class>', methods=['GET'])
 @login_required
@@ -958,3 +961,4 @@ def add_meeting():
         return redirect(url_for("teacher.meetings"))
 
     return render_template("teacher/meeting_form.html", form=form)
+
