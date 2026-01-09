@@ -81,7 +81,7 @@ db.init_app(app)
 mail.init_app(app)
 migrate = Migrate(app, db)
 csrf = CSRFProtect(app)
-socketio.init_app(app, async_mode="threading", manage_session=False)
+socketio.init_app(app, async_mode="threading", manage_session=False, cors_allowed_origins="*")
 sess = Session(app)
 
 login_manager = LoginManager()
@@ -370,3 +370,4 @@ if __name__ == "__main__":
     logger.info("SESSION_TYPE=%s", app.config['SESSION_TYPE'])
     logger.info("=" * 70)
     socketio.run(app, host="0.0.0.0", port=port, debug=app.debug)
+    
