@@ -46,9 +46,6 @@ logger.info("=" * 70)
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# Set sensible defaults
-app.config.setdefault('SQLALCHEMY_DATABASE_URI', 'sqlite:///lms.db')
-
 # Use filesystem sessions instead of database sessions (simpler, avoids SQLAlchemy conflicts)
 app.config.setdefault('SESSION_TYPE', 'filesystem')
 app.config.setdefault('SESSION_PERMANENT', False)
@@ -377,3 +374,4 @@ if __name__ == "__main__":
     logger.info("=" * 70)
     socketio.run(app, host="0.0.0.0", port=port, debug=app.debug)
     
+
