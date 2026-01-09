@@ -48,11 +48,14 @@ app.config.from_object(Config)
 
 # Set sensible defaults
 app.config.setdefault('SQLALCHEMY_DATABASE_URI', 'sqlite:///lms.db')
-app.config.setdefault('SESSION_TYPE', 'sqlalchemy')
-app.config['SESSION_SQLALCHEMY'] = db
-app.config.setdefault('SESSION_SQLALCHEMY_TABLE', 'sessions')
+
+# Use filesystem sessions instead of database sessions (simpler, avoids SQLAlchemy conflicts)
+app.config.setdefault('SESSION_TYPE', 'filesystem')
 app.config.setdefault('SESSION_PERMANENT', False)
 app.config.setdefault('SESSION_USE_SIGNER', True)
+session_folder = os.path.join(app.instance_path, 'sessions')
+os.makedirs(session_folder, exist_ok=True)
+app.config['SESSION_FILE_DIR'] = session_folder
 app.config.setdefault('UPLOAD_FOLDER', os.path.join(app.instance_path, 'uploads'))
 app.config.setdefault('MATERIALS_FOLDER', os.path.join(app.instance_path, 'materials'))
 app.config.setdefault('PAYMENT_PROOF_FOLDER', os.path.join(app.instance_path, 'payment_proofs'))
@@ -83,8 +86,9 @@ migrate = Migrate(app, db)
 csrf = CSRFProtect(app)
 socketio.init_app(app, async_mode="threading", manage_session=False, cors_allowed_origins="*")
 
-# Session MUST be initialized AFTER db is bound (deferred below)
-sess = None
+# Flask-Session with filesystem storage (no SQLAlchemy conflicts)
+from flask_session import Session
+sess = Session(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -221,16 +225,7 @@ def before_request_init():
     logger.info("=" * 70)
     
     try:
-        # Initialize Flask-Session FIRST (before db.create_all)
-        # This registers the session table with SQLAlchemy metadata
-        logger.info("[0/4] Initializing Flask-Session...")
-        global sess
-        if sess is None:
-            from flask_session import Session
-            sess = Session(app)
-            logger.info("  ✓ Flask-Session initialized")
-        
-        # NOW initialize database (after Session registers its table)
+        # Initialize database
         logger.info("[1/4] Initializing database tables...")
         initialize_database()
         
