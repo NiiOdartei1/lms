@@ -82,7 +82,9 @@ mail.init_app(app)
 migrate = Migrate(app, db)
 csrf = CSRFProtect(app)
 socketio.init_app(app, async_mode="threading", manage_session=False, cors_allowed_origins="*")
-sess = Session(app)
+
+# Session MUST be initialized AFTER db is bound (deferred below)
+sess = None
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -219,8 +221,16 @@ def before_request_init():
     logger.info("=" * 70)
     
     try:
+        # Initialize Flask-Session FIRST (needs app context)
+        logger.info("[0/4] Initializing Flask-Session...")
+        global sess
+        if sess is None:
+            from flask_session import Session
+            sess = Session(app)
+            logger.info("  ✓ Flask-Session initialized")
+        
         # Initialize database
-        logger.info("[1/3] Initializing database...")
+        logger.info("[1/4] Initializing database...")
         initialize_database()
         
         # Import and register blueprints
