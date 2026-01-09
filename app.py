@@ -27,7 +27,6 @@ from utils.extensions import db, mail, socketio
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 # ---------------------------------------------------------------------
 # APPLICATION FACTORY
 # ---------------------------------------------------------------------
@@ -134,3 +133,8 @@ def create_app():
         return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
     return app
+
+# ---------------------------------------------------------------------
+# Module-level app for Gunicorn
+# ---------------------------------------------------------------------
+app = create_app()
