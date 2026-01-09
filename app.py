@@ -221,7 +221,8 @@ def before_request_init():
     logger.info("=" * 70)
     
     try:
-        # Initialize Flask-Session FIRST (needs app context)
+        # Initialize Flask-Session FIRST (before db.create_all)
+        # This registers the session table with SQLAlchemy metadata
         logger.info("[0/4] Initializing Flask-Session...")
         global sess
         if sess is None:
@@ -229,8 +230,8 @@ def before_request_init():
             sess = Session(app)
             logger.info("  ✓ Flask-Session initialized")
         
-        # Initialize database
-        logger.info("[1/4] Initializing database...")
+        # NOW initialize database (after Session registers its table)
+        logger.info("[1/4] Initializing database tables...")
         initialize_database()
         
         # Import and register blueprints
