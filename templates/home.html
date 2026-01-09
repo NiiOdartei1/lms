@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Welcome to MyLMS{% endblock %}
+
+{% block content %}
+<style>
+  /* HOME - marketing hero */
+  .hero {
+    background: radial-gradient(circle at 10% 20%, #0b3d91 0%, #003366 35%, #004e9e 100%);
+    color: #fff;
+    padding: 7rem 1rem;
+    text-align: center;
+    background-size: 300% 300%;
+    animation: slowShift 18s ease infinite;
+  }
+  @keyframes slowShift {
+    0% { background-position: 0% 0% }
+    50% { background-position: 100% 100% }
+    100% { background-position: 0% 0% }
+  }
+
+  .home-hero-inner { max-width: 980px; margin: 0 auto; }
+  .home-hero h1 { font-weight: 800; letter-spacing: -0.02em; }
+  .home-sub { color: rgba(255,255,255,0.92); font-size: 1.1rem; }
+
+  /* Accent CTA styles */
+  .cta-primary {
+    background: linear-gradient(90deg,#ffb347,#ffcc33);
+    color: #111;
+    border: none;
+    padding: .7rem 1.25rem;
+    border-radius: 999px;
+    font-weight:700;
+    box-shadow: 0 6px 20px rgba(0,0,0,.15);
+  }
+  .cta-secondary {
+    border: 1px solid rgba(255,255,255,0.18);
+    color: white;
+    background: transparent;
+    padding: .6rem 1rem;
+    border-radius: .5rem;
+  }
+
+  /* feature section — calmer look */
+  .features { padding: 4rem 0; }
+  .feature-card { border-radius: 12px; padding: 1.5rem; background: #fff; box-shadow: 0 6px 18px rgba(3, 44, 98, 0.04); }
+  .feature-title { font-weight: 700; color: #003366; }
+
+  /* testimonials: muted, elegant */
+  .testimonials { background: linear-gradient(90deg,#f4f8ff,#edf6ff); padding: 3rem 0; border-top: 1px solid rgba(0,0,0,.03); }
+
+  /* tiny footer CTA */
+  .mini-cta { margin-top: 2rem; }
+</style>
+
+<!-- Marketing Hero -->
+<section class="hero">
+  <div class="home-hero-inner">
+    <h1 class="display-4 aurora-text">Welcome to MyLMS — Smarter school management</h1>
+    <p class="home-sub mb-4">
+      Tools for teachers, students and parents — quizzes, virtual classes, attendance,
+      fees and exams — all in one easy platform.
+    </p>
+
+    <div class="d-flex justify-content-center gap-3">
+      <a href="{{ url_for('select_portal') }}" class="cta-primary btn btn-lg">Get Started — Login</a>
+      <a href="#features" class="cta-secondary btn btn-lg">See Features</a>
+    </div>
+
+    <div class="mt-4 text-white-50 small">
+      <em>Trusted by schools for secure, reliable learning.</em>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features" class="features container features">
+  <div class="row g-4 align-items-stretch">
+    <div class="col-md-4">
+      <div class="feature-card">
+        <h5 class="feature-title">Always Available</h5>
+        <p class="mb-0">Access courses, assignments and results from any device — 24/7.</p>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="feature-card">
+        <h5 class="feature-title">Secure by Design</h5>
+        <p class="mb-0">Fine-grained roles, encrypted storage, and audit-ready logs.</p>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="feature-card">
+        <h5 class="feature-title">Designed for Schools</h5>
+        <p class="mb-0">Attendance, timetables, grading workflows and exam proctoring built-in.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Testimonials & Announcements -->
+<section class="testimonials text-center">
+  <div class="container">
+    <h3 class="mb-3">What people say</h3>
+    <blockquote class="blockquote">
+      <p class="mb-1 fst-italic">"We rolled MyLMS out across two campuses in one week — onboarding was effortless."</p>
+      <footer class="blockquote-footer">School Administrator, Greenfield Academy</footer>
+    </blockquote>
+
+    <div class="mini-cta">
+      <a href="{{ url_for('select_portal') }}" class="btn btn-outline-primary">Login to your portal</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

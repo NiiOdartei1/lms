@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% block title %}Select Portal — MyLMS{% endblock %}
+
+{% block content %}
+<style>
+/* ========== Full-bleed background that truly covers the viewport width ========== */
+.portal-background {
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+  width: 100vw;
+  min-height: 100vh;
+  background-color: #071024;
+  background-image: url("https://i.postimg.cc/wvy0XwYx/studying.png");
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 1rem;
+  box-sizing: border-box;
+  z-index: 0;
+  overflow: hidden;
+}
+
+/* dark overlay so text remains readable on bright images */
+.portal-background::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(2,6,23,0.56), rgba(2,6,23,0.62));
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* centered container with card content (keeps max width)
+   NOW semi-transparent so background peeks through slightly */
+.portal-container {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 1150px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border-radius: 12px;
+  overflow: hidden;
+
+  /* translucent white so background shows slightly */
+  background: rgba(255,255,255,0.72);
+
+  /* subtle backdrop blur to improve legibility of text over image */
+  -webkit-backdrop-filter: blur(6px) saturate(125%);
+  backdrop-filter: blur(6px) saturate(125%);
+
+  /* lighter shadow so transparency reads nicely */
+  box-shadow: 0 10px 30px rgba(2,8,23,0.28);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+/* ---------- Left branding column (kept a touch more solid) ---------- */
+.brand-side {
+  /* keep branding strong: darker gradient + slight transparency */
+  background: linear-gradient(180deg, rgba(5,32,51,0.95) 0%, rgba(8,48,74,0.95) 100%);
+  color: #fff;
+  padding: 2.5rem;
+  display:flex;
+  flex-direction:column;
+  gap:1rem;
+  justify-content:center;
+  align-items:flex-start;
+  min-height: 380px;
+}
+.brand-logo { display:flex; gap:0.85rem; align-items:center; }
+.brand-logo img {
+  height:56px; width:56px; object-fit:contain; border-radius:8px;
+  background: rgba(255,255,255,0.05); padding:6px;
+}
+.brand-title { font-size:1.5rem; font-weight:800; }
+.brand-tag { font-size:0.95rem; color: rgba(255,255,255,0.95); }
+.brand-sub { color: rgba(255,255,255,0.92); line-height:1.45; margin-top: .4rem; }
+
+/* bullets */
+.brand-bullets { margin-top: 0.6rem; display:flex; flex-direction:column; gap:0.6rem; width:100%; }
+.bullet { display:flex; gap:0.85rem; align-items:flex-start; color: rgba(255,255,255,0.95); }
+.bullet .icon { min-width:36px; min-height:36px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.06); }
+
+/* ---------- Right interactive tiles (kept translucent but readable) ---------- */
+.tiles-side {
+  padding: 2rem;
+  display:flex;
+  flex-direction:column;
+  gap:1rem;
+  justify-content:flex-start;
+  align-items:stretch;
+  min-height: 380px;
+  /* slightly less opaque to let background subtle color show */
+  background: linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.72));
+}
+
+/* top row inside tiles-side */
+.tiles-top { display:flex; justify-content:space-between; align-items:center; gap:1rem; }
+.tiles-top h2 { margin:0; font-size:1.15rem; color:#071420; }
+.tiles-top p { margin:0; color:#6b7280; font-size:0.92rem; }
+
+/* tiles grid */
+.tiles-grid { margin-top: .65rem; display:grid; grid-template-columns: repeat(2, 1fr); gap: 0.9rem; }
+
+/* tile card */
+.tile {
+  background: rgba(255,255,255,0.95);
+  border: 1px solid rgba(8,32,50,0.06);
+  border-radius: 10px;
+  padding: 14px;
+  display:flex;
+  gap:12px;
+  align-items:center;
+  cursor:pointer;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s;
+}
+.tile:focus { outline: 3px solid rgba(3,105,161,0.12); outline-offset: 2px; }
+.tile:hover { transform: translateY(-6px); box-shadow: 0 18px 36px rgba(7,22,35,0.06); border-color: rgba(3,105,161,0.12); }
+
+.tile-icon {
+  width:48px; height:48px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0;
+  background: linear-gradient(135deg,#2563eb,#7c3aed);
+}
+.tile-title { font-weight:700; color:#071420; font-size:0.98rem; margin-bottom:0.14rem; }
+.tile-desc { font-size:0.86rem; color:#6b7280; }
+
+/* per-tile accents */
+.tile-exams  .tile-icon { background: linear-gradient(135deg,#7c3aed,#2563eb); }
+.tile-teacher .tile-icon { background: linear-gradient(135deg,#10b981,#047857); }
+.tile-student .tile-icon { background: linear-gradient(135deg,#3b82f6,#1e40af); }
+.tile-parent  .tile-icon { background: linear-gradient(135deg,#f59e0b,#d97706); color:#111;}
+.tile-vclass  .tile-icon { background: linear-gradient(135deg,#06b6d4,#0ea5a4); }
+
+/* helpers */
+.help-note { margin-top:.6rem; font-size:0.88rem; color:#6b7280; }
+
+/* responsive */
+@media (max-width: 980px) {
+  .portal-container { grid-template-columns: 1fr; }
+  .brand-side, .tiles-side { padding:1.25rem; text-align:center; align-items:center; }
+  .tiles-grid { grid-template-columns: 1fr 1fr; }
+  .brand-logo { justify-content:center; }
+}
+@media (max-width: 520px) {
+  .tiles-grid { grid-template-columns: 1fr; gap:0.7rem; }
+  .brand-title { font-size:1.15rem; }
+  .portal-background { padding: 2rem 0.5rem; }
+}
+</style>
+
+<div class="portal-background" role="region" aria-label="Portal selection background">
+  <div class="portal-container" role="region" aria-label="Portal selection container">
+
+    <!-- LEFT: branding -->
+    <div class="brand-side" aria-hidden="false">
+      <div class="brand-logo">
+        <img src="https://i.postimg.cc/nzxdpFfB/lms.png" alt="MyLMS logo">
+        <div>
+          <div class="brand-title">MyLMS</div>
+          <div class="brand-tag">Unified learning, attendance, exams & virtual classes</div>
+        </div>
+      </div>
+
+      <p class="brand-sub">
+        MyLMS brings together teachers, students and parents on a modern, secure platform.
+        Manage attendance, assignments, exams, results and live classes from one central place.
+      </p>
+
+      <div class="brand-bullets" aria-hidden="true">
+        <div class="bullet"><span class="icon">✓</span><div>Single sign-on across all portals</div></div>
+        <div class="bullet"><span class="icon">🔒</span><div>Role-based security & encrypted data</div></div>
+        <div class="bullet"><span class="icon">⚡</span><div>Mobile-first, fast and lightweight UI</div></div>
+      </div>
+
+      <div style="margin-top:1rem; font-size:0.86rem; color:rgba(255,255,255,0.95)">
+        Need help? <a href="mailto:support@example.com" style="color:rgba(255,255,255,0.92); text-decoration:underline;">support@example.com</a>
+      </div>
+    </div>
+
+    <!-- RIGHT: tiles -->
+    <div class="tiles-side">
+      <div class="tiles-top">
+        <div>
+          <h2>Choose your portal</h2>
+          <p class="small">Select the portal that matches your role. Exams use a dedicated exam system.</p>
+        </div>
+        <div class="text-end" style="align-self:flex-start;">
+          <a href="{{ url_for('home') }}" class="btn btn-sm btn-outline-secondary">Home</a>
+        </div>
+      </div>
+
+      <div class="tiles-grid" role="list" aria-label="Portal tiles">
+
+        <!-- EXAMS -->
+        <div class="tile tile-exams" role="listitem" tabindex="0"
+             data-href="{{ url_for('redirect_to_portal', portal='exams') }}" aria-label="Exams portal">
+          <div class="tile-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M5 3h14v2H5z" fill="currentColor"/><rect x="4" y="6" width="16" height="14" rx="1.5" fill="currentColor" opacity="0.95"/></svg>
+          </div>
+          <div>
+            <div class="tile-title">Exams</div>
+            <div class="tile-desc">Secure, timed and proctored tests; schedules & results.</div>
+          </div>
+        </div>
+
+        <!-- TEACHERS -->
+        <div class="tile tile-teacher" role="listitem" tabindex="0"
+             data-href="{{ url_for('redirect_to_portal', portal='teachers') }}" aria-label="Teachers portal">
+          <div class="tile-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="12" rx="1.5" fill="currentColor"/><path d="M5 19h14" stroke="rgba(255,255,255,0.9)" stroke-width="1.2"/></svg>
+          </div>
+          <div>
+            <div class="tile-title">Teachers</div>
+            <div class="tile-desc">Create courses, grade submissions and manage classes.</div>
+          </div>
+        </div>
+
+        <!-- STUDENTS -->
+        <div class="tile tile-student" role="listitem" tabindex="0"
+             data-href="{{ url_for('redirect_to_portal', portal='students') }}" aria-label="Students portal">
+          <div class="tile-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 3L2 8l10 5 10-5-10-5z" fill="currentColor"/><path d="M4 9v4a8 8 0 0 0 8 8 8 8 0 0 0 8-8V9" stroke="rgba(255,255,255,0.9)" stroke-width="1"/></svg>
+          </div>
+          <div>
+            <div class="tile-title">Students</div>
+            <div class="tile-desc">Access course materials, submit assignments and view grades.</div>
+          </div>
+        </div>
+
+        <!-- PARENTS -->
+        <div class="tile tile-parent" role="listitem" tabindex="0"
+             data-href="{{ url_for('redirect_to_portal', portal='parents') }}" aria-label="Parents portal">
+          <div class="tile-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M7 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" fill="currentColor"/><path d="M2 20c0-3 2.5-5 5-5h10c2.5 0 5 2 5 5" stroke="rgba(255,255,255,0.92)" stroke-width="1.1"/></svg>
+          </div>
+          <div>
+            <div class="tile-title">Parents</div>
+            <div class="tile-desc">Monitor attendance, receive reports and communicate with teachers.</div>
+          </div>
+        </div>
+
+        <!-- VCLASS -->
+        <div class="tile tile-vclass" role="listitem" tabindex="0"
+             data-href="{{ url_for('redirect_to_portal', portal='vclass') }}" aria-label="Virtual Class portal">
+          <div class="tile-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="2" y="4" width="20" height="12" rx="2" fill="currentColor"/><path d="M8 18h8l-2 3h-4l-2-3z" fill="rgba(255,255,255,0.92)"/></svg>
+          </div>
+          <div>
+            <div class="tile-title">VClass</div>
+            <div class="tile-desc">Join live lessons, watch recordings and interact in class activities.</div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="help-note">If you don’t have an account or can’t log in, contact your school administrator.</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const tiles = document.querySelectorAll('.tile[data-href]');
+  tiles.forEach(tile => {
+    tile.addEventListener('click', () => { window.location.href = tile.dataset.href; });
+    tile.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        window.location.href = tile.dataset.href;
+      }
+    });
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<title>{% block title %}LMS Chat{% endblock %}</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+  :root{
+    --bg:#f5f7fb; --card:#ffffff; --muted:#6b7280; --accent:#6c5ce7;
+    --admin:#ffd966; --teacher:#9fc5e8; --student:#d9ead3; --parent:#f4cccc;
+  }
+  html,body { height:100%; }
+  body {
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background: linear-gradient(135deg,#eaf2ff,#f6fff2);
+    margin: 0; padding: 18px;
+  }
+  .container-wide { max-width: 1300px; margin: 0 auto; }
+
+  /* small utility */
+  .muted { color: var(--muted); }
+</style>
+
+{% block extra_head %}{% endblock %}
+</head>
+<body>
+  <div class="container-wide">
+    {% block content %}{% endblock %}
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

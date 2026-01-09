@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}LMS{% endblock %}</title>
+
+  <!-- Bootstrap & Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+
+  <!-- Favicon -->
+  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <meta name="theme-color" content="#4A90E2">
+
+  <!-- Custom Theme -->
+  <style>
+    body {
+      background-color: #f8f9fa;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    /* Navbar */
+    .navbar {
+      transition: background 0.3s ease;
+    }
+
+    .navbar-brand {
+      font-weight: bold;
+      font-size: 1.3rem;
+    }
+
+    /* Dark mode */
+    body.dark-mode {
+      background-color: #121212;
+      color: #e9ecef;
+    }
+    body.dark-mode .navbar {
+      background: #212529 !important;
+    }
+    body.dark-mode .card, body.dark-mode .toast {
+      background: #1e1e1e;
+      color: #e9ecef;
+    }
+
+    /* Toasts */
+    .toast {
+      box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+      border-radius: 0.5rem;
+    }
+
+    /* Sidebar-like message panel (optional) */
+    #messages {
+      background: #f7f7f7;
+      border-radius: 10px;
+      padding: 10px;
+      height: 100%;
+      overflow-y: auto;
+    }
+    body.dark-mode #messages {
+      background: #1f1f1f;
+    }
+
+    .user-item:hover {
+      background-color: #e9ecef;
+      cursor: pointer;
+    }
+    .user-item.active {
+      background-color: #0d6efd;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center" href="{{ url_for('home') }}">
+        🎓 <span class="ms-2">MyLMS</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMenu">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse justify-content-end" id="navbarMenu">
+        <ul class="navbar-nav align-items-lg-center">
+          {% if current_user.is_authenticated %}
+            <li class="nav-item me-2">
+              <a class="btn btn-outline-light btn-sm" href="{{ url_for('logout') }}">
+                <i class="bi bi-box-arrow-right"></i> Logout
+              </a>
+            </li>
+          {% else %}
+            <li class="nav-item me-2">
+              <a class="btn btn-light btn-sm" href="{{ url_for('select_portal') }}">
+                <i class="bi bi-box-arrow-in-right"></i> Login
+              </a>
+            </li>
+          {% endif %}
+          <!-- Dark Mode Toggle -->
+          <li class="nav-item">
+            <button id="darkToggle" class="btn btn-sm btn-secondary">
+              <i class="bi bi-moon-fill"></i>
+            </button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="container mt-1">
+    <!-- Toasts -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100;">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="toast align-items-center text-white bg-{{ 'danger' if category == 'error' else category }} border-0"
+               role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="4000">
+            <div class="d-flex">
+              <div class="toast-body">
+                {{ message }}
+              </div>
+              <button type="button" class="btn-close btn-close-white me-2 m-auto" 
+                      data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+          </div>
+        {% endfor %}
+      {% endwith %}
+    </div>
+
+    {% block content %}{% endblock %}
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Show all toasts on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('.toast').forEach(el => new bootstrap.Toast(el).show());
+
+      // Dark mode toggle
+      const toggle = document.getElementById('darkToggle');
+      const body = document.body;
+      const icon = toggle.querySelector('i');
+
+      // Load saved preference
+      if (localStorage.getItem('theme') === 'dark') {
+        body.classList.add('dark-mode');
+        icon.classList.replace('bi-moon-fill', 'bi-sun-fill');
+      }
+
+      toggle.addEventListener('click', () => {
+        body.classList.toggle('dark-mode');
+        if (body.classList.contains('dark-mode')) {
+          icon.classList.replace('bi-moon-fill', 'bi-sun-fill');
+          localStorage.setItem('theme', 'dark');
+        } else {
+          icon.classList.replace('bi-sun-fill', 'bi-moon-fill');
+          localStorage.setItem('theme', 'light');
+        }
+      });
+    });
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register("/static/sw.js").then(
+          function(registration) {
+        console.log("ServiceWorker registration successful with scope: ", registration.scope);
+          },
+          function(err) {
+            console.log("ServiceWorker registration failed: ", err);
+          }
+        );
+      });
+    }
+  </script>
+</body>
+</html>

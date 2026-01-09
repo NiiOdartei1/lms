@@ -1,0 +1,339 @@
+{# templates/chat.html - Enhanced for top-tier UX #}
+{% extends "base_chat.html" %}
+{% block title %}Chat — LMS{% endblock %}
+
+{% block extra_head %}
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+<link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+<!-- New: Emoji picker library for reactions -->
+<script src="https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@3.0.3/dist/index.min.js"></script>
+<!-- New: For animations and transitions -->
+<style>
+  /* Smooth transitions for theme switching */
+  * { transition: background-color 0.3s, color 0.3s; }
+  /* Dark mode styles */
+  body.dark-mode { background: #121212; color: #e0e0e0; }
+  body.dark-mode .chat-container { background: #1e1e1e; }
+  /* Typing indicator animation */
+  .typing-indicator { display: none; font-style: italic; color: #888; animation: blink 1.5s infinite; }
+  @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+  /* Online status dot */
+  .online-status { width: 8px; height: 8px; border-radius: 50%; background: #4CAF50; position: absolute; bottom: 0; right: 0; }
+  .offline-status { background: #ccc; }
+  /* Message reactions */
+  .message-reactions { margin-top: 5px; }
+  .reaction-btn { font-size: 14px; margin: 0 2px; cursor: pointer; }
+  /* File upload preview */
+  .file-preview { max-width: 200px; margin: 10px 0; border: 1px solid #ddd; padding: 5px; }
+  /* Mobile swipe hints */
+  @media (max-width: 768px) { }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="chat-container" id="chatContainer">
+  <!-- New: Theme toggle -->
+  <button id="themeToggle" class="icon-btn" title="Toggle Dark Mode" style="position: fixed; top: 10px; right: 10px; z-index: 1000;">🌙</button>
+
+  <!-- Backdrop for mobile left panel -->
+  <div id="leftPanelBackdrop" class="left-panel-backdrop" style="display: none;"></div>
+
+  <!-- LEFT PANEL / CONVERSATIONS -->
+  <aside class="left-panel" role="region" aria-label="Conversations sidebar">
+    <div class="left-strip" aria-hidden="false" title="Quick actions">
+      <div class="spacer"></div>
+      <button id="newDMBtn" class="icon-btn" title="New Direct Message">＋</button>
+      <button id="newGroupBtn" class="icon-btn" title="New Group Chat">👥</button>
+      <button id="refreshConvos" class="icon-btn" title="Refresh conversations">⟲</button>
+    </div>
+
+    <div class="left-main">
+      <header class="left-head">
+        <h5>Conversations</h5>
+        <input id="convoSearch" type="search" placeholder="Search conversations…" aria-label="Search conversations">
+      </header>
+
+      <!-- DM COMPOSER (overlay, hidden initially) -->
+      <div id="dmComposerWrapper" class="dm-composer-wrapper" style="display:none;">
+        <div id="dmStepZone" class="dm-step-zone">
+          <!-- Step 1 -->
+          <div id="dmStepRole">
+            <div class="dm-step-label">Step 1 · Select role</div>
+            <div class="dm-step-actions">
+              <button class="btn btn-sm btn-outline-secondary dm-role-btn" data-role="student">Student</button>
+              <button class="btn btn-sm btn-outline-secondary dm-role-btn" data-role="parent">Parent</button>
+              <button class="btn btn-sm btn-outline-secondary dm-role-btn" data-role="teacher">Teacher</button>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div id="dmStepClass" style="display:none;">
+            <div class="dm-step-label">Step 2 · Select class</div>
+            <select id="dmClassSelect">
+              <option value="">Choose class</option>
+              {% for cls in classes %}
+                <option value="{{ cls.id }}">{{ cls.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Step 3 -->
+          <div id="dmStepUsers" style="display:none;">
+            <div class="dm-step-label">Step 3 · Select person</div>
+            <div id="dmUserList"></div>
+          </div>
+
+          <div class="dm-composer-actions">
+            <button id="dm_cancel" class="btn btn-light btn-sm">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONVERSATION LIST -->
+      <div id="conversationList" class="conversation-list" aria-live="polite">
+        {% for convo in conversations %}
+          {% if convo.type == 'dm' %}
+            {% set target_pub_id = convo.target_public_id or convo.other_user_public_id %}
+          {% else %}
+            {% set target_pub_id = '' %}
+          {% endif %}
+          <div class="conv-item {{ 'group' if convo.type=='group' else '' }}"
+               data-conversation-id="{{ convo.id }}"
+               data-conversation-type="{{ convo.type }}"
+               data-target-public-id="{{ target_pub_id }}">
+            <div class="conv-title">
+              {% if convo.type == 'group' %}👥 {% endif %}{{ convo.name }}
+              <!-- New: Online status indicator -->
+              <span class="online-status {{ 'online' if convo.is_online else 'offline' }}"></span>
+            </div>
+            <!-- New: Typing indicator -->
+            <div class="typing-indicator" id="typing-{{ convo.id }}">Someone is typing...</div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </aside>
+
+  <section class="right-panel" role="region" aria-label="Messages area">
+    <header class="right-head" id="rightHead">
+      <button id="backToConversations" class="icon-btn" title="Back to Conversations" style="display: none;">←</button>
+      <div class="right-head-left">
+        <div id="rightAvatar" class="conv-avatar">DM</div>
+        <div>
+          <div class="title" id="rightTitle">Select conversation</div>
+          <div class="sub" id="rightSub">Open a conversation to start</div>
+          <div id="groupMeta"><span id="groupMemberCount">0 members</span></div>
+        </div>
+      </div>
+
+      <div id="generalMenuWrapper" class="right-head-menu">
+        <button id="menuBtn" title="Options">⋮</button>
+        <div id="menuDropdown">
+          <button data-action="search">🔎 Search</button>
+          <button data-action="add_members">👥 Add Members</button>
+          <button data-action="mute">🔕 Mute</button>
+          <button data-action="clear_chat">🗑 Clear Chat</button>
+          <!-- New: Message search -->
+          <button data-action="search_messages">🔍 Search Messages</button>
+        </div>
+      </div>
+
+      <div id="rightActions">
+        <button id="groupSettingsBtn">⚙ Group Settings</button>
+      </div>
+
+      <div id="callBtnWrapper">
+        <button id="startCallBtn" title="Start Call">📞 Call</button>
+      </div>
+    </header>
+
+    <!-- New: Message search bar -->
+    <div id="messageSearchBar" style="display:none; padding: 10px; background: #f0f0f0;">
+      <input id="messageSearchInput" type="search" placeholder="Search messages..." style="width: 100%;">
+      <button id="closeMessageSearch">✕</button>
+    </div>
+
+    <div id="messages" class="messages" aria-live="polite" tabindex="0">
+      <!-- Messages will be loaded here with lazy scrolling -->
+    </div>
+
+    <div class="input-area">
+      <div id="replyDiv" class="reply-div"></div>
+      <!-- New: File upload -->
+      <div id="filePreview" class="file-preview" style="display:none;"></div>
+      <div class="input-row">
+        <textarea id="messageInput" placeholder="Type your message — Enter to send, Shift+Enter for newline"></textarea>
+        <!-- New: Emoji picker button -->
+        <button id="emojiBtn" class="icon-btn" title="Add Emoji">😊</button>
+        <!-- New: File upload button -->
+        <button id="fileBtn" class="icon-btn" title="Attach File">📎</button>
+        <input type="file" id="fileInput" style="display:none;" multiple>
+        <button id="sendDirect" class="btn btn-primary btn-send">Send</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- HIDDEN INPUTS -->
+<input type="hidden" id="current-user-id" value="{{ current_user.public_id }}">
+<input type="hidden" id="current-user-role" value="{{ current_user.role }}">
+<input type="hidden" id="current-conversation-id" value="">
+<input type="hidden" id="current-conversation-type" value="">
+<input type="hidden" id="current-conversation-target" value="">
+
+<!-- AUDIO -->
+<audio id="ringtone" src="/static/sounds/ringtone.mp3" loop></audio>
+
+<!-- MESSAGE CONTEXT MENU -->
+<div id="msgContextMenu" style="position:absolute; display:none; z-index:9999;">
+  <button data-action="reply">↩️ Reply</button>
+  <button data-action="edit">✏️ Edit</button>
+  <button data-action="copy">📋 Copy</button>
+  <button data-action="forward">➡️ Forward</button>
+  <button data-action="delete">🗑 Delete</button>
+  <!-- New: Add reaction -->
+  <button data-action="react">👍 React</button>
+</div>
+
+<!-- CALL MODALS -->
+<div id="callModal" class="call-modal" style="display:none;">
+  <div class="call-backdrop"></div>
+
+  <!-- Incoming -->
+  <div id="incomingCallUI" class="call-panel" style="display:none;">
+    <img id="callerAvatar" class="call-avatar">
+    <h3 id="callerName">Incoming call</h3>
+    <div class="call-actions">
+      <button id="acceptCallBtn" class="btn btn-success">Accept</button>
+      <button id="rejectCallBtn" class="btn btn-danger">Reject</button>
+    </div>
+  </div>
+
+  <!-- Active / Ongoing -->
+  <div id="activeCallUI" class="call-panel" style="display:none;">
+    <img id="callerAvatar" class="call-avatar">
+    <h3 id="callerName">Call in progress</h3>
+    <div id="callVideoContainer"></div>
+    <div class="call-actions">
+      <button id="endCallBtn" class="btn btn-danger">End</button>
+      <button id="muteCallBtn" class="btn btn-secondary">Mute</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div id="msgActionModal" class="modal">
+  <div class="modal-backdrop"></div>
+  <div class="modal-content">
+    <h5 id="modalTitle">Action</h5>
+    <textarea id="modalInput" rows="3" placeholder="Type here..."></textarea>
+    <p id="modalConfirmText">Are you sure you want to delete this message?</p>
+    <div id="modalConvoList"></div>
+    <div class="modal-actions">
+      <button id="modalCancel" class="btn btn-light">Cancel</button>
+      <button id="modalConfirm" class="btn btn-primary">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="groupSettingsModal" class="msg-modal">
+  <div class="msg-modal-backdrop"></div>
+  <div class="msg-modal-content">
+    <h5>Group Settings</h5>
+    <label>Group name</label>
+    <input id="groupNameInput" type="text">
+    <div>
+      <strong>Members</strong>
+      <div id="groupMemberList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- New: Emoji picker container -->
+<!-- Removed: Emoji picker now positions automatically -->
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+<script src="{{ url_for('static', filename='js/call.js') }}"></script>
+<!-- New: Enhanced chat script for top-tier features -->
+<script>
+  // Theme toggle
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    document.body.classList.toggle('dark-mode');
+    localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+  });
+  // Load saved theme
+  if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode');
+
+  // Emoji picker
+  const emojiPicker = new EmojiButton({
+    position: 'top-end',
+    autoHide: true,
+    zIndex: 1000
+  });
+  emojiPicker.on('emoji', emoji => {
+    document.getElementById('messageInput').value += emoji;
+  });
+  document.getElementById('emojiBtn').addEventListener('click', (e) => {
+    emojiPicker.togglePicker(e.target);
+  });
+
+  // File upload
+  document.getElementById('fileBtn').addEventListener('click', () => {
+    document.getElementById('fileInput').click();
+  });
+  document.getElementById('fileInput').addEventListener('change', (e) => {
+    const files = e.target.files;
+    // Handle file preview and upload logic here (integrate with backend)
+    console.log('Files selected:', files);
+  });
+
+  // Message search
+  document.querySelector('[data-action="search_messages"]').addEventListener('click', () => {
+    document.getElementById('messageSearchBar').style.display = 'block';
+  });
+  document.getElementById('closeMessageSearch').addEventListener('click', () => {
+    document.getElementById('messageSearchBar').style.display = 'none';
+  });
+
+  // Toggle left panel button
+  const toggleBtn = document.getElementById('toggleLeftPanel');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      const leftPanel = document.querySelector('.left-panel');
+      const backdrop = document.getElementById('leftPanelBackdrop');
+      leftPanel.classList.toggle('open');
+      if (backdrop) backdrop.style.display = leftPanel.classList.contains('open') ? 'block' : 'none';
+    });
+  }
+
+  // Close on backdrop click
+  const leftPanelBackdrop = document.getElementById('leftPanelBackdrop');
+  if (leftPanelBackdrop) {
+    leftPanelBackdrop.addEventListener('click', () => {
+      const leftPanel = document.querySelector('.left-panel');
+      leftPanel.classList.remove('open');
+      leftPanelBackdrop.style.display = 'none';
+    });
+  }
+
+  // Mobile swipe for left panel
+  let startX;
+  document.addEventListener('touchstart', e => startX = e.touches[0].clientX);
+  document.addEventListener('touchend', e => {
+    const deltaX = startX - e.changedTouches[0].clientX;
+    const leftPanel = document.querySelector('.left-panel');
+    const backdrop = document.getElementById('leftPanelBackdrop');
+    if (deltaX > 50) {
+      leftPanel.classList.remove('open');
+      if (backdrop) backdrop.style.display = 'none';
+    } else if (deltaX < -50) {
+      leftPanel.classList.add('open');
+      if (backdrop) backdrop.style.display = 'block';
+    }
+  });
+</script>
+{% endblock %}
