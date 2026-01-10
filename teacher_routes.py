@@ -617,8 +617,8 @@ def manage_slots():
     now = datetime.now()
     expired_slots = AppointmentSlot.query.filter(
         AppointmentSlot.teacher_id == teacher.id,
-        db.func.datetime(AppointmentSlot.date, AppointmentSlot.end_time) < now,
-        AppointmentSlot.is_booked == False  # Optional: only delete unbooked
+        (cast(AppointmentSlot.date, DateTime) + cast(AppointmentSlot.end_time, DateTime)) < now,
+        AppointmentSlot.is_booked == False
     ).all()
 
     for slot in expired_slots:
@@ -962,6 +962,7 @@ def add_meeting():
         return redirect(url_for("teacher.meetings"))
 
     return render_template("teacher/meeting_form.html", form=form)
+
 
 
 
