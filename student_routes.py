@@ -1214,7 +1214,7 @@ def teacher_assessment():
     teachers = (
         db.session.query(
             User,
-            db.func.group_concat(Course.name, ', ').label('courses')
+            db.func.string_agg(Course.name, ', ').label('courses')
         )
         .join(TeacherProfile, TeacherProfile.user_id == User.user_id)
         .join(TeacherCourseAssignment, TeacherCourseAssignment.teacher_id == TeacherProfile.id)
@@ -1319,8 +1319,4 @@ def teacher_assessment():
         completed_count=completed_count,
         progress_percent=progress_percent
     )
-
-
-
-
-
+    
