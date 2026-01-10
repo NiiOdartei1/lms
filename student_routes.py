@@ -20,6 +20,7 @@ from reportlab.lib.utils import ImageReader
 import qrcode
 from PIL import Image, ImageDraw
 import textwrap
+from utils.extensions import db
 from utils.result_builder import ResultBuilder
 from utils.results_manager import ResultManager
 from utils.result_templates import get_template_path
@@ -1318,6 +1319,7 @@ def teacher_assessment():
         completed_count=completed_count,
         progress_percent=progress_percent
     )
+
 
 
 
