@@ -2,7 +2,7 @@ from flask import Blueprint, app, current_app, render_template, abort, request, 
 from flask_login import login_required, current_user, login_user
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
-from models import PasswordResetRequest, PasswordResetToken, StudentFeeBalance, db, User, Admin, StudentProfile, ParentProfile, Quiz, Question, Option, StudentQuizSubmission, Assignment, CourseMaterial, Course, CourseLimit, TimetableEntry, TeacherProfile, AcademicCalendar, AcademicYear, ClassFeeStructure, StudentFeeTransaction, ParentChildLink, Exam, ExamSubmission, ExamQuestion, ExamAttempt, ExamOption, ExamSet, ExamSetQuestion, SchoolClass
+from models import PasswordResetRequest, PasswordResetToken, StudentFeeBalance, User, Admin, StudentProfile, ParentProfile, Quiz, Question, Option, StudentQuizSubmission, Assignment, CourseMaterial, Course, CourseLimit, TimetableEntry, TeacherProfile, AcademicCalendar, AcademicYear, ClassFeeStructure, StudentFeeTransaction, ParentChildLink, Exam, ExamSubmission, ExamQuestion, ExamAttempt, ExamOption, ExamSet, ExamSetQuestion, SchoolClass
 from datetime import date, datetime, timedelta, time
 from sqlalchemy import extract, asc, desc
 from sqlalchemy.orm import joinedload
@@ -2852,3 +2852,4 @@ def toggle_assessment_period(pid):
 
     db.session.commit()
     return redirect(url_for('admin.assessment_periods'))
+
