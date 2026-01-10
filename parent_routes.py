@@ -3,36 +3,63 @@ from flask_login import login_required, current_user, login_user
 from forms import ChangePasswordForm, ParentLoginForm
 from models import User, ParentProfile, ParentChildLink, StudentProfile, Assignment, StudentQuizSubmission, Quiz, AttendanceRecord, StudentFeeBalance, StudentFeeTransaction , ClassFeeStructure , Notification, NotificationRecipient
 from datetime import datetime
-import os
+import os, logging
 from werkzeug.utils import secure_filename
 
-parent_bp = Blueprint('parent', __name__, url_prefix='/parent')
+logger = logging.getLogger('parent_login')
+logger.setLevel(logging.DEBUG)
+if not logger.handlers:
+    handler = logging.StreamHandler()  # logs to console
+    formatter = logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
 
 @parent_bp.route('/login', methods=['GET', 'POST'])
 def parent_login():
     form = ParentLoginForm()
     if form.validate_on_submit():
-        user_id = form.user_id.data.strip()
         username = form.username.data.strip()
+        user_id = form.user_id.data.strip()
         password = form.password.data.strip()
 
-        # First, try by user_id and role
-        user = User.query.filter_by(user_id=user_id, role='parent').first()
+        logger.debug(f"Parent login attempt: user_id='{user_id}', username='{username}'")
 
-        # If not found, try by username (case-insensitive)
-        if not user:
-            user = User.query.filter(User.username.ilike(username), User.role == 'parent').first()
+        try:
+            user = None
+            # First try lookup by user_id
+            if user_id:
+                user = User.query.filter_by(user_id=user_id, role='parent').first()
+                logger.debug(f"Lookup by user_id returned: {user}")
 
-        if user and user.check_password(password):
+            # If not found, try username (case-insensitive)
+            if not user and username:
+                user = User.query.filter(User.username.ilike(username), User.role == 'parent').first()
+                logger.debug(f"Lookup by username returned: {user}")
+
+            if not user:
+                logger.warning(f"No parent user found for user_id='{user_id}', username='{username}'")
+                flash("Invalid parent credentials.", "danger")
+                return render_template('parent/login.html', form=form)
+
+            # Check password
+            if not user.check_password(password):
+                logger.warning(f"Password check failed for user_id='{user.user_id}', username='{user.username}'")
+                flash("Invalid parent credentials.", "danger")
+                return render_template('parent/login.html', form=form)
+
+            # Successful login
             login_user(user)
+            logger.info(f"Parent '{user.first_name} {user.last_name}' logged in successfully (user_id={user.user_id})")
             flash(f"Welcome back, {user.first_name}!", "success")
             return redirect(url_for('parent.dashboard'))
 
-        flash("Invalid parent credentials. Make sure you use your assigned username and ID.", "danger")
+        except Exception as e:
+            logger.error(f"Exception during parent login: {e}", exc_info=True)
+            flash(f"An error occurred during login. Check logs for details.", "danger")
 
     return render_template('parent/login.html', form=form)
-
+    
 # ------------------------
 # Parent Dashboard
 # ------------------------
@@ -523,5 +550,6 @@ def download_receipt(txn_id):
         return redirect(url_for('student.student_fees'))
 
     return send_file(filepath, as_attachment=True)
+
 
 
