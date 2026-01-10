@@ -72,16 +72,15 @@ def dashboard():
         abort(403)
 
     parent_profile = ParentProfile.query.filter_by(user_id=current_user.user_id).first()
+
     children = []
     if parent_profile:
-        # more robust join: return (StudentProfile, User) tuples
-        children = (
-            db.session.query(StudentProfile, User)
-            .join(ParentChildLink, ParentChildLink.student_id == StudentProfile.id)
-            .join(User, StudentProfile.user_id == User.user_id)
-            .filter(ParentChildLink.parent_id == parent_profile.id)
-            .all()
-        )
+        children_links = ParentChildLink.query.filter_by(parent_id=parent_profile.id).all()
+        for link in children_links:
+            student = StudentProfile.query.filter_by(id=link.student_id).first()
+            user = User.query.filter_by(user_id=student.user_id).first() if student else None
+            if student and user:
+                children.append((student, user))
 
     total_children = len(children)
 
@@ -552,6 +551,7 @@ def download_receipt(txn_id):
         return redirect(url_for('student.student_fees'))
 
     return send_file(filepath, as_attachment=True)
+
 
 
 
