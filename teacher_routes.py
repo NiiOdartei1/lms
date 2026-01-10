@@ -5,7 +5,7 @@ All database queries happen inside route handlers, not at import time.
 from flask import Blueprint, render_template, abort, flash, redirect, url_for, request, jsonify, current_app
 from flask_login import login_required, current_user, login_user
 from models import (
-    CourseAssessmentScheme, Meeting, QuizAttempt, db, TeacherProfile, Course,
+    CourseAssessmentScheme, Meeting, QuizAttempt, TeacherProfile, Course,
     StudentCourseRegistration, TeacherCourseAssignment, AttendanceRecord, User,
     StudentProfile, AcademicCalendar, AcademicYear, AppointmentBooking,
     AppointmentSlot, Assignment, SchoolClass, Quiz, StudentQuizSubmission,
@@ -961,4 +961,5 @@ def add_meeting():
         return redirect(url_for("teacher.meetings"))
 
     return render_template("teacher/meeting_form.html", form=form)
+
 
