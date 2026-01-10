@@ -17,7 +17,7 @@ class Admin(db.Model, UserMixin):
     public_id = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
     admin_id = db.Column(db.String(50), unique=True, nullable=False)
     username = db.Column(db.String(100), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
+    password_hash = db.Column(db.String(512), nullable=False)
     last_seen = db.Column(db.DateTime, nullable=True)
 
     def set_password(self, password):
@@ -998,3 +998,4 @@ class TeacherAssessmentAnswer(db.Model):
 
     assessment = db.relationship('TeacherAssessment', backref='answers')
     question = db.relationship('TeacherAssessmentQuestion')
+
