@@ -1,7 +1,7 @@
 from flask import Blueprint, current_app, render_template, abort, redirect, url_for, flash, jsonify, session, send_from_directory, send_file
 from flask import request
 from flask_login import login_required, current_user, login_user
-from models import db, User, Quiz, StudentQuizSubmission, Question, StudentProfile, QuizAttempt, Assignment, CourseMaterial, StudentCourseRegistration, Course,  TimetableEntry, AcademicCalendar, AcademicYear, AppointmentSlot, AppointmentBooking, StudentFeeBalance, ClassFeeStructure, StudentFeeTransaction, Exam, ExamSubmission, ExamQuestion, ExamAttempt, ExamSet, ExamSetQuestion, Notification, NotificationRecipient
+from models import User, Quiz, StudentQuizSubmission, Question, StudentProfile, QuizAttempt, Assignment, CourseMaterial, StudentCourseRegistration, Course,  TimetableEntry, AcademicCalendar, AcademicYear, AppointmentSlot, AppointmentBooking, StudentFeeBalance, ClassFeeStructure, StudentFeeTransaction, Exam, ExamSubmission, ExamQuestion, ExamAttempt, ExamSet, ExamSetQuestion, Notification, NotificationRecipient
 from datetime import date, datetime, timedelta, time
 from sqlalchemy.orm import joinedload
 from forms import ExamLoginForm   # adjust path depending on your project structure
@@ -454,3 +454,4 @@ def exam_result(submission_id):
         set_name=set_name,
         pass_percent=pass_percent,
     )
+
