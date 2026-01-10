@@ -4,7 +4,7 @@ from flask import request
 from flask_login import login_required, current_user, login_user, logout_user
 from sqlalchemy import func
 from werkzeug.utils import safe_join, secure_filename
-from models import db, User, Quiz, StudentQuizSubmission, Question, StudentProfile, QuizAttempt, Assignment, CourseMaterial, StudentCourseRegistration, Course,  TimetableEntry, AcademicCalendar, AcademicYear, AppointmentSlot, AppointmentBooking, StudentFeeBalance, ClassFeeStructure, StudentFeeTransaction, Exam, ExamSubmission, ExamQuestion, ExamAttempt, ExamSet, ExamSetQuestion, Meeting, StudentAnswer, Recording, PasswordResetRequest, PasswordResetToken, AssignmentSubmission
+from models import User, Quiz, StudentQuizSubmission, Question, StudentProfile, QuizAttempt, Assignment, CourseMaterial, StudentCourseRegistration, Course,  TimetableEntry, AcademicCalendar, AcademicYear, AppointmentSlot, AppointmentBooking, StudentFeeBalance, ClassFeeStructure, StudentFeeTransaction, Exam, ExamSubmission, ExamQuestion, ExamAttempt, ExamSet, ExamSetQuestion, Meeting, StudentAnswer, Recording, PasswordResetRequest, PasswordResetToken, AssignmentSubmission
 from datetime import date, datetime, timedelta, time
 from forms import StudentLoginForm, ForgotPasswordForm, ResetPasswordForm
 from io import BytesIO
@@ -1153,3 +1153,4 @@ def calculator():
     if getattr(current_user, "role", None) != "student":
         abort(403)
     return render_template('vclass/calculator.html')
+
