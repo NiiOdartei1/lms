@@ -6,7 +6,7 @@ from datetime import datetime
 import os, logging
 from werkzeug.utils import secure_filename
 
-parent_bp = Blueprint("teacher", __name__, url_prefix="/parent")
+parent_bp = Blueprint("parent", __name__, url_prefix="/parent")
 
 logger = logging.getLogger('parent_login')
 logger.setLevel(logging.DEBUG)
@@ -552,6 +552,7 @@ def download_receipt(txn_id):
         return redirect(url_for('student.student_fees'))
 
     return send_file(filepath, as_attachment=True)
+
 
 
 
