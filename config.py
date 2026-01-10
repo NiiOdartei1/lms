@@ -18,9 +18,10 @@ class Config:
     # Sessions
     SESSION_TYPE = 'filesystem'
     SESSION_PERMANENT = False
-    SESSION_USE_SIGNER = True
+    SESSION_USE_SIGNER = False
 
     # External services
     ZOOM_ACCOUNT_ID = os.environ.get('ZOOM_ACCOUNT_ID')
     ZOOM_CLIENT_ID = os.environ.get('ZOOM_CLIENT_ID')
     ZOOM_CLIENT_SECRET = os.environ.get('ZOOM_CLIENT_SECRET')
+
