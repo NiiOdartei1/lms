@@ -95,6 +95,21 @@ def create_app():
         app.register_blueprint(chat_bp, url_prefix="/chat")
         app.register_blueprint(auth_bp)
 
+        # ------------------------------------------------------------
+        # CREATE SUPERADMIN ONCE (PRODUCTION SAFE)
+        # ------------------------------------------------------------
+        from models import Admin
+        super_admin = Admin.query.filter_by(username="SuperAdmin").first()
+        if not super_admin:
+            admin = Admin(
+                username="SuperAdmin",
+                admin_id="ADM001"
+            )
+            admin.set_password("Password123")  # Change this immediately after login
+            db.session.add(admin)
+            db.session.commit()
+            logger.info("SuperAdmin created successfully.")
+
     # ------------------------------------------------------------
     # Routes
     # ------------------------------------------------------------
@@ -138,3 +153,4 @@ def create_app():
 # Module-level app for Gunicorn
 # ---------------------------------------------------------------------
 app = create_app()
+
