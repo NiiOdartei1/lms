@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, abort, flash, redirect, url_for, request, send_file, current_app, jsonify
 from flask_login import login_required, current_user, login_user
 from forms import ChangePasswordForm, ParentLoginForm
-from models import db, User, ParentProfile, ParentChildLink, StudentProfile, Assignment, StudentQuizSubmission, Quiz, AttendanceRecord, StudentFeeBalance, StudentFeeTransaction , ClassFeeStructure , Notification, NotificationRecipient
+from models import User, ParentProfile, ParentChildLink, StudentProfile, Assignment, StudentQuizSubmission, Quiz, AttendanceRecord, StudentFeeBalance, StudentFeeTransaction , ClassFeeStructure , Notification, NotificationRecipient
 from datetime import datetime
 import os
 from werkzeug.utils import secure_filename
@@ -516,3 +516,4 @@ def download_receipt(txn_id):
         return redirect(url_for('student.student_fees'))
 
     return send_file(filepath, as_attachment=True)
+
