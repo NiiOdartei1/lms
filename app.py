@@ -1,9 +1,38 @@
+""" LMS Flask Application — Production Safe Key Principles
+- No database access at import time
+- No db.create_all() in production
+- No before_request hacks
+- App factory pattern (Gunicorn-safe)
+"""
+
+import os
+import logging
+from datetime import datetime
+
+from flask import Flask, render_template, redirect, url_for, abort, flash, send_from_directory
+from flask_login import LoginManager, login_required, logout_user
+from flask_migrate import Migrate
+from flask_wtf.csrf import CSRFProtect
+from flask_session import Session
+
+from config import Config
+from utils.extensions import db, mail, socketio
+
+# ---------------------------------------------------------------------
+# LOGGING
+# ---------------------------------------------------------------------
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------
+# APPLICATION FACTORY
+# ---------------------------------------------------------------------
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
     # ------------------------------------------------------------
-    # Instance folders
+    # Instance folder
     # ------------------------------------------------------------
     os.makedirs(app.instance_path, exist_ok=True)
 
@@ -11,15 +40,16 @@ def create_app():
     # Create all upload folders automatically
     # ------------------------------------------------------------
     folders = [
-        app.config["UPLOAD_FOLDER"],
-        app.config["MATERIALS_FOLDER"],
-        app.config["PAYMENT_PROOF_FOLDER"],
-        app.config["RECEIPT_FOLDER"],
-        app.config["PROFILE_PICS_FOLDER"],
+        app.config.get("UPLOAD_FOLDER"),
+        app.config.get("MATERIALS_FOLDER"),
+        app.config.get("PAYMENT_PROOF_FOLDER"),
+        app.config.get("RECEIPT_FOLDER"),
+        app.config.get("PROFILE_PICS_FOLDER"),
     ]
     for folder in folders:
-        os.makedirs(folder, exist_ok=True)
-        logger.info(f"Folder ready: {folder}")
+        if folder:
+            os.makedirs(folder, exist_ok=True)
+            logger.info(f"Folder ready: {folder}")
 
     # ------------------------------------------------------------
     # Extensions
@@ -29,6 +59,7 @@ def create_app():
     CSRFProtect(app)
     Session(app)
     socketio.init_app(app, async_mode="threading", manage_session=False)
+    Migrate(app, db)
 
     login_manager = LoginManager()
     login_manager.login_view = "select_portal"
@@ -47,7 +78,6 @@ def create_app():
     @login_manager.user_loader
     def load_user(user_id):
         from models import Admin, User
-
         if user_id.startswith("admin:"):
             return Admin.query.filter_by(public_id=user_id[6:]).first()
         if user_id.startswith("user:"):
@@ -77,31 +107,22 @@ def create_app():
         app.register_blueprint(auth_bp)
 
         # ------------------------------------------------------------
-        # CREATE DATABASE TABLES IF THEY DON'T EXIST
+        # CREATE SUPERADMIN (PRODUCTION SAFE)
         # ------------------------------------------------------------
         try:
-            db.create_all()
-            logger.info("Database tables created successfully.")
-        except Exception as e:
-            logger.error(f"Failed to create tables: {e}")
-
-        # ------------------------------------------------------------
-        # CREATE SUPERADMIN IF NONE EXISTS
-        # ------------------------------------------------------------
-        from models import Admin
-        try:
+            from models import Admin
             super_admin = Admin.query.filter_by(username="SuperAdmin").first()
             if not super_admin:
                 admin = Admin(
                     username="SuperAdmin",
                     admin_id="ADM001"
                 )
-                admin.set_password("Password123")  # Change immediately after login
+                admin.set_password("Password123")  # Change after first login
                 db.session.add(admin)
                 db.session.commit()
                 logger.info("SuperAdmin created successfully.")
         except Exception as e:
-            logger.error(f"Failed to create SuperAdmin: {e}")
+            logger.error(f"SuperAdmin creation failed: {e}")
 
     # ------------------------------------------------------------
     # Routes
