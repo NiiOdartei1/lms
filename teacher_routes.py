@@ -607,19 +607,16 @@ def calendar():
 
     return render_template('teacher/calendar.html', cal_events=cal_events)
 
-# Appointments Management
 @teacher_bp.route('/appointment-slots', methods=['GET', 'POST'])
 @login_required
 def manage_slots():
     teacher = TeacherProfile.query.filter_by(user_id=current_user.user_id).first_or_404()
 
-    # Delete expired slots (where end datetime is in the past)
     now = datetime.now()
-    expired_slots = AppointmentSlot.query.filter(
-        AppointmentSlot.teacher_id == teacher.id,
-        (cast(AppointmentSlot.date, DateTime) + cast(AppointmentSlot.end_time, DateTime)) < now,
-        AppointmentSlot.is_booked == False
-    ).all()
+
+    # Fetch unbooked slots and delete expired ones
+    all_slots = AppointmentSlot.query.filter_by(teacher_id=teacher.id, is_booked=False).all()
+    expired_slots = [s for s in all_slots if datetime.combine(s.date, s.end_time) < now]
 
     for slot in expired_slots:
         db.session.delete(slot)
@@ -642,7 +639,7 @@ def manage_slots():
 
     slots = AppointmentSlot.query.filter_by(teacher_id=teacher.id).all()
     return render_template('teacher/appointment_slots.html', slots=slots)
-
+    
 @teacher_bp.route('/appointment-requests')
 @login_required
 def appointment_requests():
@@ -962,6 +959,7 @@ def add_meeting():
         return redirect(url_for("teacher.meetings"))
 
     return render_template("teacher/meeting_form.html", form=form)
+
 
 
 
