@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
 from flask_socketio import emit, join_room
-from utils.extensions import db, socketio
+from utils.extensions import socketio
 from models import Admin, Conversation, ConversationParticipant, Message, MessageReaction, SchoolClass, User, ParentChildLink
 from datetime import datetime
 import json
