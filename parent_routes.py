@@ -13,16 +13,23 @@ parent_bp = Blueprint('parent', __name__, url_prefix='/parent')
 def parent_login():
     form = ParentLoginForm()
     if form.validate_on_submit():
-        username = form.username.data.strip()
         user_id = form.user_id.data.strip()
+        username = form.username.data.strip()
         password = form.password.data.strip()
 
+        # First, try by user_id and role
         user = User.query.filter_by(user_id=user_id, role='parent').first()
-        if user and user.username.lower() == username.lower() and user.check_password(password):
+
+        # If not found, try by username (case-insensitive)
+        if not user:
+            user = User.query.filter(User.username.ilike(username), User.role == 'parent').first()
+
+        if user and user.check_password(password):
             login_user(user)
             flash(f"Welcome back, {user.first_name}!", "success")
             return redirect(url_for('parent.dashboard'))
-        flash("Invalid parent credentials.", "danger")
+
+        flash("Invalid parent credentials. Make sure you use your assigned username and ID.", "danger")
 
     return render_template('parent/login.html', form=form)
 
@@ -516,4 +523,5 @@ def download_receipt(txn_id):
         return redirect(url_for('student.student_fees'))
 
     return send_file(filepath, as_attachment=True)
+
 
