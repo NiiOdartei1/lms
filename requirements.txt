@@ -38,12 +38,9 @@ sqlalchemy==2.0.45
 tomli==2.3.0
 typing-extensions==4.15.0
 urllib3==2.6.3
-werkzeug==3.1.4
+werkzeug==2.3.7
 wsproto==1.2.0
 wtforms==3.2.1
 zipp==3.23.0
 gunicorn==21.2.0
 eventlet==0.33.3
-
-
-
