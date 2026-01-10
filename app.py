@@ -1,7 +1,6 @@
 """ LMS Flask Application — Production Safe Key Principles
-- No database access at import time
-- No db.create_all() in production
-- No before_request hacks
+- Create tables first, then create admin
+- No DB access at import time
 - App factory pattern (Gunicorn-safe)
 """
 
@@ -107,22 +106,29 @@ def create_app():
         app.register_blueprint(auth_bp)
 
         # ------------------------------------------------------------
-        # CREATE SUPERADMIN (PRODUCTION SAFE)
+        # CREATE TABLES FIRST (DEV / FIRST-TIME SETUP ONLY)
         # ------------------------------------------------------------
         try:
             from models import Admin
+            # Only create tables if they don't exist (safe fallback)
+            db.create_all()
+            logger.info("All tables created (or already exist).")
+
+            # --------------------------------------------------------
+            # CREATE SUPERADMIN (PRODUCTION SAFE)
+            # --------------------------------------------------------
             super_admin = Admin.query.filter_by(username="SuperAdmin").first()
             if not super_admin:
                 admin = Admin(
                     username="SuperAdmin",
                     admin_id="ADM001"
                 )
-                admin.set_password("Password123")  # Change after first login
+                admin.set_password("Password123")  # CHANGE after first login
                 db.session.add(admin)
                 db.session.commit()
                 logger.info("SuperAdmin created successfully.")
         except Exception as e:
-            logger.error(f"SuperAdmin creation failed: {e}")
+            logger.error(f"Error creating tables or SuperAdmin: {e}")
 
     # ------------------------------------------------------------
     # Routes
