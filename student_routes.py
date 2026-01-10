@@ -88,9 +88,14 @@ def register_courses():
 
     class_name = profile.current_class
 
-    # Get all distinct academic years
-    db = current_app.extensions['sqlalchemy'].db  # grab db from app context
-    years = db.session.query(Course.academic_year).distinct().order_by(Course.academic_year).all()
+    # ✅ FIXED: use db directly
+    years = (
+        db.session.query(Course.academic_year)
+        .distinct()
+        .order_by(Course.academic_year)
+        .all()
+    )
+
     if not years:
         flash("No academic years available yet. Contact admin.", "warning")
         return redirect(url_for("student.dashboard"))
@@ -99,13 +104,12 @@ def register_courses():
 
     # Determine current step
     step = request.form.get("step")
-    selected_sem = request.form.get("semester") or form.semester.data or 'First'
+    selected_sem = request.form.get("semester") or form.semester.data or "First"
     selected_year = request.form.get("academic_year") or form.academic_year.data or years[-1][0]
 
     form.semester.data = selected_sem
     form.academic_year.data = selected_year
 
-    # Fetch relevant courses
     courses = Course.query.filter_by(
         assigned_class=class_name,
         semester=selected_sem,
@@ -114,6 +118,7 @@ def register_courses():
 
     mandatory_courses = [c for c in courses if c.is_mandatory]
     optional_courses = [c for c in courses if not c.is_mandatory]
+
     form.courses.choices = [(c.id, f"{c.code} - {c.name}") for c in optional_courses]
 
     registered = StudentCourseRegistration.query.filter_by(
@@ -121,18 +126,19 @@ def register_courses():
         semester=selected_sem,
         academic_year=selected_year
     ).all()
-    form.courses.data = [r.course_id for r in registered if not r.course.is_mandatory]
 
-    # === Block registration if deadline passed ===
+    form.courses.data = [
+        r.course_id for r in registered if not r.course.is_mandatory
+    ]
+
     deadline_passed = registration_deadline and now > registration_deadline
 
-    # Handle final registration submission
     if request.method == "POST" and step == "register_courses" and form.validate_on_submit():
         if deadline_passed:
-            flash("Registration deadline has passed. You cannot register or update courses.", "danger")
+            flash("Registration deadline has passed.", "danger")
             return redirect(url_for("student.register_courses"))
 
-        selected_ids = set(map(int, request.form.getlist('courses[]')))
+        selected_ids = set(map(int, request.form.getlist("courses[]")))
         mandatory_ids = {c.id for c in mandatory_courses}
         final_course_ids = selected_ids | mandatory_ids
 
@@ -141,15 +147,17 @@ def register_courses():
             semester=selected_sem,
             academic_year=selected_year
         ).delete()
-        db.session.commit()
 
         for cid in final_course_ids:
-            db.session.add(StudentCourseRegistration(
-                student_id=student.id,
-                course_id=cid,
-                semester=selected_sem,
-                academic_year=selected_year
-            ))
+            db.session.add(
+                StudentCourseRegistration(
+                    student_id=student.id,
+                    course_id=cid,
+                    semester=selected_sem,
+                    academic_year=selected_year
+                )
+            )
+
         db.session.commit()
 
         flash("Courses registered successfully!", "success")
@@ -158,7 +166,7 @@ def register_courses():
     show_courses = (step == "select_semester") or len(registered) > 0
 
     return render_template(
-        'student/courses.html',
+        "student/courses.html",
         form=form,
         mandatory_courses=mandatory_courses,
         optional_courses=optional_courses,
@@ -167,7 +175,7 @@ def register_courses():
         registration_deadline=registration_deadline,
         deadline_passed=deadline_passed
     )
-
+    
 @student_bp.route('/courses/reset', methods=['POST'])
 @login_required
 def reset_registration():
@@ -1312,5 +1320,6 @@ def teacher_assessment():
         completed_count=completed_count,
         progress_percent=progress_percent
     )
+
 
 
