@@ -1,35 +1,3 @@
-"""
-LMS Flask Application — Production Safe
-
-Key principles:
-- No database access at import time
-- No db.create_all() in production
-- No before_request initialization hacks
-- App factory pattern (Gunicorn-safe)
-"""
-
-import os
-import logging
-from datetime import datetime
-
-from flask import Flask, render_template, redirect, url_for, abort, flash, send_from_directory
-from flask_login import LoginManager, login_required, logout_user
-from flask_migrate import Migrate
-from flask_wtf.csrf import CSRFProtect
-from flask_session import Session
-
-from config import Config
-from utils.extensions import db, mail, socketio
-
-# ---------------------------------------------------------------------
-# LOGGING
-# ---------------------------------------------------------------------
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------
-# APPLICATION FACTORY
-# ---------------------------------------------------------------------
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -40,6 +8,20 @@ def create_app():
     os.makedirs(app.instance_path, exist_ok=True)
 
     # ------------------------------------------------------------
+    # Create all upload folders automatically
+    # ------------------------------------------------------------
+    folders = [
+        app.config["UPLOAD_FOLDER"],
+        app.config["MATERIALS_FOLDER"],
+        app.config["PAYMENT_PROOF_FOLDER"],
+        app.config["RECEIPT_FOLDER"],
+        app.config["PROFILE_PICS_FOLDER"],
+    ]
+    for folder in folders:
+        os.makedirs(folder, exist_ok=True)
+        logger.info(f"Folder ready: {folder}")
+
+    # ------------------------------------------------------------
     # Extensions
     # ------------------------------------------------------------
     db.init_app(app)
@@ -47,7 +29,6 @@ def create_app():
     CSRFProtect(app)
     Session(app)
     socketio.init_app(app, async_mode="threading", manage_session=False)
-    Migrate(app, db)
 
     login_manager = LoginManager()
     login_manager.login_view = "select_portal"
@@ -74,7 +55,7 @@ def create_app():
         return None
 
     # ------------------------------------------------------------
-    # Blueprints (imported INSIDE app context)
+    # Blueprints
     # ------------------------------------------------------------
     with app.app_context():
         from admin_routes import admin_bp
@@ -96,19 +77,31 @@ def create_app():
         app.register_blueprint(auth_bp)
 
         # ------------------------------------------------------------
-        # CREATE SUPERADMIN ONCE (PRODUCTION SAFE)
+        # CREATE DATABASE TABLES IF THEY DON'T EXIST
+        # ------------------------------------------------------------
+        try:
+            db.create_all()
+            logger.info("Database tables created successfully.")
+        except Exception as e:
+            logger.error(f"Failed to create tables: {e}")
+
+        # ------------------------------------------------------------
+        # CREATE SUPERADMIN IF NONE EXISTS
         # ------------------------------------------------------------
         from models import Admin
-        super_admin = Admin.query.filter_by(username="SuperAdmin").first()
-        if not super_admin:
-            admin = Admin(
-                username="SuperAdmin",
-                admin_id="ADM001"
-            )
-            admin.set_password("Password123")  # Change this immediately after login
-            db.session.add(admin)
-            db.session.commit()
-            logger.info("SuperAdmin created successfully.")
+        try:
+            super_admin = Admin.query.filter_by(username="SuperAdmin").first()
+            if not super_admin:
+                admin = Admin(
+                    username="SuperAdmin",
+                    admin_id="ADM001"
+                )
+                admin.set_password("Password123")  # Change immediately after login
+                db.session.add(admin)
+                db.session.commit()
+                logger.info("SuperAdmin created successfully.")
+        except Exception as e:
+            logger.error(f"Failed to create SuperAdmin: {e}")
 
     # ------------------------------------------------------------
     # Routes
@@ -153,4 +146,3 @@ def create_app():
 # Module-level app for Gunicorn
 # ---------------------------------------------------------------------
 app = create_app()
-
