@@ -17,11 +17,13 @@ class Config:
 
     # Sessions
     SESSION_TYPE = 'filesystem'
+    SESSION_FILE_DIR = os.path.join(os.getcwd(), 'flask_session')  # add this
     SESSION_PERMANENT = False
-    SESSION_USE_SIGNER = False
+    SESSION_USE_SIGNER = True  # optional but recommended
 
     # External services
     ZOOM_ACCOUNT_ID = os.environ.get('ZOOM_ACCOUNT_ID')
     ZOOM_CLIENT_ID = os.environ.get('ZOOM_CLIENT_ID')
     ZOOM_CLIENT_SECRET = os.environ.get('ZOOM_CLIENT_SECRET')
+
 
