@@ -17,6 +17,7 @@ from datetime import datetime, timedelta, date
 from sqlalchemy import and_, desc, func
 from sqlalchemy.orm import joinedload
 from collections import defaultdict
+from utils.extensions import db
 from utils.notifications import create_assignment_notification
 import os, uuid
 
@@ -961,5 +962,6 @@ def add_meeting():
         return redirect(url_for("teacher.meetings"))
 
     return render_template("teacher/meeting_form.html", form=form)
+
 
 
