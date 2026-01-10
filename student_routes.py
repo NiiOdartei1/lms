@@ -4,7 +4,7 @@ from flask import request
 from flask_login import login_required, current_user, login_user
 from sqlalchemy import func
 from werkzeug.utils import safe_join, secure_filename
-from models import ExamTimetableEntry, TeacherAssessment, TeacherAssessmentAnswer, TeacherAssessmentPeriod, TeacherAssessmentQuestion, TeacherCourseAssignment, TeacherProfile, db, User, Quiz, StudentQuizSubmission, Question, StudentProfile, QuizAttempt, Assignment, CourseMaterial, StudentCourseRegistration, Course,  TimetableEntry, AcademicCalendar, AcademicYear, AppointmentSlot, AppointmentBooking, StudentFeeBalance, ClassFeeStructure, StudentFeeTransaction, Exam, ExamSubmission, ExamQuestion, ExamAttempt, ExamSet, ExamSetQuestion, Notification, NotificationRecipient, Meeting, StudentAnswer
+from models import ExamTimetableEntry, TeacherAssessment, TeacherAssessmentAnswer, TeacherAssessmentPeriod, TeacherAssessmentQuestion, TeacherCourseAssignment, TeacherProfile, User, Quiz, StudentQuizSubmission, Question, StudentProfile, QuizAttempt, Assignment, CourseMaterial, StudentCourseRegistration, Course,  TimetableEntry, AcademicCalendar, AcademicYear, AppointmentSlot, AppointmentBooking, StudentFeeBalance, ClassFeeStructure, StudentFeeTransaction, Exam, ExamSubmission, ExamQuestion, ExamAttempt, ExamSet, ExamSetQuestion, Notification, NotificationRecipient, Meeting, StudentAnswer
 from datetime import datetime
 from forms import CourseRegistrationForm, ChangePasswordForm, StudentLoginForm
 from io import BytesIO
@@ -1311,3 +1311,4 @@ def teacher_assessment():
         completed_count=completed_count,
         progress_percent=progress_percent
     )
+
