@@ -212,15 +212,17 @@ def chat_home():
 # -------------------------
 # Routes for classes
 # -------------------------
+from utils.helpers import get_class_choices
+
 @chat_bp.route('/classes')
 @login_required
 def get_classes():
-    """
-    Returns all school classes.
-    Output format: [{ "id": 1, "name": "Primary 1" }, ...]
-    """
     classes = SchoolClass.query.order_by(SchoolClass.name).all()
-    result = [{"id": c.id, "name": c.name} for c in classes]
+    if classes:
+        result = [{"id": c.id, "name": c.name} for c in classes]
+    else:
+        choices = get_class_choices()
+        result = [{"id": i+1, "name": name} for i, (name, _) in enumerate(choices)]
     return jsonify(result), 200
 
 @chat_bp.route('/conversations', methods=['GET'])
