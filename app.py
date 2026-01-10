@@ -34,6 +34,7 @@ def create_app():
     # Instance folder
     # ------------------------------------------------------------
     os.makedirs(app.instance_path, exist_ok=True)
+    os.makedirs(os.path.join(os.getcwd(), 'flask_session'), exist_ok=True)
 
     # ------------------------------------------------------------
     # Create all upload folders automatically
@@ -173,3 +174,4 @@ def create_app():
 # Module-level app for Gunicorn
 # ---------------------------------------------------------------------
 app = create_app()
+
