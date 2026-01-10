@@ -89,6 +89,7 @@ def register_courses():
     class_name = profile.current_class
 
     # Get all distinct academic years
+    db = current_app.extensions['sqlalchemy'].db  # grab db from app context
     years = db.session.query(Course.academic_year).distinct().order_by(Course.academic_year).all()
     if not years:
         flash("No academic years available yet. Contact admin.", "warning")
@@ -1311,4 +1312,5 @@ def teacher_assessment():
         completed_count=completed_count,
         progress_percent=progress_percent
     )
+
 
