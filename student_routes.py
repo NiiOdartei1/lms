@@ -5,7 +5,7 @@ from flask_login import login_required, current_user, login_user
 from sqlalchemy import func
 from werkzeug.utils import safe_join, secure_filename
 from models import ExamTimetableEntry, TeacherAssessment, TeacherAssessmentAnswer, TeacherAssessmentPeriod, TeacherAssessmentQuestion, TeacherCourseAssignment, TeacherProfile, User, Quiz, StudentQuizSubmission, Question, StudentProfile, QuizAttempt, Assignment, CourseMaterial, StudentCourseRegistration, Course,  TimetableEntry, AcademicCalendar, AcademicYear, AppointmentSlot, AppointmentBooking, StudentFeeBalance, ClassFeeStructure, StudentFeeTransaction, Exam, ExamSubmission, ExamQuestion, ExamAttempt, ExamSet, ExamSetQuestion, Notification, NotificationRecipient, Meeting, StudentAnswer
-from datetime import datetime
+from datetime import datetime, timedelta
 from forms import CourseRegistrationForm, ChangePasswordForm, StudentLoginForm
 from io import BytesIO
 from reportlab.lib.pagesizes import A4, landscape, letter
@@ -69,8 +69,6 @@ def inject_notification_count():
             unread_count = NotificationRecipient.query.filter_by(is_read=False).count()
 
     return dict(unread_count=unread_count)
-
-from datetime import timedelta
 
 
 @student_bp.route('/courses', methods=['GET', 'POST'])
@@ -1320,6 +1318,7 @@ def teacher_assessment():
         completed_count=completed_count,
         progress_percent=progress_percent
     )
+
 
 
 
