@@ -349,7 +349,7 @@ def mark_read():
 
 @chat_bp.route("/chat/users")
 @login_required
-def get_users():
+def get_chat_users():
     role = request.args.get("role")
     class_id = request.args.get("class_id", type=int)
 
