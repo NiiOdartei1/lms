@@ -347,35 +347,25 @@ def mark_read():
         db.session.commit()
     return jsonify({"success": True}), 200
 
-@chat_bp.route('/users')
+@app.route("/chat/users")
 @login_required
 def get_users():
-    role = request.args.get('role')
-    class_id = request.args.get('class_id')
+    role = request.args.get("role")
+    class_id = request.args.get("class_id", type=int)
 
-    if not role:
-        return jsonify([])
+    query = User.query
+    if role:
+        query = query.filter_by(role=role.lower())  # ensure case matches
+    if class_id:
+        query = query.filter_by(class_id=class_id)
 
-    q = User.query.filter(
-        User.role == role,
-        User.id != current_user.id   # exclude self
-    )
-
-    # ONLY students are class-bound
-    if role == 'student':
-        if not class_id:
-            return jsonify([])
-        q = q.filter(User.class_id == int(class_id))
-
-    users = q.order_by(User.first_name, User.last_name).all()
-
-    return jsonify([
-        {
-            "id": u.public_id,
-            "name": u.full_name
-        }
-        for u in users
-    ])
+    users = query.all()
+    return jsonify([{
+        "public_id": u.public_id,
+        "username": u.username,
+        "full_name": u.full_name,
+        "class_id": u.class_id
+    } for u in users])
 
 @chat_bp.route('/conversations/<int:conv_id>/messages/<int:msg_id>/edit', methods=['POST'])
 @login_required
