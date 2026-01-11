@@ -553,9 +553,121 @@ def download_receipt(txn_id):
 
     return send_file(filepath, as_attachment=True)
 
+@parent_bp.route('/child/<int:student_id>/timetable')
+@login_required
+def view_child_timetable(student_id):
+    if current_user.role != 'parent':
+        abort(403)
 
+    # Verify the parent actually has this child
+    link = ParentChildLink.query.filter_by(parent_id=current_user.id, student_id=student_id).first()
+    if not link:
+        abort(403)
 
+    student = StudentProfile.query.get_or_404(student_id)
 
+    # === TIMETABLE LOGIC (reuse the same logic as student view) ===
+    entries = (
+        TimetableEntry.query
+        .filter_by(assigned_class=student.current_class)
+        .order_by(TimetableEntry.day_of_week, TimetableEntry.start_time)
+        .all()
+    )
 
+    # TIME SLOTS, day_blocks, vlines etc. (copy the same code you already have)
+    TIME_SLOTS = [
+        (8*60, 9*60),
+        (9*60, 10*60),
+        (10*60, 10*60+30),
+        (10*60+30, 11*60+30),
+        (11*60+30, 12*60+30),
+        (12*60+30, 13*60),
+        (13*60, 14*60),
+        (14*60, 15*60),
+        (15*60, 16*60),
+        (16*60, 17*60),
+    ]
 
+    MIN_START = TIME_SLOTS[0][0]
+    MAX_END = TIME_SLOTS[-1][1]
+    total_minutes = MAX_END - MIN_START
 
+    time_ticks = []
+    for start, end in TIME_SLOTS:
+        width_pct = ((end - start) / total_minutes) * 100.0
+        label = f"{(start//60)%12 or 12}:{start%60:02d} - {(end//60)%12 or 12}:{end%60:02d}"
+        time_ticks.append({'start': start, 'end': end, 'label': label, 'width_pct': round(width_pct, 4)})
+
+    cum = MIN_START
+    vlines = []
+    for start, end in TIME_SLOTS:
+        cum += (end - start)
+        cum_pct = ((cum - MIN_START) / total_minutes) * 100.0
+        is_thick = ((end % 60) == 0)
+        vlines.append({'left_pct': round(cum_pct, 3), 'is_thick': is_thick})
+
+    day_order = ['Monday','Tuesday','Wednesday','Thursday','Friday']
+    day_blocks = {d: [] for d in day_order}
+
+    def pct_from_minutes(start_min, end_min):
+        s = max(start_min, MIN_START)
+        e = min(end_min, MAX_END)
+        if e <= s:
+            return None, None
+        left_pct = ((s - MIN_START) / total_minutes) * 100.0
+        width_pct = ((e - s) / total_minutes) * 100.0
+        return round(left_pct,3), round(width_pct,3)
+
+    for e in entries:
+        s_min = e.start_time.hour*60 + e.start_time.minute
+        e_min = e.end_time.hour*60 + e.end_time.minute
+        left_pct, width_pct = pct_from_minutes(s_min, e_min)
+        if left_pct is None:
+            continue
+        day_blocks[e.day_of_week].append({
+            'id': e.id,
+            'title': e.course.name if getattr(e, 'course', None) else 'Class',
+            'start_str': e.start_time.strftime('%I:%M %p'),
+            'end_str': e.end_time.strftime('%I:%M %p'),
+            'left_pct': left_pct,
+            'width_pct': width_pct,
+            'is_break': False
+        })
+
+    # Add breaks (same as student)
+    MORNING_BREAK_LETTERS = ['B','R','E','A','K']
+    AFTERNOON_BREAK_LETTERS = ['L','U','N','C','H']
+    BREAKS = [
+        {'title': 'Morning Break', 'start_min': 10*60, 'end_min': 10*60+25, 'letters': MORNING_BREAK_LETTERS},
+        {'title': 'Lunch Break',   'start_min': 12*60+30, 'end_min': 12*60+55, 'letters': AFTERNOON_BREAK_LETTERS},
+    ]
+    for i, day in enumerate(day_order):
+        for br in BREAKS:
+            left_pct, width_pct = pct_from_minutes(br['start_min'], br['end_min'])
+            if left_pct is None: continue
+            day_blocks[day].append({
+                'id': None,
+                'title': br['letters'][i],
+                'start_str': f"{br['start_min']//60:02d}:{br['start_min']%60:02d}",
+                'end_str': f"{br['end_min']//60:02d}:{br['end_min']%60:02d}",
+                'left_pct': left_pct,
+                'width_pct': width_pct,
+                'is_break': True
+            })
+
+    for d in day_order:
+        day_blocks[d].sort(key=lambda x: x['left_pct'])
+
+    col_template = ' '.join(f'{slot["width_pct"]}%' for slot in time_ticks)
+
+    return render_template(
+        'student/timetable.html',  # reuse student template
+        student_class=student.current_class,
+        time_ticks=time_ticks,
+        day_blocks=day_blocks,
+        vlines=vlines,
+        col_template=col_template,
+        total_minutes=total_minutes,
+        download_ts=int(datetime.utcnow().timestamp())
+    )
+    
