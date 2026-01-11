@@ -1,0 +1,21 @@
+{
+  "name": "LMS Teacher Panel",
+  "short_name": "Teacher LMS",
+  "start_url": "/teacher/dashboard",
+  "scope": "/teacher/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#5b21b6",
+  "icons": [
+    {
+      "src": "/static/icons/teacher-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/teacher-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
