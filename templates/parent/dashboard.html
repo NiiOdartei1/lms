@@ -102,6 +102,10 @@
             <a class="btn btn-outline-primary" href="{{ url_for('parent.view_child_detail', child_id=student_profile.id) }}"><i class="fas fa-user"></i></a>
             <a class="btn btn-outline-success" href="{{ url_for('parent.view_student_report', child_id=student_profile.id) }}"><i class="fas fa-chart-line"></i></a>
             <a class="btn btn-outline-warning" href="{{ url_for('parent.view_attendance', child_id=student_profile.id) }}"><i class="fas fa-calendar-check"></i></a>
+            <!-- ✅ New Timetable Button -->
+            <a class="btn btn-outline-info" href="{{ url_for('parent.view_child_timetable', child_id=student_profile.id) }}" title="View Timetable">
+              <i class="fas fa-calendar-alt"></i>
+            </a>
           </div>
           <small class="text-muted">
             <i class="fas fa-bell me-1"></i> {{ student_profile.notifications_count or 0 }}
@@ -174,3 +178,4 @@ document.addEventListener('DOMContentLoaded', () => {
 }
 </style>
 {% endblock %}
+
