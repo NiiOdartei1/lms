@@ -4,6 +4,7 @@ from forms import ChangePasswordForm, ParentLoginForm
 from models import User, ParentProfile, ParentChildLink, StudentProfile, Assignment, StudentQuizSubmission, Quiz, AttendanceRecord, StudentFeeBalance, StudentFeeTransaction , ClassFeeStructure , Notification, NotificationRecipient
 from datetime import datetime
 import os, logging
+from utils.extensions import db
 from werkzeug.utils import secure_filename
 
 parent_bp = Blueprint("parent", __name__, url_prefix="/parent")
@@ -551,6 +552,7 @@ def download_receipt(txn_id):
         return redirect(url_for('student.student_fees'))
 
     return send_file(filepath, as_attachment=True)
+
 
 
 
