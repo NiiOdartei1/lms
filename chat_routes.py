@@ -226,6 +226,42 @@ def get_classes():
         result = [{"id": i+1, "name": name} for i, (name, _) in enumerate(choices)]
     return jsonify(result), 200
 
+@chat_bp.route('/dm/users')
+@login_required
+def dm_users():
+    """
+    Fetch users filtered by role and optionally class_id.
+    Query params:
+        role: 'student', 'parent', 'teacher'
+        class_id: optional, required for student/parent
+    """
+    role = request.args.get('role')
+    class_id = request.args.get('class_id')
+
+    if role not in ('student', 'parent', 'teacher'):
+        return jsonify([])
+
+    users = []
+
+    if role == 'teacher':
+        teachers = User.query.filter_by(role='teacher').all()
+        users = [{'id': t.id, 'name': t.username} for t in teachers]
+
+    elif role == 'student':
+        if not class_id:
+            return jsonify([])  # must select class first
+        students = User.query.filter_by(role='student').join(Student).filter(Student.class_id==class_id).all()
+        users = [{'id': s.id, 'name': s.username} for s in students]
+
+    elif role == 'parent':
+        if not class_id:
+            return jsonify([])  # must select class first
+        # Parents whose child is in the class
+        parents = User.query.filter_by(role='parent').join(Parent).join(Parent.children).join(Student).filter(Student.class_id==class_id).all()
+        users = [{'id': p.id, 'name': p.username} for p in parents]
+
+    return jsonify(users)
+
 @chat_bp.route('/conversations', methods=['GET'])
 @login_required
 def get_conversations():
