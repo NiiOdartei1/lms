@@ -6,7 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <!-- PWA (Teacher) -->
-  <link rel="manifest" href="{{ url_for('static', filename='teacher_manifest.json') }}">
   <meta name="theme-color" content="#5b21b6">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/teacher-192.png') }}">
   <!-- Bootstrap & Icons -->
@@ -521,20 +520,7 @@ body.dark-mode .btn-ghost {
   });
 })();
 </script>
-
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register(
-      "{{ url_for('static', filename='teacher_sw.js') }}",
-      { scope: "/teacher/" }
-    ).then(reg => {
-      console.log("Teacher SW registered:", reg.scope);
-    }).catch(err => {
-      console.error("Teacher SW failed:", err);
-    });
-  });
-}
 </script>
 </body>
 </html>
+
