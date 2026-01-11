@@ -670,4 +670,169 @@ def view_child_timetable(student_id):
         total_minutes=total_minutes,
         download_ts=int(datetime.utcnow().timestamp())
     )
-    
+
+@parent_bp.route('/download_child_timetable/<int:child_id>')
+@login_required
+def download_child_timetable(child_id):
+    from io import BytesIO
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    from datetime import datetime
+    from flask import send_file, flash, redirect, url_for
+
+    # Make sure current user is a parent
+    if current_user.role != 'parent':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('parent.dashboard'))
+
+    # Get child profile and class
+    child_profile = StudentProfile.query.get(child_id)
+    if not child_profile:
+        flash('Child profile not found.', 'danger')
+        return redirect(url_for('parent.dashboard'))
+
+    # Check if this child belongs to the parent
+    link = ParentChildLink.query.filter_by(parent_id=current_user.id, student_id=child_id).first()
+    if not link:
+        flash('You do not have permission to view this timetable.', 'danger')
+        return redirect(url_for('parent.dashboard'))
+
+    student_class = child_profile.current_class
+
+    timetable_entries = TimetableEntry.query \
+        .filter_by(assigned_class=student_class) \
+        .join(Course, TimetableEntry.course_id == Course.id) \
+        .order_by(TimetableEntry.day_of_week, TimetableEntry.start_time) \
+        .all()
+
+    if not timetable_entries:
+        flash('No timetable available to download.', 'warning')
+        return redirect(url_for('parent.view_child_timetable', child_id=child_id))
+
+    # === TIME SLOTS ===
+    TIME_SLOTS = [
+        (8*60, 9*60),
+        (9*60, 10*60),
+        (10*60, 10*60+30),
+        (10*60+30, 11*60+30),
+        (11*60+30, 12*60+30),
+        (12*60+30, 13*60),
+        (13*60, 14*60),
+        (14*60, 15*60),
+        (15*60, 16*60),
+        (16*60, 17*60),
+    ]
+    MIN_START = TIME_SLOTS[0][0]
+    MAX_END = TIME_SLOTS[-1][1]
+    total_minutes = MAX_END - MIN_START
+
+    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+
+    # Break letters
+    MORNING_LETTERS = ['B', 'R', 'E', 'A', 'K']
+    LUNCH_LETTERS = ['L', 'U', 'N', 'C', 'H']
+    BREAKS = [
+        {'start_min': 10*60, 'end_min': 10*60+25, 'letters': MORNING_LETTERS},
+        {'start_min': 12*60+30, 'end_min': 12*60+55, 'letters': LUNCH_LETTERS},
+    ]
+
+    # Build header labels & column widths
+    header = ['Day / Time']
+    col_widths = [1.2 * inch]
+    total_width = 10.5 * inch
+    remaining_width = total_width - col_widths[0]
+
+    for start, end in TIME_SLOTS:
+        mins = end - start
+        width = remaining_width * (mins / total_minutes)
+        col_widths.append(width)
+        label = f"{start//60:02d}:{start%60:02d} - {end//60:02d}:{end%60:02d}"
+        header.append(label)
+
+    # PDF Paragraph style
+    styles = getSampleStyleSheet()
+    cell_style = ParagraphStyle(
+        'cell_style',
+        parent=styles['Normal'],
+        alignment=1,  # center
+        fontSize=9,
+        leading=10,
+        wordWrap='CJK',
+    )
+
+    # Build timetable matrix
+    timetable_matrix = []
+    now = datetime.now()
+    today_name = now.strftime('%A')
+
+    for i, day in enumerate(days):
+        row = [day]
+        for start, end in TIME_SLOTS:
+            match = next(
+                (e for e in timetable_entries 
+                 if e.day_of_week == day and 
+                    (e.start_time.hour*60 + e.start_time.minute) == start),
+                None
+            )
+            if match:
+                row.append(Paragraph(match.course.name, cell_style))
+            else:
+                letter = None
+                for br in BREAKS:
+                    if start >= br['start_min'] and start < br['end_min']:
+                        letter = br['letters'][i]
+                        break
+                row.append(Paragraph(letter if letter else "—", cell_style))
+        timetable_matrix.append(row)
+
+    data = [header] + timetable_matrix
+
+    # PDF Generation
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4),
+                            leftMargin=inch/2, rightMargin=inch/2,
+                            topMargin=inch/2, bottomMargin=inch/2)
+    elements = []
+
+    elements.append(Paragraph(f"<b>{child_profile.full_name} — Class Timetable: {student_class}</b>", styles['Title']))
+    elements.append(Spacer(1, 12))
+
+    table = Table(data, colWidths=col_widths, repeatRows=1)
+
+    table_style = TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#4A90E2")),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#cccccc")),
+    ])
+
+    for i, row in enumerate(timetable_matrix):
+        bg_color = colors.HexColor("#f0f4f8") if i % 2 == 0 else colors.white
+        table_style.add('BACKGROUND', (0,i+1), (-1,i+1), bg_color)
+        if row[0] == today_name:
+            table_style.add('BACKGROUND', (0,i+1), (-1,i+1), colors.HexColor("#FFF4CC"))
+
+        for j, val in enumerate(row[1:], start=1):
+            text = val.getPlainText().strip()
+            if text in MORNING_LETTERS + LUNCH_LETTERS:
+                table_style.add('BACKGROUND', (j,i+1), (j,i+1), colors.HexColor("#FFD966"))
+                table_style.add('TEXTCOLOR', (j,i+1), (j,i+1), colors.HexColor("#222222"))
+                table_style.add('FONTNAME', (j,i+1), (j,i+1), 'Helvetica-Bold')
+
+    table.setStyle(table_style)
+    elements.append(table)
+
+    elements.append(Spacer(1,12))
+    elements.append(Paragraph(f"Generated on: {datetime.now().strftime('%d %b %Y %I:%M %p')}", styles['Normal']))
+
+    doc.build(elements)
+    buffer.seek(0)
+
+    return send_file(buffer, as_attachment=True,
+                     download_name=f"{child_profile.full_name}_{student_class}_timetable.pdf",
+                     mimetype='application/pdf')
