@@ -107,6 +107,44 @@ function syncHiddenInputsForCall(conv) {
 //
 // FULL CONTEXT (around line 580-590 in your original chat.js):
 // ============================================
+async function loadDMUsers({ role, class_id }) {
+  if (!role) return;
+
+  const params = new URLSearchParams({ role });
+  if (class_id) params.append('class_id', class_id);
+
+  try {
+    const res = await fetch(`/chat/dm/users?${params.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch users');
+
+    const users = await res.json();
+    const dmUserList = document.getElementById('dmUserList');
+    dmUserList.innerHTML = '';
+
+    if (users.length === 0) {
+      dmUserList.innerHTML = '<div style="padding:6px;color:#555;">No users found</div>';
+      return;
+    }
+
+    users.forEach(u => {
+      const item = document.createElement('div');
+      item.className = 'dm-user-item';
+      item.textContent = u.name;
+      item.dataset.userId = u.id;
+
+      item.addEventListener('click', () => {
+        pendingReceiverId = u.id;
+        pendingReceiverLabel = u.name;
+        alert(`Selected: ${u.name} (ID: ${u.id})`); // replace with opening DM
+        dmComposerWrapper.style.display = 'none';
+      });
+
+      dmUserList.appendChild(item);
+    });
+  } catch (err) {
+    console.error('loadDMUsers error', err);
+  }
+}
 
   async function openConversation(convId){
   currentConversationId = convId;
@@ -1591,3 +1629,4 @@ dmCancel?.addEventListener('click', () => {
   refreshBtn?.addEventListener('click', loadConversations);
   loadConversations();
 });
+
