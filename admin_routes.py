@@ -1757,6 +1757,12 @@ MODELS = {
     "Exam Attempts": ExamAttempt,
     "Exam Answers": ExamAnswer,
     "Notices": Notification,
+    "Messages": Message,
+    "Message Reactions": MessageReaction,
+    "Teacher Assessment Periods": TeacherAssessmentPeriod,
+    "Teacher Assessment Questions": TeacherAssessmentQuestion,
+    "Teacher Assessments": TeacherAssessment,
+    "Teacher Assessment Answers": TeacherAssessmentAnswer,
     #"Chat Messages": Message
 }
 
@@ -2852,4 +2858,5 @@ def toggle_assessment_period(pid):
 
     db.session.commit()
     return redirect(url_for('admin.assessment_periods'))
+
 
