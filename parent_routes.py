@@ -661,7 +661,7 @@ def view_child_timetable(student_id):
     col_template = ' '.join(f'{slot["width_pct"]}%' for slot in time_ticks)
 
     return render_template(
-        'student/timetable.html',  # reuse student template
+        'parent/child_timetable.html',  # reuse student template
         student_class=student.current_class,
         time_ticks=time_ticks,
         day_blocks=day_blocks,
@@ -671,4 +671,3 @@ def view_child_timetable(student_id):
         download_ts=int(datetime.utcnow().timestamp())
     )
     
-
