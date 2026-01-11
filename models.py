@@ -780,12 +780,51 @@ class Notification(db.Model):
     title = db.Column(db.String(200), nullable=False)
     message = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    sender_id = db.Column(db.String(20), db.ForeignKey('user.user_id'), nullable=True)
-    related_type = db.Column(db.String(50), nullable=True)  # link target type
-    related_id = db.Column(db.Integer, nullable=True)        # target object id
-
-    sender = db.relationship('User', foreign_keys=[sender_id])
-    recipients = db.relationship("NotificationRecipient", back_populates="notification", cascade="all, delete-orphan")
+    
+    # Support both user and admin senders
+    sender_id = db.Column(db.String(20), nullable=True)  # Can be user_id or admin_id
+    sender_type = db.Column(db.String(10), default='user', nullable=False)  # 'user' or 'admin'
+    
+    related_type = db.Column(db.String(50), nullable=True)
+    related_id = db.Column(db.Integer, nullable=True)
+    
+    # Define relationships with foreign_keys parameter
+    user_sender = db.relationship(
+        'User',
+        foreign_keys='Notification.sender_id',
+        primaryjoin="and_(Notification.sender_id==User.user_id, Notification.sender_type=='user')",
+        viewonly=True,
+        lazy='joined'
+    )
+    
+    admin_sender = db.relationship(
+        'Admin',
+        foreign_keys='Notification.sender_id',
+        primaryjoin="and_(Notification.sender_id==Admin.admin_id, Notification.sender_type=='admin')",
+        viewonly=True,
+        lazy='joined'
+    )
+    
+    recipients = db.relationship(
+        "NotificationRecipient",
+        back_populates="notification",
+        cascade="all, delete-orphan"
+    )
+    
+    @property
+    def sender(self):
+        """Get the sender object (User or Admin)"""
+        if self.sender_type == 'admin':
+            return self.admin_sender
+        return self.user_sender
+    
+    @property
+    def sender_name(self):
+        """Get the sender's display name"""
+        sender = self.sender
+        if sender:
+            return sender.display_name
+        return "Unknown"
 
 class NotificationRecipient(db.Model):
     __tablename__ = 'notification_recipients'
@@ -998,4 +1037,5 @@ class TeacherAssessmentAnswer(db.Model):
 
     assessment = db.relationship('TeacherAssessment', backref='answers')
     question = db.relationship('TeacherAssessmentQuestion')
+
 
