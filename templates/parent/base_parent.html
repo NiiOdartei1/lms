@@ -148,48 +148,46 @@
   </nav>
 
   <!-- Sidebar -->
-<nav id="sidebar" class="sidebar" role="navigation" aria-label="Parent navigation">
-  <div class="sidebar-header px-2">Welcome back</div>
+  <nav id="sidebar" class="sidebar" role="navigation" aria-label="Parent navigation">
+    <div class="sidebar-header px-3">Welcome back, {{ current_user.first_name }}</div>
 
-  <a class="nav-link {% if request.endpoint == 'parent.dashboard' %}active{% endif %}" href="{{ url_for('parent.dashboard') }}">
-    <i class="fas fa-home"></i> <span class="label">Dashboard</span>
-  </a>
+    <!-- Core Links -->
+    <a class="nav-link {% if request.endpoint == 'parent.dashboard' %}active{% endif %}" href="{{ url_for('parent.dashboard') }}">
+      <i class="fas fa-home"></i> <span class="label">Dashboard</span>
+    </a>
+    <a class="nav-link {% if request.endpoint == 'parent.view_children' %}active{% endif %}" href="{{ url_for('parent.view_children') }}">
+      <i class="fas fa-child"></i> <span class="label">My Children</span>
+    </a>
+    <a class="nav-link {% if request.endpoint == 'parent.reports_list' %}active{% endif %}" href="{{ url_for('parent.reports_list') }}">
+      <i class="fas fa-file-alt"></i> <span class="label">Reports</span>
+    </a>
+    <a class="nav-link" href="{{ url_for('chat.chat_home') }}">
+      <i class="fas fa-comments"></i> <span class="label">Chat</span>
+    </a>
+    <a class="nav-link {% if request.endpoint == 'parent.notifications' %}active{% endif %}" href="{{ url_for('parent.notifications') }}">
+      <i class="fas fa-bell"></i> <span class="label">Notifications
+        <span class="badge bg-danger ms-1" {% if unread_count == 0 %}style="display:none"{% endif %}>{{ unread_count }}</span>
+      </span>
+    </a>
 
-  <a class="nav-link {% if request.endpoint == 'parent.view_children' %}active{% endif %}" href="{{ url_for('parent.view_children') }}">
-    <i class="fas fa-child"></i> <span class="label">My Children</span>
-  </a>
-
-  <a class="nav-link {% if request.endpoint == 'parent.reports_list' %}active{% endif %}" href="{{ url_for('parent.reports_list') }}">
-    <i class="fas fa-file-alt"></i> <span class="label">Reports</span>
-  </a>
-
-  <!-- ✅ NEW: Communication Page -->
-  <a href="{{ url_for('chat.chat_home') }}" class="nav-link"><i class="fas fa-comments me-2"></i>Chat</a>
-
-  <a class="nav-link {% if request.endpoint == 'parent.notifications' %}active{% endif %}" href="{{ url_for('parent.notifications') }}">
-    <i class="fas fa-bell"></i>
-    <span class="label">Notifications
-      <span class="badge bg-danger ms-2" id="parent-unread-count" {% if unread_count == 0 %}style="display:none;"{% endif %}>{{ unread_count }}</span>
-    </span>
-  </a>
-
-  <div class="sidebar-header px-2 mt-3">Fees</div>
-
-  <!-- Timetable Links per Child -->
-  <div class="sidebar-header px-2 mt-3">Timetable</div>
-
-  {% if current_user.children %}
-    {% for child in current_user.children %}
-      {% set active_child_id = request.view_args.child_id if request.view_args is defined and request.view_args else None %}
-      <a class="child-link nav-link {% if request.endpoint == 'parent.view_child_timetable' and active_child_id == (child.id|string) %}active{% endif %}" 
-         href="{{ url_for('parent.view_child_timetable', child_id=child.id) }}">
-        <div class="avatar">{{ child.first_name[0]|upper }}</div>
-        <span class="label">{{ child.first_name }} <small class="d-block text-muted">{{ child.class_name or '—' }}</small></span>
-      </a>
-    {% endfor %}
-  {% else %}
-    <div class="px-3 text-muted small">No children linked</div>
-  {% endif %}
+    <!-- Children: Fees & Timetable -->
+    {% if current_user.children %}
+      <div class="sidebar-header px-3 mt-3">Children</div>
+      {% for child in current_user.children %}
+        <div class="child-group mb-2 px-2">
+          <div class="child-name fw-bold">{{ child.first_name }} <small class="text-muted">{{ child.class_name or '—' }}</small></div>
+          <a class="child-link nav-link {% if request.endpoint == 'parent.parent_pay_fees' %}active{% endif %}" href="{{ url_for('parent.parent_pay_fees', student_id=child.id) }}">
+            <i class="fas fa-wallet me-2"></i> Pay Fees
+          </a>
+          <a class="child-link nav-link {% if request.endpoint == 'parent.view_child_timetable' %}active{% endif %}" href="{{ url_for('parent.view_child_timetable', child_id=child.id) }}">
+            <i class="fas fa-calendar-alt me-2"></i> Timetable
+          </a>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="px-3 text-muted small">No children linked</div>
+    {% endif %}
+  </nav>
 
   <div id="sidebarOverlay" class="sidebar-overlay"></div>
 
@@ -419,5 +417,6 @@
 </script>
 </body>
 </html>
+
 
 
