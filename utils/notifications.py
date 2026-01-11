@@ -1,7 +1,8 @@
 # utils/notifications.py
 from datetime import datetime
-from models import db, Notification, NotificationRecipient, User, StudentProfile, SchoolClass
-from flask_login import current_user, json
+import json
+from models import SchoolClass, db, Notification, NotificationRecipient, User, StudentProfile
+from flask_login import current_user
 
 def create_assignment_notification(assignment):
     """
@@ -152,4 +153,3 @@ def create_missed_call_notification(caller_name, target_user_id, conversation_id
 
     db.session.commit()
     return notice
-
