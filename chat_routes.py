@@ -347,7 +347,7 @@ def mark_read():
         db.session.commit()
     return jsonify({"success": True}), 200
 
-@app.route("/chat/users")
+@chat_bp.route("/chat/users")
 @login_required
 def get_users():
     role = request.args.get("role")
