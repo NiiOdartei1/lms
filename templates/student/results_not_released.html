@@ -1,0 +1,18 @@
+<!-- templates/student/results_not_released.html -->
+{% extends "student/base_student.html" %}
+
+{% block title %}Results Not Released{% endblock %}
+
+{% block content %}
+<div class="container mt-5 text-center">
+    <div class="alert alert-warning">
+        <h2>📄 Results Not Released Yet</h2>
+        <p>Dear student, your results for the current academic period have not been released.</p>
+        <p>Please check back later or contact your school administrator for more information.</p>
+    </div>
+
+    <a href="{{ url_for('student.dashboard') }}" class="btn btn-primary mt-3">
+        Back to Dashboard
+    </a>
+</div>
+{% endblock %}
