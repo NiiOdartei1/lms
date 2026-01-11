@@ -175,10 +175,14 @@
 
   <div class="sidebar-header px-2 mt-3">Fees</div>
 
+  <!-- Timetable Link per Child -->
+  <div class="sidebar-header px-2 mt-3">Timetable</div>
+
   {% if current_user.children %}
     {% for child in current_user.children %}
-      {% set active_child_id = request.view_args.student_id if request.view_args is defined and request.view_args else None %}
-      <a class="child-link nav-link {% if request.endpoint == 'parent.parent_pay_fees' and active_child_id == (child.id|string) %}active{% endif %}" href="{{ url_for('parent.parent_pay_fees', student_id=child.id) }}">
+      {% set active_child_id = request.view_args.child_id if request.view_args is defined and request.view_args else None %}
+      <a class="child-link nav-link {% if request.endpoint == 'parent.view_child_timetable' and active_child_id == (child.id|string) %}active{% endif %}" 
+         href="{{ url_for('parent.view_child_timetable', child_id=child.id) }}">
         <div class="avatar">{{ child.first_name[0]|upper }}</div>
         <span class="label">{{ child.first_name }} <small class="d-block text-muted">{{ child.class_name or '—' }}</small></span>
       </a>
@@ -186,7 +190,7 @@
   {% else %}
     <div class="px-3 text-muted small">No children linked</div>
   {% endif %}
-</nav>
+  </nav>
 
   <div id="sidebarOverlay" class="sidebar-overlay"></div>
 
@@ -416,3 +420,4 @@
 </script>
 </body>
 </html>
+
