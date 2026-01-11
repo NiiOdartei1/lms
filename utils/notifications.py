@@ -1,7 +1,7 @@
 # utils/notifications.py
 from datetime import datetime
-from models import db, Notification, NotificationRecipient, User, StudentProfile
-from flask_login import current_user
+from models import db, Notification, NotificationRecipient, User, StudentProfile, SchoolClass
+from flask_login import current_user, json
 
 def create_assignment_notification(assignment):
     """
@@ -44,54 +44,90 @@ def create_assignment_notification(assignment):
     db.session.commit()
     return notice
 
-def create_fee_notification(fee):
+def create_fee_notification(fee_group, sender=None):
     """
-    Create a notification when a new fee is assigned.
-    Sends notification to all students and parents of that class.
+    Create a notification for a fee assignment.
+
+    Args:
+        fee_group: ClassFeeStructure object
+        sender: User/Admin object creating the notification. Defaults to current_user.
     """
-    notice = Notification(
-        type='fee',
-        title=f"New Fee Assigned: {fee.description}",
-        message=(
-            f"A new fee has been assigned for your class {fee.class_level}.\n\n"
-            f"Academic Year: {fee.academic_year}\n"
-            f"Semester: {fee.semester}\n"
-            f"Description: {fee.description}\n"
-            f"Amount: {fee.amount:.2f} GHS\n\n"
-            f"Please check your Fees section for details."
-        ),
-        created_at=datetime.utcnow(),
-        related_type='fee',
-        related_id=fee.id,
-        sender_id=getattr(current_user, 'user_id', None) or getattr(current_user, 'admin_id', None)
+    if sender is None:
+        sender = current_user
+
+    # Determine sender_id and type
+    if hasattr(sender, 'admin_id'):
+        sender_id = sender.admin_id
+        sender_type = 'admin'
+    elif hasattr(sender, 'user_id'):
+        sender_id = sender.user_id
+        sender_type = 'user'
+    else:
+        sender_id = None
+        sender_type = 'system'
+
+    # Parse items if stored as JSON
+    items = fee_group.items
+    if isinstance(items, str):
+        try:
+            items = json.loads(items)
+        except Exception:
+            items = []
+
+    # Build message text
+    items_text = '\n'.join([f"  • {item['description']}: {item['amount']} GHS" for item in items])
+    message = (
+        f"A new fee has been assigned for your class {fee_group.class_level}.\n\n"
+        f"Academic Year: {fee_group.academic_year}\n"
+        f"Semester: {fee_group.semester}\n"
+        f"Description: {fee_group.description}\n"
+        f"Total Amount: {fee_group.amount} GHS\n\n"
+        f"Breakdown:\n{items_text}\n\n"
+        f"Please check your Fees section for details."
     )
 
-    db.session.add(notice)
-    db.session.flush()  # get notice.id
+    # Create Notification object
+    notification = Notification(
+        type='fee',
+        title=f'New Fee Assigned: {fee_group.description}',
+        message=message,
+        sender_id=sender_id,
+        sender_type=sender_type,
+        related_type='fee',
+        related_id=fee_group.id,
+        created_at=datetime.utcnow()
+    )
+    db.session.add(notification)
+    db.session.flush()  # Get notification.id
 
-    # 🔹 Students in the assigned class
-    students = User.query.join(StudentProfile).filter(
-        StudentProfile.current_class == fee.class_level
-    ).all()
+    # Map class_level string to SchoolClass
+    school_class = SchoolClass.query.filter_by(name=fee_group.class_level).first()
+    if not school_class:
+        db.session.rollback()
+        raise ValueError(f"No class found matching '{fee_group.class_level}'")
 
-    recipients = []
+    # Get all students in the class
+    students = User.query.filter_by(class_id=school_class.id, role='student').all()
 
+    # Create recipients for students and optionally parents
     for student in students:
-        if student.user_id:
-            # Add student
-            recipients.append(NotificationRecipient(notification_id=notice.id, user_id=student.user_id))
+        # Notify student
+        db.session.add(NotificationRecipient(
+            notification_id=notification.id,
+            user_id=student.user_id,
+            is_read=False
+        ))
 
-            # Add parents
-            if hasattr(student, 'parent_id') and student.parent_id:
-                parent = User.query.filter_by(user_id=student.parent_id).first()
-                if parent:
-                    recipients.append(NotificationRecipient(notification_id=notice.id, user_id=parent.user_id))
-
-    if recipients:
-        db.session.add_all(recipients)
+        # Notify parents if you have a relationship student.parents
+        if hasattr(student, 'parents'):
+            for parent in student.parents:
+                db.session.add(NotificationRecipient(
+                    notification_id=notification.id,
+                    user_id=parent.user_id,
+                    is_read=False
+                ))
 
     db.session.commit()
-    return notice
 
 def create_missed_call_notification(caller_name, target_user_id, conversation_id):
     """
@@ -116,3 +152,4 @@ def create_missed_call_notification(caller_name, target_user_id, conversation_id
 
     db.session.commit()
     return notice
+
