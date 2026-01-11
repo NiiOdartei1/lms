@@ -11,7 +11,7 @@ chat_bp = Blueprint('chat', __name__, url_prefix='/chat')
 # -------------------------
 # Helper functions
 # -------------------------
-resolve_person_by_public_id(pub_id):
+def resolve_person_by_public_id(pub_id):
     """Return (model_instance, role_string) or (None, None)."""
     if not pub_id:
         return None, None
