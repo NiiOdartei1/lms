@@ -148,4 +148,15 @@
     setInterval(updateDateTime, 1000);
     updateDateTime();
 </script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register(
+      "{{ url_for('static', filename='teacher_sw.js') }}",
+      { scope: "/teacher/" }
+    );
+  });
+}
+<link rel="manifest" href="{{ url_for('static', filename='teacher_manifest.json') }}">
 {% endblock %}
+
