@@ -11,7 +11,7 @@ chat_bp = Blueprint('chat', __name__, url_prefix='/chat')
 # -------------------------
 # Helper functions
 # -------------------------
-def resolve_person_by_public_id(pub_id):
+resolve_person_by_public_id(pub_id):
     """Return (model_instance, role_string) or (None, None)."""
     if not pub_id:
         return None, None
@@ -207,7 +207,8 @@ def handle_message(data):
 @chat_bp.route('/')
 @login_required
 def chat_home():
-    return render_template('chat.html')
+    classes = SchoolClass.query.order_by(SchoolClass.name).all()
+    return render_template('chat.html', classes=classes)
 
 # -------------------------
 # Routes for classes
