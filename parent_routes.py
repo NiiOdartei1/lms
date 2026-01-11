@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, abort, flash, redirect, url_for, request, send_file, current_app, jsonify
 from flask_login import login_required, current_user, login_user
 from forms import ChangePasswordForm, ParentLoginForm
-from models import User, ParentProfile, ParentChildLink, StudentProfile, Assignment, StudentQuizSubmission, Quiz, AttendanceRecord, StudentFeeBalance, StudentFeeTransaction , ClassFeeStructure , Notification, NotificationRecipient
+from models import User, ParentProfile, ParentChildLink, StudentProfile, Assignment, StudentQuizSubmission, Quiz, AttendanceRecord, StudentFeeBalance, StudentFeeTransaction , ClassFeeStructure , Notification, NotificationRecipient, TimetableEntry
 from datetime import datetime
 import os, logging
 from utils.extensions import db
@@ -671,3 +671,4 @@ def view_child_timetable(student_id):
         download_ts=int(datetime.utcnow().timestamp())
     )
     
+
