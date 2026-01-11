@@ -559,14 +559,17 @@ def view_child_timetable(student_id):
     if current_user.role != 'parent':
         abort(403)
 
+    # Get parent profile
+    parent_profile = ParentProfile.query.filter_by(user_id=current_user.user_id).first_or_404()
+
     # Verify the parent actually has this child
-    link = ParentChildLink.query.filter_by(parent_id=current_user.id, student_id=student_id).first()
+    link = ParentChildLink.query.filter_by(parent_id=parent_profile.id, student_id=student_id).first()
     if not link:
         abort(403)
 
     student = StudentProfile.query.get_or_404(student_id)
 
-    # === TIMETABLE LOGIC (reuse the same logic as student view) ===
+    # TIMETABLE LOGIC (reuse student timetable logic)
     entries = (
         TimetableEntry.query
         .filter_by(assigned_class=student.current_class)
@@ -661,7 +664,7 @@ def view_child_timetable(student_id):
     col_template = ' '.join(f'{slot["width_pct"]}%' for slot in time_ticks)
 
     return render_template(
-        'parent/child_timetable.html',  # reuse student template
+        'student/timetable.html',  # reuse student template
         student_class=student.current_class,
         time_ticks=time_ticks,
         day_blocks=day_blocks,
@@ -836,3 +839,4 @@ def download_child_timetable(child_id):
     return send_file(buffer, as_attachment=True,
                      download_name=f"{child_profile.full_name}_{student_class}_timetable.pdf",
                      mimetype='application/pdf')
+
