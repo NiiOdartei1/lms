@@ -154,34 +154,5 @@ setInterval(updateDateTime, 1000);
 updateDateTime();
 </script>
 
-<!-- Service Worker -->
-<script>
-if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-        navigator.serviceWorker.register(
-            "{{ url_for('static', filename='teacher_sw.js') }}",
-            { scope: "/teacher/" }
-        );
-    });
-}
-</script>
-
-<!-- PWA Install -->
-<script>
-let deferredPrompt;
-
-window.addEventListener("beforeinstallprompt", (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    document.getElementById("installAppBtn").style.display = "inline-block";
-});
-
-document.getElementById("installAppBtn").addEventListener("click", async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    deferredPrompt = null;
-});
-</script>
-
 {% endblock %}
+
