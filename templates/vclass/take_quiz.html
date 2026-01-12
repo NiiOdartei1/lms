@@ -95,6 +95,8 @@
     return;
   }
 
+  let autoSubmitted = false;
+
   // -----------------------
   // Config / state
   // -----------------------
@@ -674,7 +676,15 @@ summaryUnanswered.textContent = totalQuestions;
       const left = duration - elapsed;
 
       if (left <= 0) {
+        if (sessionStorage.getItem(AUTO_SUBMIT_KEY) === '1') {
+          ticking = false;
+          return;
+        }
+
+        sessionStorage.setItem(AUTO_SUBMIT_KEY, '1');
+
         if (timerEl) timerEl.textContent = '00:00';
+
         try {
           injectAnswersIntoForm();
           ensureCsrfInput();
@@ -683,8 +693,8 @@ summaryUnanswered.textContent = totalQuestions;
           setTimeout(() => {
             const csrfVal = getCsrfToken();
             if (!csrfVal) {
-              console.error('CSRF token missing at auto-submit time; aborting auto-submit');
-              alert('Unable to auto-submit: CSRF token is missing. Please manually submit your quiz.');
+              console.error('CSRF token missing at auto-submit time');
+              alert('Unable to auto-submit. Please manually submit your quiz.');
               return;
             }
             form.submit();
@@ -693,6 +703,7 @@ summaryUnanswered.textContent = totalQuestions;
           console.error('Auto-submit failed:', err);
           alert('Auto-submit failed. Please manually submit your quiz.');
         }
+
         ticking = false;
         return;
       }
@@ -755,4 +766,5 @@ summaryUnanswered.textContent = totalQuestions;
 .blank-input { min-width: 140px; }
 </style>
 {% endblock %}
+
 
