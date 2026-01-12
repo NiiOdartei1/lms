@@ -14,7 +14,7 @@ from reportlab.lib.units import inch
 from reportlab.lib import colors
 from reportlab.platypus import Table, TableStyle
 from utils.email_utils import send_password_reset_email
-from urils.extensions import db
+from utils.extensions import db
 
 
 vclass_bp = Blueprint('vclass', __name__, url_prefix='/vclass')
@@ -1154,5 +1154,6 @@ def calculator():
     if getattr(current_user, "role", None) != "student":
         abort(403)
     return render_template('vclass/calculator.html')
+
 
 
