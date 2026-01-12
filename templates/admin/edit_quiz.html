@@ -67,6 +67,9 @@
           <div class="card-body">
             <div id="questions-container"></div>
             <button type="button" class="btn btn-outline-primary" onclick="addQuestion()">+ Add Question</button>
+            <small class="form-text text-muted mt-2">
+              Removing a question here will hide it and mark it. Nothing is deleted from database until you explicitly delete from the manage page.
+            </small>
           </div>
         </div>
 
@@ -79,7 +82,7 @@
   </div>
 </div>
 
-<!-- add this near the top of your template, outside the <script> that contains your logic -->
+<!-- server payload -->
 <script id="quiz-questions-data" type="application/json">
   {{ quiz_questions | tojson }}
 </script>
@@ -100,7 +103,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const courseIdInput = document.getElementById('course_id');
 
   if (courseSelect) {
-    // ensure hidden is set for edit mode
     syncCourseId();
     courseSelect.addEventListener('change', syncCourseId);
   }
@@ -129,7 +131,6 @@ document.addEventListener('DOMContentLoaded', () => {
             opt.dataset.id = c.id;
             courseSelect.appendChild(opt);
           });
-          // select first by default and sync hidden id
           courseSelect.selectedIndex = 0;
           syncCourseId();
         })
@@ -141,7 +142,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ---- Quiz questions rendering logic (consolidated) ----
-  // Server-provided payload (safe Jinja insertion)
   const quizQuestionsEl = document.getElementById('quiz-questions-data');
   const quizQuestions = (quizQuestionsEl && quizQuestionsEl.textContent)
     ? JSON.parse(quizQuestionsEl.textContent)
@@ -158,23 +158,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('questions-container');
     if (!container) return;
     const labelStyle = data.label_style || 'abc';
+    const qId = data.id ? data.id : '';
 
     const cardHtml = `
-      <div class="card mb-3 shadow-sm border border-info" id="question-${qIndex}">
+      <div class="card mb-3 shadow-sm border border-info" id="question-${qIndex}" data-qindex="${qIndex}">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center mb-2">
             <h6 class="mb-0">Question ${qIndex + 1}</h6>
-            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeQuestion(${qIndex})">
-              🗑 Remove Question
-            </button>
+            <div>
+              <button type="button" class="btn btn-sm btn-outline-danger" onclick="softRemoveQuestion(${qIndex})">
+                🗑 Remove Question
+              </button>
+            </div>
           </div>
+
+          <input type="hidden" name="questions[${qIndex}][id]" value="${qId}" data-qid="${qId}">
 
           <div class="mb-3">
             <label class="form-label" for="question-text-${qIndex}">Question</label>
             <textarea
               id="question-text-${qIndex}"
               name="questions[${qIndex}][text]"
-              class="form-control"
+              class="form-control question-text"
               required
             >${(data.text || '').replace(/<\/?script>/g, '')}</textarea>
           </div>
@@ -198,27 +203,37 @@ document.addEventListener('DOMContentLoaded', () => {
             <button type="button" class="btn btn-sm btn-outline-secondary me-1" onclick="addOption(${qIndex})">
               + Add Option
             </button>
-            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeOption(${qIndex})">
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="softRemoveLastOption(${qIndex})">
               − Remove Option
             </button>
           </div>
+
+          <div class="mt-2 text-muted small" id="question-removed-note-${qIndex}" style="display:none;">
+            This question is marked removed. It will not be changed on save. Use the Manage view to permanently delete.
+          </div>
+
+          <input type="hidden" name="questions[${qIndex}][_removed]" id="questions-${qIndex}-removed" value="0">
         </div>
       </div>
     `;
 
     container.insertAdjacentHTML('beforeend', cardHtml);
-    // initialize option counter for this question
     optionCounters[qIndex] = 0;
 
-    // render existing options (if any)
+    // render existing options (if any) (with option ids)
     if (Array.isArray(data.options)) {
-      data.options.forEach(opt => {
-        addOption(qIndex, opt.text || '', !!opt.is_correct);
+      data.options.forEach((opt) => {
+        addOption(qIndex, opt.text || '', !!opt.is_correct, opt.id || '');
       });
+    } else {
+      // create a default set for MCQ convenience (if none)
+      addOption(qIndex);
+      addOption(qIndex);
     }
   }
 
-  window.addOption = function addOption(qIndex, optText = '', isCorrect = false) {
+  // addOption now accepts optId for existing options
+  window.addOption = function addOption(qIndex, optText = '', isCorrect = false, optId = '') {
     const currentCount = optionCounters[qIndex] ?? 0;
     const oIndex = currentCount;
     optionCounters[qIndex] = currentCount + 1;
@@ -228,17 +243,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const label = labelStyles[style][oIndex] || `opt${oIndex + 1}`;
     const checked = isCorrect ? 'checked' : '';
 
-    // escape double quotes in optText to avoid breaking the value attribute
-    const safeText = String(optText || '').replace(/"/g, '&quot;');
+    const safeText = String(optText || '').replace(/"/g, '&quot;').replace(/<\/?script>/g, '');
 
     const optionHtml = `
-      <div class="input-group mb-2" id="question-${qIndex}-option-${oIndex}">
-        <span class="input-group-text">${label}</span>
-        <input type="text" class="form-control" name="questions[${qIndex}][options][${oIndex}][text]" value="${safeText}" required />
+      <div class="input-group mb-2 question-option" id="question-${qIndex}-option-${oIndex}" data-oindex="${oIndex}">
+        <span class="input-group-text option-label">${label}</span>
+        <input type="text" class="form-control option-text" name="questions[${qIndex}][options][${oIndex}][text]" value="${safeText}" required />
+        <input type="hidden" name="questions[${qIndex}][options][${oIndex}][id]" value="${optId}">
         <span class="input-group-text">
           <input type="checkbox" name="questions[${qIndex}][options][${oIndex}][is_correct]" ${checked} />
           <span class="ms-1">✔</span>
         </span>
+        <input type="hidden" name="questions[${qIndex}][options][${oIndex}][_removed]" id="questions-${qIndex}-option-${oIndex}-removed" value="0">
       </div>
     `;
 
@@ -246,7 +262,56 @@ document.addEventListener('DOMContentLoaded', () => {
     if (optionsContainer) optionsContainer.insertAdjacentHTML('beforeend', optionHtml);
   };
 
-  window.removeOption = function removeOption(qIndex) {
+  // Soft-remove question: hide it, clear visible fields to avoid accidental edits,
+  // but keep the hidden id so nothing is destroyed by default
+  window.softRemoveQuestion = function softRemoveQuestion(qIndex) {
+    const card = document.getElementById(`question-${qIndex}`);
+    if (!card) return;
+    card.style.opacity = '0.4';
+    card.style.transition = 'opacity .12s ease';
+    card.querySelectorAll('.question-text, .option-text, .option-style-select, input[type="checkbox"]').forEach(el => {
+      if (el.classList && el.classList.contains('question-text')) {
+        // preserve value behind the scenes by storing it on dataset so admin can undo in UI
+        el.dataset._orig = el.value;
+        el.value = ''; // clear visible value so route's "if not q_text continue" won't process
+      } else if (el.classList && el.classList.contains('option-text')) {
+        el.dataset._orig = el.value;
+        el.value = '';
+      } else {
+        // disable checkboxes visually
+        try { el.disabled = true; } catch (e) {}
+      }
+    });
+    const removedInput = document.getElementById(`questions-${qIndex}-removed`);
+    if (removedInput) removedInput.value = '1';
+    const note = document.getElementById(`question-removed-note-${qIndex}`);
+    if (note) note.style.display = 'block';
+  };
+
+  // Soft-remove last option for a question: hides it and marks removed
+  window.softRemoveLastOption = function softRemoveLastOption(qIndex) {
+    const count = optionCounters[qIndex] ?? 0;
+    if (count <= 0) return;
+    const oIndex = count - 1;
+    const optDiv = document.getElementById(`question-${qIndex}-option-${oIndex}`);
+    if (!optDiv) return;
+
+    // mark removed hidden input
+    const removedHidden = document.getElementById(`questions-${qIndex}-option-${oIndex}-removed`);
+    if (removedHidden) removedHidden.value = '1';
+
+    // visually hide and clear visible value (but keep id)
+    optDiv.style.display = 'none';
+    const text = optDiv.querySelector('.option-text');
+    if (text) {
+      text.dataset._orig = text.value;
+      text.value = '';
+    }
+    optionCounters[qIndex] = oIndex; // reduce counter so addOption adds into the same slot visually
+  };
+
+  window.removeOption = function removeOptionLegacy(qIndex) {
+    // not used by default; kept for backward compatibility
     const count = optionCounters[qIndex] ?? 0;
     if (count > 0) {
       const oIndex = count - 1;
@@ -263,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!container) return;
     const optionGroups = container.querySelectorAll('.input-group');
     optionGroups.forEach((group, idx) => {
-      const labelSpan = group.querySelector('.input-group-text');
+      const labelSpan = group.querySelector('.input-group-text.option-label');
       if (labelSpan) labelSpan.textContent = labelStyles[style][idx] || `opt${idx + 1}`;
     });
   };
@@ -276,24 +341,13 @@ document.addEventListener('DOMContentLoaded', () => {
     questionCount++;
   };
 
-  window.removeQuestion = function removeQuestion(qIndex) {
-    const questionDiv = document.getElementById(`question-${qIndex}`);
-    if (questionDiv) {
-      questionDiv.remove();
-      delete optionCounters[qIndex];
-    }
-  };
-
-  // ---- Render existing questions (if any) ----
+  // Render existing questions
   if (quizQuestions && quizQuestions.length) {
     quizQuestions.forEach((q, i) => {
       addQuestionFromData(q, i);
     });
   } else {
-    // if none, create an initial empty question slot for convenience
-    if (questionCount === 0) {
-      addQuestion();
-    }
+    if (questionCount === 0) addQuestion();
   }
 });
 </script>
