@@ -389,6 +389,8 @@ def take_quiz(quiz_id):
         flash("This quiz is past its due date and can no longer be taken.", "danger")
         return redirect(url_for('vclass.virtual_class'))
 
+    start_time = session.get(f'quiz_{quiz.id}_start_time')
+
     attempts_made = QuizAttempt.query.filter_by(
         quiz_id=quiz.id, student_id=current_user.id
     ).count()
@@ -411,11 +413,6 @@ def take_quiz(quiz_id):
             for q in Question.query.filter_by(quiz_id=quiz.id).all()  # force only current quiz
         ]
     }
-
-    key = f'quiz_{quiz.id}_start_time'
-    if key not in session:
-        session[key] = datetime.utcnow().isoformat()
-        session.modified = True
 
     saved_qs = (
         StudentAnswer.query
@@ -446,7 +443,8 @@ def take_quiz(quiz_id):
         questions=quiz.questions,
         session=session,
         csrf_token_value=csrf_token_value,
-        saved_answers=saved_answers
+        saved_answers=saved_answers,
+        start_time=start_time
     )
 
 
@@ -1164,6 +1162,7 @@ def calculator():
     if getattr(current_user, "role", None) != "student":
         abort(403)
     return render_template('vclass/calculator.html')
+
 
 
 
