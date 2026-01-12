@@ -597,49 +597,28 @@ def edit_quiz(quiz_id):
     quiz = Quiz.query.get_or_404(quiz_id)
     form = QuizForm(obj=quiz)
 
-    # FORM CHOICES (SAME AS ADD)
+    # FORM CHOICES
     form.assigned_class.choices = get_class_choices()
-
     selected_class = request.form.get('assigned_class') or quiz.assigned_class
-    if selected_class:
-        form.course_name.choices = get_course_choices(selected_class)
-    else:
-        form.course_name.choices = []
+    form.course_name.choices = get_course_choices(selected_class) if selected_class else []
 
-    # HELPER: BUILD QUESTIONS
-    def build_quiz_questions_payload(qz):
-        payload = []
-        for q in qz.questions:
-            payload.append({
-                "text": q.text,
-                "type": q.question_type,
-                "options": [
-                    {"text": o.text, "is_correct": bool(o.is_correct)}
-                    for o in q.options
-                ]
-            })
-        return payload
-
-    # GET
+    # GET: pre-fill form
     if request.method == 'GET':
         form.course_id.data = quiz.course_id
         form.course_name.data = quiz.course_name
-
         return render_template(
             'admin/edit_quiz.html',
             form=form,
             quiz=quiz,
-            quiz_questions=build_quiz_questions_payload(quiz),
-            selected_course_id=quiz.course_id   # 🔥 ADD THIS
+            selected_course_id=quiz.course_id
         )
 
-    # POST (VALIDATION SAME AS ADD)
+    # POST: validate
     if not form.validate_on_submit():
         return render_template(
             'admin/edit_quiz.html',
             form=form,
-            quiz=quiz,
-            quiz_questions=build_quiz_questions_payload(quiz)
+            quiz=quiz
         )
 
     try:
@@ -655,12 +634,8 @@ def edit_quiz(quiz_id):
             flash("Invalid start and end time.", "danger")
             return redirect(request.url)
 
-        # COURSE (EXACT SAME AS ADD)
+        # COURSE
         course_id = request.form.get('course_id', type=int)
-        if not course_id:
-            flash("Please select a valid course.", "danger")
-            return redirect(request.url)
-
         course = Course.query.get(course_id)
         if not course:
             flash("Selected course does not exist.", "danger")
@@ -683,12 +658,11 @@ def edit_quiz(quiz_id):
             Quiz.start_datetime < end_datetime,
             Quiz.end_datetime > start_datetime
         ).first()
-
         if overlap:
             flash("Another quiz is already scheduled during this time.", "danger")
             return redirect(request.url)
 
-        # UPDATE QUIZ (PARALLELS CREATE)
+        # UPDATE QUIZ METADATA ONLY
         quiz.assigned_class = assigned_class
         quiz.course_id = course.id
         quiz.course_name = course.name
@@ -699,75 +673,13 @@ def edit_quiz(quiz_id):
         quiz.duration_minutes = duration
         quiz.attempts_allowed = attempts_allowed
 
-        # FILE UPLOAD
+        # OPTIONAL FILE UPLOAD
         content_file = request.files.get('content_file')
         if content_file and content_file.filename and allowed_file(content_file.filename):
             filename = secure_filename(content_file.filename)
             os.makedirs(UPLOAD_FOLDER, exist_ok=True)
             content_file.save(os.path.join(UPLOAD_FOLDER, filename))
             quiz.content_file = filename
-
-        # DELETE OLD QUESTIONS
-        for q in quiz.questions:
-            Option.query.filter_by(question_id=q.id).delete()
-        Question.query.filter_by(quiz_id=quiz.id).delete()
-        db.session.flush()
-
-        # REBUILD QUESTIONS (IDENTICAL TO ADD)
-        for key in request.form:
-            if not re.match(r'^questions\[\d+\]\[text\]$', key):
-                continue
-
-            q_index = key.split('[')[1].split(']')[0]
-            q_text = request.form.get(key, '').strip()
-            if not q_text:
-                continue
-
-            blanks = re.findall(r'_{3,}', q_text)
-            q_type = 'fill_in' if blanks else request.form.get(
-                f'questions[{q_index}][type]', 'mcq'
-            )
-
-            question = Question(
-                quiz_id=quiz.id,
-                text=q_text,
-                question_type=q_type
-            )
-            db.session.add(question)
-            db.session.flush()
-
-            if q_type == 'mcq':
-                o_index = 0
-                while True:
-                    t_key = f'questions[{q_index}][options][{o_index}][text]'
-                    c_key = f'questions[{q_index}][options][{o_index}][is_correct]'
-                    if t_key not in request.form:
-                        break
-
-                    text = request.form.get(t_key, '').strip()
-                    if text:
-                        db.session.add(Option(
-                            question_id=question.id,
-                            text=text,
-                            is_correct=(c_key in request.form)
-                        ))
-                    o_index += 1
-
-            elif q_type == 'fill_in':
-                a_index = 0
-                while True:
-                    a_key = f'questions[{q_index}][answers][{a_index}]'
-                    if a_key not in request.form:
-                        break
-
-                    ans = request.form.get(a_key, '').strip()
-                    if ans:
-                        db.session.add(Option(
-                            question_id=question.id,
-                            text=ans,
-                            is_correct=True
-                        ))
-                    a_index += 1
 
         db.session.commit()
         flash("Quiz updated successfully!", "success")
@@ -2858,5 +2770,6 @@ def toggle_assessment_period(pid):
 
     db.session.commit()
     return redirect(url_for('admin.assessment_periods'))
+
 
 
