@@ -602,7 +602,22 @@ def edit_quiz(quiz_id):
     selected_class = request.form.get('assigned_class') or quiz.assigned_class
     form.course_name.choices = get_course_choices(selected_class) if selected_class else []
 
-    # GET: pre-fill form
+    # Helper: build questions payload for template
+    def build_quiz_questions_payload(qz):
+        payload = []
+        for q in qz.questions:
+            payload.append({
+                "id": q.id,  # include DB id for safe updating
+                "text": q.text,
+                "type": q.question_type,
+                "options": [
+                    {"id": o.id, "text": o.text, "is_correct": bool(o.is_correct)}
+                    for o in q.options
+                ]
+            })
+        return payload
+
+    # GET request: populate form
     if request.method == 'GET':
         form.course_id.data = quiz.course_id
         form.course_name.data = quiz.course_name
@@ -610,19 +625,21 @@ def edit_quiz(quiz_id):
             'admin/edit_quiz.html',
             form=form,
             quiz=quiz,
+            quiz_questions=build_quiz_questions_payload(quiz),
             selected_course_id=quiz.course_id
         )
 
-    # POST: validate
+    # POST request
     if not form.validate_on_submit():
         return render_template(
             'admin/edit_quiz.html',
             form=form,
-            quiz=quiz
+            quiz=quiz,
+            quiz_questions=build_quiz_questions_payload(quiz)
         )
 
     try:
-        # BASIC FIELDS
+        # BASIC METADATA
         assigned_class = form.assigned_class.data
         title = form.title.data.strip()
         start_datetime = form.start_datetime.data
@@ -662,7 +679,7 @@ def edit_quiz(quiz_id):
             flash("Another quiz is already scheduled during this time.", "danger")
             return redirect(request.url)
 
-        # UPDATE QUIZ METADATA ONLY
+        # UPDATE QUIZ METADATA
         quiz.assigned_class = assigned_class
         quiz.course_id = course.id
         quiz.course_name = course.name
@@ -673,13 +690,75 @@ def edit_quiz(quiz_id):
         quiz.duration_minutes = duration
         quiz.attempts_allowed = attempts_allowed
 
-        # OPTIONAL FILE UPLOAD
+        # FILE UPLOAD
         content_file = request.files.get('content_file')
         if content_file and content_file.filename and allowed_file(content_file.filename):
             filename = secure_filename(content_file.filename)
             os.makedirs(UPLOAD_FOLDER, exist_ok=True)
             content_file.save(os.path.join(UPLOAD_FOLDER, filename))
             quiz.content_file = filename
+
+        # --- UPDATE QUESTIONS IN PLACE ---
+        for key in request.form:
+            # Only consider question text fields
+            m = re.match(r'^questions\[(\d+)\]\[text\]$', key)
+            if not m:
+                continue
+
+            q_index = m.group(1)
+            q_text = request.form.get(key, '').strip()
+            if not q_text:
+                continue
+
+            q_type = 'fill_in' if re.findall(r'_{3,}', q_text) else request.form.get(f'questions[{q_index}][type]', 'mcq')
+            question_id = request.form.get(f'questions[{q_index}][id]', type=int)
+
+            if question_id:
+                # Update existing question
+                question = Question.query.get(question_id)
+                if question:
+                    question.text = q_text
+                    question.question_type = q_type
+            else:
+                # New question
+                question = Question(
+                    quiz_id=quiz.id,
+                    text=q_text,
+                    question_type=q_type
+                )
+                db.session.add(question)
+                db.session.flush()  # get question.id
+
+            # --- OPTIONS ---
+            # Track option IDs to update or add
+            o_index = 0
+            while True:
+                t_key = f'questions[{q_index}][options][{o_index}][text]'
+                c_key = f'questions[{q_index}][options][{o_index}][is_correct]'
+                option_id_key = f'questions[{q_index}][options][{o_index}][id]'
+
+                if t_key not in request.form:
+                    break
+
+                text = request.form.get(t_key, '').strip()
+                is_correct = c_key in request.form
+                option_id = request.form.get(option_id_key, type=int)
+
+                if option_id:
+                    # update existing option
+                    option = Option.query.get(option_id)
+                    if option:
+                        option.text = text
+                        option.is_correct = is_correct
+                else:
+                    # new option
+                    if text:
+                        db.session.add(Option(
+                            question_id=question.id,
+                            text=text,
+                            is_correct=is_correct
+                        ))
+                o_index += 1
 
         db.session.commit()
         flash("Quiz updated successfully!", "success")
@@ -2770,6 +2849,7 @@ def toggle_assessment_period(pid):
 
     db.session.commit()
     return redirect(url_for('admin.assessment_periods'))
+
 
 
 
