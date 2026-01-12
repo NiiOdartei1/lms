@@ -463,36 +463,46 @@ def start_quiz_timer(quiz_id):
 @vclass_bp.route('/autosave_answer', methods=['POST'])
 @login_required
 def autosave_answer():
-    """
-    Accepts JSON payload:
-      { quiz_id, question_id, selected_option_id?, answer_text? }
-    The client must send X-CSRFToken header.
-    """
     data = request.get_json(silent=True) or {}
+
     quiz_id = data.get('quiz_id')
-    qid = data.get('question_id')
+    question_id = data.get('question_id')
     selected_option_id = data.get('selected_option_id')
     answer_text = data.get('answer_text')
 
     if isinstance(answer_text, (list, dict)):
         answer_text = json.dumps(answer_text)
 
-    if not quiz_id or not qid:
+    if not quiz_id or not question_id:
         return jsonify({'ok': False, 'error': 'missing quiz_id or question_id'}), 400
 
+    # 🔑 STEP 1: Get or create active attempt
+    attempt = QuizAttempt.query.filter_by(
+        quiz_id=quiz_id,
+        student_id=current_user.id
+    ).first()
+
+    if not attempt:
+        attempt = QuizAttempt(
+            quiz_id=quiz_id,
+            student_id=current_user.id
+        )
+        db.session.add(attempt)
+        db.session.flush()  # get attempt.id
+
+    # 🔑 STEP 2: Get or create answer tied to attempt
     ans = StudentAnswer.query.filter_by(
-        student_id=current_user.id, quiz_id=quiz_id, question_id=qid
+        attempt_id=attempt.id,
+        question_id=question_id
     ).first()
 
     if ans:
         ans.selected_option_id = selected_option_id
         ans.answer_text = answer_text
-        ans.saved_at = datetime.utcnow()
     else:
         ans = StudentAnswer(
-            student_id=current_user.id,
-            quiz_id=quiz_id,
-            question_id=qid,
+            attempt_id=attempt.id,
+            question_id=question_id,
             selected_option_id=selected_option_id,
             answer_text=answer_text
         )
@@ -1154,6 +1164,7 @@ def calculator():
     if getattr(current_user, "role", None) != "student":
         abort(403)
     return render_template('vclass/calculator.html')
+
 
 
 
