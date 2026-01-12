@@ -107,8 +107,6 @@
   let currentPage = 1;
   const answers = {}; // keyed by question id -> string | number | array
   const LS_KEY = `vclass_quiz_answers_${quizId}`;
-  if (summaryTotal) summaryTotal.textContent = totalQuestions;
-  if (summaryUnanswered) summaryUnanswered.textContent = totalQuestions - answeredCount;
 
   // -----------------------
   // DOM references
@@ -122,6 +120,15 @@
   const summaryUnanswered = document.getElementById('summary-unanswered');
   const paletteEl = document.getElementById('question-palette');
   const form = document.getElementById('quiz-form');
+
+  const summaryTotal = document.getElementById('summary-total');
+
+let answeredCount = 0;
+
+summaryTotal.textContent = totalQuestions;
+summaryAnswered.textContent = 0;
+summaryUnanswered.textContent = totalQuestions;
+
 
   // Fail fast if essential DOM missing
   if (!form || !questionsContainer || !paginationEl || !paletteEl) {
@@ -748,3 +755,4 @@
 .blank-input { min-width: 140px; }
 </style>
 {% endblock %}
+
