@@ -102,7 +102,7 @@ class AdminRegisterForm(FlaskForm):
     qualification = StringField('Qualification', validators=[Optional(), Length(max=100)])
     specialization = StringField('Specialization', validators=[Optional(), Length(max=100)])
     years_of_experience = IntegerField('Years of Experience', validators=[Optional(), NumberRange(min=0, max=100)])
-    subjects_taught = StringField('Subjects Taught (comma-separated)', validators=[Optional(), Length(max=200)])
+    courses_taught = StringField('Courses Taught (comma-separated)', validators=[Optional(), Length(max=200)])
     employment_type = SelectField('Employment Type', choices=[
         ('', 'Select Type'),
         ('Full-time', 'Full-time'),
@@ -175,7 +175,7 @@ class QuizForm(FlaskForm):
         ('SHS 1', 'SHS 1'), ('SHS 2', 'SHS 2'), ('SHS 3', 'SHS 3')
     ], validators=[DataRequired()])
     course_id = HiddenField()
-    course_name = SelectField('Subject/Course', choices=[], validators=[DataRequired()])
+    course_name = SelectField('Course', choices=[], validators=[DataRequired()])
     title = StringField('Title', validators=[DataRequired()])
     start_datetime = DateTimeLocalField(
         'Start DateTime', format='%Y-%m-%dT%H:%M', validators=[DataRequired()]
@@ -198,7 +198,7 @@ class ExamSetForm(FlaskForm):
 
 class ExamForm(FlaskForm):
     title = StringField('Title', validators=[DataRequired()])
-    subject = StringField('Subject', validators=[DataRequired()])
+    course = StringField('Course', validators=[DataRequired()])
     assigned_class = SelectField('Assign to Class', validators=[DataRequired()])
     start_datetime = DateTimeLocalField('Start', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
     end_datetime = DateTimeLocalField('End', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
@@ -297,3 +297,4 @@ class RecordingForm(FlaskForm):
     title = StringField('Recording Title', validators=[DataRequired()])
     file = FileField('Upload Recording', validators=[DataRequired()])
     submit = SubmitField('Upload Recording')
+
