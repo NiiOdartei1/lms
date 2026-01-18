@@ -207,7 +207,7 @@ def register_user():
                     qualification=request.form.get('qualification', '').strip(),
                     specialization=request.form.get('specialization', '').strip(),
                     years_of_experience=int(request.form.get('years_of_experience') or 0),
-                    subjects_taught=request.form.get('subjects_taught', '').strip(),
+                    courses_taught=request.form.get('courses_taught', '').strip(),
                     employment_type=request.form.get('employment_type', '').strip(),
                     department=request.form.get('department', '').strip(),
                     date_of_hire=date_of_hire,
@@ -1094,7 +1094,7 @@ def add_exam():
     if form.validate_on_submit():
         exam = Exam(
             title=form.title.data.strip(),
-            subject=form.subject.data.strip(),
+            course=form.course.data.strip(),
             assigned_class=form.assigned_class.data,
             start_datetime=form.start_datetime.data,
             end_datetime=form.end_datetime.data,
@@ -1122,7 +1122,7 @@ def edit_exam(exam_id):
 
     if form.validate_on_submit():
         exam.title = form.title.data.strip()
-        exam.subject = form.subject.data.strip()
+        exam.course = form.course.data.strip()
         exam.assigned_class = form.assigned_class.data
         exam.start_datetime = form.start_datetime.data
         exam.end_datetime = form.end_datetime.data
@@ -2849,6 +2849,7 @@ def toggle_assessment_period(pid):
 
     db.session.commit()
     return redirect(url_for('admin.assessment_periods'))
+
 
 
 
