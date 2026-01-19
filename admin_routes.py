@@ -1095,8 +1095,9 @@ def add_exam():
     ]
     
     # Populate assigned_class choices from database
+    # Note: Using SchoolClass, not Class
     form.assigned_class.choices = [
-        (cls.id, cls.name) for cls in Class.query.all()
+        (cls.id, cls.name) for cls in SchoolClass.query.all()
     ]
     
     if form.validate_on_submit():
@@ -1104,7 +1105,7 @@ def add_exam():
         exam = Exam(
             title=form.title.data,
             course_id=form.course_id.data,
-            assigned_class_id=form.assigned_class.data,
+            assigned_class=form.assigned_class.data,  # This stores the class name/ID
             start_datetime=form.start_datetime.data,
             end_datetime=form.end_datetime.data,
             duration_minutes=form.duration_minutes.data,
@@ -2868,6 +2869,7 @@ def toggle_assessment_period(pid):
 
     db.session.commit()
     return redirect(url_for('admin.assessment_periods'))
+
 
 
 
