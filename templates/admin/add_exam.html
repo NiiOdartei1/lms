@@ -23,9 +23,9 @@
 
         <!-- Subject -->
         <div class="mb-3">
-          <label class="form-label fw-bold"><i class="fas fa-book text-info"></i> {{ form.subject.label }}</label>
-          {{ form.subject(class="form-control", placeholder="Enter subject name") }}
-          {% for err in form.subject.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+          <label class="form-label fw-bold"><i class="fas fa-book text-info"></i> {{ form.course.label }}</label>
+          {{ form.course(class="form-control", placeholder="Enter course name") }}
+          {% for err in form.course.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
         </div>
 
         <!-- Class -->
@@ -132,3 +132,4 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 </script>
 {% endblock %}
+
