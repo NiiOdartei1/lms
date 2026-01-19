@@ -28,11 +28,18 @@
           {% for err in form.assigned_class.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
         </div>
 
-        <!-- Subject / Course -->
+        <!-- Course (visible select + hidden id field) -->
         <div class="mb-3">
           <label class="form-label fw-bold"><i class="fas fa-book text-info"></i> Course</label>
-          <select id="course_name" class="form-select"></select>
-          {{ form.course_id(type="hidden", id="course_id") }}
+
+          <!-- visible select populated via JS -->
+          <select id="course_name" class="form-select" aria-label="Course select">
+            <option value="">Select a class first</option>
+          </select>
+
+          <!-- manually render a hidden input for course_id (DO NOT call form.course_id widget) -->
+          <input type="hidden" name="{{ form.course_id.name }}" id="course_id" value="{{ form.course_id.data if form.course_id.data is not none else '' }}">
+
           {% for err in form.course_id.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
         </div>
 
@@ -99,71 +106,93 @@ document.addEventListener("DOMContentLoaded", function () {
   const courseSelect = document.getElementById("course_name");
   const courseIdInput = document.getElementById("course_id");
 
+  // Helper to safely set hidden input value
+  function setHiddenCourseId(id) {
+    if (!courseIdInput) return;
+    courseIdInput.value = id === null || id === undefined ? '' : String(id);
+  }
+
   function populateCourses(selectedClass, preselectId=null) {
     if (!courseSelect) return;
     courseSelect.disabled = true;
     courseSelect.innerHTML = '<option>Loading...</option>';
-    courseIdInput.value = '';
+    setHiddenCourseId('');
 
     fetch(`/admin/get_courses/${encodeURIComponent(selectedClass)}`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('Network error');
+        return res.json();
+      })
       .then(data => {
         courseSelect.innerHTML = '';
         courseSelect.disabled = false;
 
-        if (!data || data.length === 0) {
+        if (!Array.isArray(data) || data.length === 0) {
           const opt = document.createElement('option');
           opt.value = '';
           opt.textContent = 'No courses available';
           courseSelect.appendChild(opt);
+          setHiddenCourseId('');
           return;
         }
 
         data.forEach(c => {
           const opt = document.createElement('option');
           opt.textContent = c.name;
-          opt.value = c.name;  // visible text
-          opt.dataset.id = c.id; // hidden id
+          opt.value = c.name;      // visible text (keeps parity with Quiz UI)
+          opt.dataset.id = String(c.id); // store the actual DB id
           courseSelect.appendChild(opt);
         });
 
-        // Preselect
+        // Preselect by id if provided
         if (preselectId) {
-          const match = Array.from(courseSelect.options).find(o => o.dataset.id == preselectId);
-          if (match) courseSelect.value = match.value;
+          const match = Array.from(courseSelect.options).find(o => o.dataset.id === String(preselectId));
+          if (match) {
+            courseSelect.value = match.value;
+            setHiddenCourseId(match.dataset.id);
+            return;
+          }
         }
 
-        // Set hidden field to first option if none selected
-        const firstOption = courseSelect.options[0];
-        if (firstOption) courseIdInput.value = firstOption.dataset.id || '';
+        // Otherwise auto-select first valid option and set its id
+        const first = Array.from(courseSelect.options).find(o => o.value !== '');
+        if (first) {
+          courseSelect.value = first.value;
+          setHiddenCourseId(first.dataset.id || '');
+        } else {
+          setHiddenCourseId('');
+        }
       })
-      .catch(() => {
+      .catch(err => {
+        console.error('Error loading courses:', err);
         courseSelect.innerHTML = '<option>Error loading courses</option>';
         courseSelect.disabled = false;
+        setHiddenCourseId('');
       });
   }
 
+  // Wire class -> courses
   if (classSelect) {
-    classSelect.addEventListener('change', function() {
-      const cls = this.value;
+    classSelect.addEventListener('change', function () {
+      const cls = this.value || '';
       if (cls) populateCourses(cls);
       else {
         courseSelect.innerHTML = '<option>Select a class first</option>';
-        courseIdInput.value = '';
+        setHiddenCourseId('');
       }
     });
 
-    // Populate on load if editing
-    if (classSelect.value) {
-      populateCourses(classSelect.value, courseIdInput.value || null);
-    }
+    // If page loaded with a preselected class (edit mode), populate now
+    const preClass = classSelect.value || '';
+    const preCourseId = courseIdInput && courseIdInput.value ? courseIdInput.value : null;
+    if (preClass) populateCourses(preClass, preCourseId);
   }
 
-  // Update hidden field when visible course changes
+  // Keep hidden input in sync when user changes visible course
   if (courseSelect && courseIdInput) {
-    courseSelect.addEventListener('change', function() {
-      const selected = courseSelect.options[courseSelect.selectedIndex];
-      courseIdInput.value = selected?.dataset.id || '';
+    courseSelect.addEventListener('change', function () {
+      const sel = courseSelect.options[courseSelect.selectedIndex];
+      setHiddenCourseId(sel?.dataset?.id || '');
     });
   }
 
@@ -171,20 +200,24 @@ document.addEventListener("DOMContentLoaded", function () {
   const modeSelect = document.getElementById("assignment_mode");
   const seedGroup = document.getElementById("assignment-seed-group");
   function toggleSeed() {
+    if (!modeSelect) return;
     if (modeSelect.value === 'hash') {
       new bootstrap.Collapse(seedGroup, { show: true });
     } else {
       new bootstrap.Collapse(seedGroup, { hide: true });
     }
   }
-  modeSelect.addEventListener('change', toggleSeed);
-  toggleSeed();
+  if (modeSelect) {
+    modeSelect.addEventListener('change', toggleSeed);
+    toggleSeed();
+  }
 
   // Duration preview
   const durationInput = document.getElementById("duration_minutes");
   const durationPreview = document.getElementById("durationPreview");
   function updateDurationPreview() {
-    const mins = parseInt(durationInput.value) || 0;
+    if (!durationInput || !durationPreview) return;
+    const mins = parseInt(durationInput.value, 10) || 0;
     if (mins <= 0) {
       durationPreview.innerHTML = "<span class='badge bg-danger'>Invalid duration</span>";
       return;
@@ -196,8 +229,10 @@ document.addEventListener("DOMContentLoaded", function () {
     if (rem) text += `${rem}m`;
     durationPreview.innerHTML = `<span class="badge bg-success">⏱ ${text.trim()}</span>`;
   }
-  durationInput.addEventListener('input', updateDurationPreview);
-  updateDurationPreview();
+  if (durationInput) {
+    durationInput.addEventListener('input', updateDurationPreview);
+    updateDurationPreview();
+  }
 });
 </script>
 {% endblock %}
