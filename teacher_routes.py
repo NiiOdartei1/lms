@@ -945,23 +945,19 @@ def add_meeting():
         meeting = Meeting(
             title=form.title.data,
             description=form.description.data,
-            host_id=current_user.user_id,
+            host_id=current_user.id,  # ✅ INTEGER PK
             course_id=form.course_id.data,
-            meeting_code=zoom_meeting["id"],
+            meeting_code=str(zoom_meeting["id"]),  # also fix type
             scheduled_start=form.scheduled_start.data,
             scheduled_end=form.scheduled_end.data,
             join_url=zoom_meeting["join_url"],
             start_url=zoom_meeting["start_url"]
         )
+
         db.session.add(meeting)
         db.session.commit()
         flash("Zoom meeting created successfully!", "success")
         return redirect(url_for("teacher.meetings"))
 
     return render_template("teacher/meeting_form.html", form=form)
-
-
-
-
-
 
