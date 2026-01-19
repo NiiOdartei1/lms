@@ -1119,12 +1119,16 @@ def edit_exam(exam_id):
     exam = Exam.query.get_or_404(exam_id)
     form = ExamForm(obj=exam)
 
-    # Populate class choices from SchoolClass table
+    form.course_id.choices = [(c.id, c.name) for c in Course.query.order_by(Course.name).all()]
     form.assigned_class.choices = [(c.name, c.name) for c in SchoolClass.query.order_by(SchoolClass.name).all()]
+
+    # ensure the select shows the current course on GET
+    if request.method == "GET":
+        form.course_id.data = exam.course_id
 
     if form.validate_on_submit():
         exam.title = form.title.data.strip()
-        exam.course = form.course.data.strip()
+        exam.course_id = form.course_id.data        # <-- set course_id (int)
         exam.assigned_class = form.assigned_class.data
         exam.start_datetime = form.start_datetime.data
         exam.end_datetime = form.end_datetime.data
@@ -2851,6 +2855,7 @@ def toggle_assessment_period(pid):
 
     db.session.commit()
     return redirect(url_for('admin.assessment_periods'))
+
 
 
 
