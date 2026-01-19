@@ -1087,41 +1087,37 @@ def create_exam_question(exam_id):
 @admin_bp.route('/exams/add', methods=['GET', 'POST'])
 @login_required
 def add_exam():
-    admin_only()
     form = ExamForm()
-
-    # Populate class choices
-    form.assigned_class.choices = [(c.name, c.name) for c in SchoolClass.query.order_by(SchoolClass.name).all()]
-
-    # On GET or POST, pre-populate courses for the selected class
-    selected_class = request.form.get('assigned_class') or form.assigned_class.data
-    if selected_class:
-        courses = Course.query.filter(func.lower(Course.assigned_class) == selected_class.lower()).order_by(Course.name).all()
-        form.course_id.choices = [(c.id, c.name) for c in courses]
-    else:
-        form.course_id.choices = [("", "Select a class first")]
-
+    
+    # Populate course_id choices from database
+    form.course_id.choices = [
+        (course.id, course.name) for course in Course.query.all()
+    ]
+    
+    # Populate assigned_class choices from database
+    form.assigned_class.choices = [
+        (cls.id, cls.name) for cls in Class.query.all()
+    ]
+    
     if form.validate_on_submit():
-        if not form.course_id.data:
-            flash("Please select a valid course.", "danger")
-        else:
-            exam = Exam(
-                title=form.title.data.strip(),
-                course_id=form.course_id.data,
-                assigned_class=form.assigned_class.data,
-                start_datetime=form.start_datetime.data,
-                end_datetime=form.end_datetime.data,
-                duration_minutes=form.duration_minutes.data,
-                assignment_mode=form.assignment_mode.data,
-                assignment_seed=form.assignment_seed.data or None
-            )
-            db.session.add(exam)
-            db.session.commit()
-            flash("Exam created successfully!", "success")
-            return redirect(url_for('admin.manage_exams'))
-
+        # Handle form submission
+        exam = Exam(
+            title=form.title.data,
+            course_id=form.course_id.data,
+            assigned_class_id=form.assigned_class.data,
+            start_datetime=form.start_datetime.data,
+            end_datetime=form.end_datetime.data,
+            duration_minutes=form.duration_minutes.data,
+            assignment_mode=form.assignment_mode.data,
+            assignment_seed=form.assignment_seed.data
+        )
+        db.session.add(exam)
+        db.session.commit()
+        flash('Exam created successfully!', 'success')
+        return redirect(url_for('admin.exams'))
+    
     return render_template('admin/add_exam.html', form=form)
-
+    
 @admin_bp.route("/edit_exam/<int:exam_id>", methods=["GET", "POST"])
 @login_required
 def edit_exam(exam_id):
@@ -2872,6 +2868,7 @@ def toggle_assessment_period(pid):
 
     db.session.commit()
     return redirect(url_for('admin.assessment_periods'))
+
 
 
 
