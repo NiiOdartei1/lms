@@ -94,6 +94,45 @@
 <!-- Script -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+  const classSelect = document.getElementById("assigned_class");
+  const courseSelect = document.getElementById("course_id");
+
+  classSelect.addEventListener("change", function () {
+    const selectedClass = this.value;
+
+    courseSelect.innerHTML = '<option value="">Loading courses...</option>';
+
+    if (!selectedClass) {
+      courseSelect.innerHTML = '<option value="">Select a class first</option>';
+      return;
+    }
+
+    fetch(`/admin/get_courses/${encodeURIComponent(selectedClass)}`)
+      .then(res => res.json())
+      .then(data => {
+        courseSelect.innerHTML = '';
+
+        if (data.length === 0) {
+          courseSelect.innerHTML = '<option value="">No courses for this class</option>';
+          return;
+        }
+
+        data.forEach(course => {
+          const opt = document.createElement("option");
+          opt.value = course.id;
+          opt.textContent = course.name;
+          courseSelect.appendChild(opt);
+        });
+      })
+      .catch(() => {
+        courseSelect.innerHTML = '<option value="">Error loading courses</option>';
+      });
+  });
+});
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
   const modeSelect = document.getElementById("assignment_mode");
   const seedGroup = document.getElementById("assignment-seed-group");
   const durationInput = document.getElementById("duration_minutes");
@@ -132,5 +171,6 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 </script>
 {% endblock %}
+
 
 
