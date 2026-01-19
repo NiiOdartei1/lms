@@ -1090,20 +1090,19 @@ def add_exam():
     admin_only()
     form = ExamForm()
 
-    # Populate choices BEFORE validate_on_submit()
-    form.course_id.choices = [(c.id, c.name) for c in Course.query.order_by(Course.name).all()]
     form.assigned_class.choices = get_class_choices()
+    form.course_id.choices = [(-1, "Select a class first")]
 
     if form.validate_on_submit():
         exam = Exam(
             title=form.title.data.strip(),
-            course_id=form.course_id.data,        # <-- use course_id (int), not course (str)
+            course_id=form.course_id.data,
             assigned_class=form.assigned_class.data,
             start_datetime=form.start_datetime.data,
             end_datetime=form.end_datetime.data,
             duration_minutes=form.duration_minutes.data,
             assignment_mode=form.assignment_mode.data,
-            assignment_seed=(form.assignment_seed.data or None)
+            assignment_seed=form.assignment_seed.data or None
         )
         db.session.add(exam)
         db.session.commit()
@@ -2855,6 +2854,7 @@ def toggle_assessment_period(pid):
 
     db.session.commit()
     return redirect(url_for('admin.assessment_periods'))
+
 
 
 
