@@ -198,7 +198,7 @@ class ExamSetForm(FlaskForm):
 
 class ExamForm(FlaskForm):
     title = StringField('Title', validators=[DataRequired()])
-    course = StringField('Course', validators=[DataRequired()])
+    course_id = SelectField( 'Course', coerce=int, validators=[DataRequired()] )
     assigned_class = SelectField('Assign to Class', validators=[DataRequired()])
     start_datetime = DateTimeLocalField('Start', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
     end_datetime = DateTimeLocalField('End', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
@@ -297,4 +297,5 @@ class RecordingForm(FlaskForm):
     title = StringField('Recording Title', validators=[DataRequired()])
     file = FileField('Upload Recording', validators=[DataRequired()])
     submit = SubmitField('Upload Recording')
+
 
