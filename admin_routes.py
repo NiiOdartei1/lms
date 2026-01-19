@@ -1090,24 +1090,37 @@ def add_exam():
     admin_only()
     form = ExamForm()
 
-    form.assigned_class.choices = get_class_choices()
-    form.course_id.choices = [(-1, "Select a class first")]
+    # Populate class choices
+    form.assigned_class.choices = [(c.name, c.name) for c in SchoolClass.query.order_by(SchoolClass.name).all()]
+
+    # If a class has been selected, populate course_id choices for that class
+    selected_class = form.assigned_class.data or None
+    if selected_class:
+        courses = Course.query.filter(func.lower(Course.assigned_class) == selected_class.lower()).order_by(Course.name).all()
+        form.course_id.choices = [(c.id, c.name) for c in courses]
+    else:
+        # Default placeholder
+        form.course_id.choices = [(-1, "Select a class first")]
 
     if form.validate_on_submit():
-        exam = Exam(
-            title=form.title.data.strip(),
-            course_id=form.course_id.data,
-            assigned_class=form.assigned_class.data,
-            start_datetime=form.start_datetime.data,
-            end_datetime=form.end_datetime.data,
-            duration_minutes=form.duration_minutes.data,
-            assignment_mode=form.assignment_mode.data,
-            assignment_seed=form.assignment_seed.data or None
-        )
-        db.session.add(exam)
-        db.session.commit()
-        flash("Exam created successfully!", "success")
-        return redirect(url_for('admin.manage_exams'))
+        # Extra check: ensure course_id is valid
+        if form.course_id.data == -1:
+            flash("Please select a valid course.", "danger")
+        else:
+            exam = Exam(
+                title=form.title.data.strip(),
+                course_id=form.course_id.data,
+                assigned_class=form.assigned_class.data,
+                start_datetime=form.start_datetime.data,
+                end_datetime=form.end_datetime.data,
+                duration_minutes=form.duration_minutes.data,
+                assignment_mode=form.assignment_mode.data,
+                assignment_seed=form.assignment_seed.data or None
+            )
+            db.session.add(exam)
+            db.session.commit()
+            flash("Exam created successfully!", "success")
+            return redirect(url_for('admin.manage_exams'))
 
     return render_template('admin/add_exam.html', form=form)
 
@@ -2861,6 +2874,7 @@ def toggle_assessment_period(pid):
 
     db.session.commit()
     return redirect(url_for('admin.assessment_periods'))
+
 
 
 
