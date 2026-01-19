@@ -21,18 +21,19 @@
           {% for err in form.title.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
         </div>
 
-        <!-- Subject -->
-        <div class="mb-3">
-          <label class="form-label fw-bold"><i class="fas fa-book text-info"></i> {{ form.course_id.label }}</label>
-          {{ form.course_id(class="form-control", placeholder="Enter course name") }}
-          {% for err in form.course_id.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
-        </div>
-
         <!-- Class -->
         <div class="mb-3">
           <label class="form-label fw-bold"><i class="fas fa-users text-warning"></i> {{ form.assigned_class.label }}</label>
-          {{ form.assigned_class(class="form-select") }}
+          {{ form.assigned_class(class="form-select", id="assigned_class") }}
           {% for err in form.assigned_class.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+        </div>
+
+        <!-- Subject / Course -->
+        <div class="mb-3">
+          <label class="form-label fw-bold"><i class="fas fa-book text-info"></i> Course</label>
+          <select id="course_name" class="form-select"></select>
+          {{ form.course_id(type="hidden", id="course_id") }}
+          {% for err in form.course_id.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
         </div>
 
         <!-- DateTime -->
@@ -91,63 +92,97 @@
   </div>
 </div>
 
-<!-- Script -->
+<!-- Scripts -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   const classSelect = document.getElementById("assigned_class");
-  const courseSelect = document.getElementById("course_id");
+  const courseSelect = document.getElementById("course_name");
+  const courseIdInput = document.getElementById("course_id");
 
-  classSelect.addEventListener("change", function () {
-    const selectedClass = this.value;
-
-    courseSelect.innerHTML = '<option value="">Loading courses...</option>';
-
-    if (!selectedClass) {
-      courseSelect.innerHTML = '<option value="">Select a class first</option>';
-      return;
-    }
+  function populateCourses(selectedClass, preselectId=null) {
+    if (!courseSelect) return;
+    courseSelect.disabled = true;
+    courseSelect.innerHTML = '<option>Loading...</option>';
+    courseIdInput.value = '';
 
     fetch(`/admin/get_courses/${encodeURIComponent(selectedClass)}`)
       .then(res => res.json())
       .then(data => {
         courseSelect.innerHTML = '';
+        courseSelect.disabled = false;
 
-        if (data.length === 0) {
-          courseSelect.innerHTML = '<option value="">No courses for this class</option>';
+        if (!data || data.length === 0) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'No courses available';
+          courseSelect.appendChild(opt);
           return;
         }
 
-        data.forEach(course => {
-          const opt = document.createElement("option");
-          opt.value = course.id;
-          opt.textContent = course.name;
+        data.forEach(c => {
+          const opt = document.createElement('option');
+          opt.textContent = c.name;
+          opt.value = c.name;  // visible text
+          opt.dataset.id = c.id; // hidden id
           courseSelect.appendChild(opt);
         });
+
+        // Preselect
+        if (preselectId) {
+          const match = Array.from(courseSelect.options).find(o => o.dataset.id == preselectId);
+          if (match) courseSelect.value = match.value;
+        }
+
+        // Set hidden field to first option if none selected
+        const firstOption = courseSelect.options[0];
+        if (firstOption) courseIdInput.value = firstOption.dataset.id || '';
       })
       .catch(() => {
-        courseSelect.innerHTML = '<option value="">Error loading courses</option>';
+        courseSelect.innerHTML = '<option>Error loading courses</option>';
+        courseSelect.disabled = false;
       });
-  });
-});
-</script>
+  }
 
-<script>
-document.addEventListener("DOMContentLoaded", function () {
+  if (classSelect) {
+    classSelect.addEventListener('change', function() {
+      const cls = this.value;
+      if (cls) populateCourses(cls);
+      else {
+        courseSelect.innerHTML = '<option>Select a class first</option>';
+        courseIdInput.value = '';
+      }
+    });
+
+    // Populate on load if editing
+    if (classSelect.value) {
+      populateCourses(classSelect.value, courseIdInput.value || null);
+    }
+  }
+
+  // Update hidden field when visible course changes
+  if (courseSelect && courseIdInput) {
+    courseSelect.addEventListener('change', function() {
+      const selected = courseSelect.options[courseSelect.selectedIndex];
+      courseIdInput.value = selected?.dataset.id || '';
+    });
+  }
+
+  // Assignment Mode toggle
   const modeSelect = document.getElementById("assignment_mode");
   const seedGroup = document.getElementById("assignment-seed-group");
-  const durationInput = document.getElementById("duration_minutes");
-  const durationPreview = document.getElementById("durationPreview");
-
-  // Toggle Seed Field
-  function toggleSeedField() {
-    if (modeSelect.value === "hash") {
+  function toggleSeed() {
+    if (modeSelect.value === 'hash') {
       new bootstrap.Collapse(seedGroup, { show: true });
     } else {
       new bootstrap.Collapse(seedGroup, { hide: true });
     }
   }
+  modeSelect.addEventListener('change', toggleSeed);
+  toggleSeed();
 
-  // Live Duration Preview
+  // Duration preview
+  const durationInput = document.getElementById("duration_minutes");
+  const durationPreview = document.getElementById("durationPreview");
   function updateDurationPreview() {
     const mins = parseInt(durationInput.value) || 0;
     if (mins <= 0) {
@@ -155,22 +190,14 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
     const hours = Math.floor(mins / 60);
-    const remainingMins = mins % 60;
+    const rem = mins % 60;
     let text = "";
-    if (hours > 0) text += `${hours}h `;
-    if (remainingMins > 0) text += `${remainingMins}m`;
+    if (hours) text += `${hours}h `;
+    if (rem) text += `${rem}m`;
     durationPreview.innerHTML = `<span class="badge bg-success">⏱ ${text.trim()}</span>`;
   }
-
-  toggleSeedField();
-  modeSelect.addEventListener("change", toggleSeedField);
-  durationInput.addEventListener("input", updateDurationPreview);
-
-  // Initialize preview on load
+  durationInput.addEventListener('input', updateDurationPreview);
   updateDurationPreview();
 });
 </script>
 {% endblock %}
-
-
-
