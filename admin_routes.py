@@ -1093,18 +1093,16 @@ def add_exam():
     # Populate class choices
     form.assigned_class.choices = [(c.name, c.name) for c in SchoolClass.query.order_by(SchoolClass.name).all()]
 
-    # If a class has been selected, populate course_id choices for that class
-    selected_class = form.assigned_class.data or None
+    # On GET or POST, pre-populate courses for the selected class
+    selected_class = request.form.get('assigned_class') or form.assigned_class.data
     if selected_class:
         courses = Course.query.filter(func.lower(Course.assigned_class) == selected_class.lower()).order_by(Course.name).all()
         form.course_id.choices = [(c.id, c.name) for c in courses]
     else:
-        # Default placeholder
-        form.course_id.choices = [(-1, "Select a class first")]
+        form.course_id.choices = [("", "Select a class first")]
 
     if form.validate_on_submit():
-        # Extra check: ensure course_id is valid
-        if form.course_id.data == -1:
+        if not form.course_id.data:
             flash("Please select a valid course.", "danger")
         else:
             exam = Exam(
@@ -2874,6 +2872,7 @@ def toggle_assessment_period(pid):
 
     db.session.commit()
     return redirect(url_for('admin.assessment_periods'))
+
 
 
 
