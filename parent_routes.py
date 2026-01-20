@@ -1,21 +1,12 @@
 from flask import Blueprint, render_template, abort, flash, redirect, url_for, request, send_file, current_app, jsonify
 from flask_login import login_required, current_user, login_user
 from forms import ChangePasswordForm, ParentLoginForm
-from models import User, ParentProfile, ParentChildLink, StudentProfile, Assignment, StudentQuizSubmission, Quiz, AttendanceRecord, StudentFeeBalance, StudentFeeTransaction , ClassFeeStructure , Notification, NotificationRecipient, TimetableEntry
+from models import TimetableEntry, db, User, ParentProfile, ParentChildLink, StudentProfile, Assignment, StudentQuizSubmission, Quiz, AttendanceRecord, StudentFeeBalance, StudentFeeTransaction , ClassFeeStructure , Notification, NotificationRecipient
 from datetime import datetime
-import os, logging
-from utils.extensions import db
+import os
 from werkzeug.utils import secure_filename
 
-parent_bp = Blueprint("parent", __name__, url_prefix="/parent")
-
-logger = logging.getLogger('parent_login')
-logger.setLevel(logging.DEBUG)
-if not logger.handlers:
-    handler = logging.StreamHandler()  # logs to console
-    formatter = logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+parent_bp = Blueprint('parent', __name__, url_prefix='/parent')
 
 
 @parent_bp.route('/login', methods=['GET', 'POST'])
@@ -26,43 +17,15 @@ def parent_login():
         user_id = form.user_id.data.strip()
         password = form.password.data.strip()
 
-        logger.debug(f"Parent login attempt: user_id='{user_id}', username='{username}'")
-
-        try:
-            user = None
-            # First try lookup by user_id
-            if user_id:
-                user = User.query.filter_by(user_id=user_id, role='parent').first()
-                logger.debug(f"Lookup by user_id returned: {user}")
-
-            # If not found, try username (case-insensitive)
-            if not user and username:
-                user = User.query.filter(User.username.ilike(username), User.role == 'parent').first()
-                logger.debug(f"Lookup by username returned: {user}")
-
-            if not user:
-                logger.warning(f"No parent user found for user_id='{user_id}', username='{username}'")
-                flash("Invalid parent credentials.", "danger")
-                return render_template('parent/login.html', form=form)
-
-            # Check password
-            if not user.check_password(password):
-                logger.warning(f"Password check failed for user_id='{user.user_id}', username='{user.username}'")
-                flash("Invalid parent credentials.", "danger")
-                return render_template('parent/login.html', form=form)
-
-            # Successful login
+        user = User.query.filter_by(user_id=user_id, role='parent').first()
+        if user and user.username.lower() == username.lower() and user.check_password(password):
             login_user(user)
-            logger.info(f"Parent '{user.first_name} {user.last_name}' logged in successfully (user_id={user.user_id})")
             flash(f"Welcome back, {user.first_name}!", "success")
             return redirect(url_for('parent.dashboard'))
-
-        except Exception as e:
-            logger.error(f"Exception during parent login: {e}", exc_info=True)
-            flash(f"An error occurred during login. Check logs for details.", "danger")
+        flash("Invalid parent credentials.", "danger")
 
     return render_template('parent/login.html', form=form)
-    
+
 # ------------------------
 # Parent Dashboard
 # ------------------------
@@ -73,15 +36,16 @@ def dashboard():
         abort(403)
 
     parent_profile = ParentProfile.query.filter_by(user_id=current_user.user_id).first()
-
     children = []
     if parent_profile:
-        children_links = ParentChildLink.query.filter_by(parent_id=parent_profile.id).all()
-        for link in children_links:
-            student = StudentProfile.query.filter_by(id=link.student_id).first()
-            user = User.query.filter_by(user_id=student.user_id).first() if student else None
-            if student and user:
-                children.append((student, user))
+        # more robust join: return (StudentProfile, User) tuples
+        children = (
+            db.session.query(StudentProfile, User)
+            .join(ParentChildLink, ParentChildLink.student_id == StudentProfile.id)
+            .join(User, StudentProfile.user_id == User.user_id)
+            .filter(ParentChildLink.parent_id == parent_profile.id)
+            .all()
+        )
 
     total_children = len(children)
 
@@ -569,7 +533,9 @@ def view_child_timetable(student_id):
 
     student = StudentProfile.query.get_or_404(student_id)
 
-    # TIMETABLE LOGIC (reuse student timetable logic)
+    # ==========================
+    # Use the same logic as student timetable
+    # ==========================
     entries = (
         TimetableEntry.query
         .filter_by(assigned_class=student.current_class)
@@ -577,7 +543,7 @@ def view_child_timetable(student_id):
         .all()
     )
 
-    # TIME SLOTS, day_blocks, vlines etc. (copy the same code you already have)
+    # Time slots, day_blocks, vlines etc. (reuse student logic)
     TIME_SLOTS = [
         (8*60, 9*60),
         (9*60, 10*60),
@@ -621,6 +587,7 @@ def view_child_timetable(student_id):
         width_pct = ((e - s) / total_minutes) * 100.0
         return round(left_pct,3), round(width_pct,3)
 
+    # Add classes
     for e in entries:
         s_min = e.start_time.hour*60 + e.start_time.minute
         e_min = e.end_time.hour*60 + e.end_time.minute
@@ -663,182 +630,16 @@ def view_child_timetable(student_id):
 
     col_template = ' '.join(f'{slot["width_pct"]}%' for slot in time_ticks)
 
+    # 🔑 Render the student template, but with the child’s timetable
     return render_template(
-        'parent/child_timetable.html',   # ✅ correct
-        student=student,
-        student_class=student.current_class,
-        time_ticks=time_ticks,
-        day_blocks=day_blocks,
-        vlines=vlines,
-        col_template=col_template,
-        total_minutes=total_minutes,
-        download_ts=int(datetime.utcnow().timestamp())
-    )
-
-@parent_bp.route('/download_child_timetable/<int:child_id>')
-@login_required
-def download_child_timetable(child_id):
-    from io import BytesIO
-    from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib import colors
-    from reportlab.lib.units import inch
-    from datetime import datetime
-    from flask import send_file, flash, redirect, url_for
-
-    # Make sure current user is a parent
-    if current_user.role != 'parent':
-        flash('Access denied.', 'danger')
-        return redirect(url_for('parent.dashboard'))
-
-    # Get child profile and class
-    child_profile = StudentProfile.query.get(child_id)
-    if not child_profile:
-        flash('Child profile not found.', 'danger')
-        return redirect(url_for('parent.dashboard'))
-
-    # Check if this child belongs to the parent
-    link = ParentChildLink.query.filter_by(parent_id=current_user.id, student_id=child_id).first()
-    if not link:
-        flash('You do not have permission to view this timetable.', 'danger')
-        return redirect(url_for('parent.dashboard'))
-
-    student_class = child_profile.current_class
-
-    timetable_entries = TimetableEntry.query \
-        .filter_by(assigned_class=student_class) \
-        .join(Course, TimetableEntry.course_id == Course.id) \
-        .order_by(TimetableEntry.day_of_week, TimetableEntry.start_time) \
-        .all()
-
-    if not timetable_entries:
-        flash('No timetable available to download.', 'warning')
-        return redirect(url_for('parent.view_child_timetable', child_id=child_id))
-
-    # === TIME SLOTS ===
-    TIME_SLOTS = [
-        (8*60, 9*60),
-        (9*60, 10*60),
-        (10*60, 10*60+30),
-        (10*60+30, 11*60+30),
-        (11*60+30, 12*60+30),
-        (12*60+30, 13*60),
-        (13*60, 14*60),
-        (14*60, 15*60),
-        (15*60, 16*60),
-        (16*60, 17*60),
-    ]
-    MIN_START = TIME_SLOTS[0][0]
-    MAX_END = TIME_SLOTS[-1][1]
-    total_minutes = MAX_END - MIN_START
-
-    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-
-    # Break letters
-    MORNING_LETTERS = ['B', 'R', 'E', 'A', 'K']
-    LUNCH_LETTERS = ['L', 'U', 'N', 'C', 'H']
-    BREAKS = [
-        {'start_min': 10*60, 'end_min': 10*60+25, 'letters': MORNING_LETTERS},
-        {'start_min': 12*60+30, 'end_min': 12*60+55, 'letters': LUNCH_LETTERS},
-    ]
-
-    # Build header labels & column widths
-    header = ['Day / Time']
-    col_widths = [1.2 * inch]
-    total_width = 10.5 * inch
-    remaining_width = total_width - col_widths[0]
-
-    for start, end in TIME_SLOTS:
-        mins = end - start
-        width = remaining_width * (mins / total_minutes)
-        col_widths.append(width)
-        label = f"{start//60:02d}:{start%60:02d} - {end//60:02d}:{end%60:02d}"
-        header.append(label)
-
-    # PDF Paragraph style
-    styles = getSampleStyleSheet()
-    cell_style = ParagraphStyle(
-        'cell_style',
-        parent=styles['Normal'],
-        alignment=1,  # center
-        fontSize=9,
-        leading=10,
-        wordWrap='CJK',
-    )
-
-    # Build timetable matrix
-    timetable_matrix = []
-    now = datetime.now()
-    today_name = now.strftime('%A')
-
-    for i, day in enumerate(days):
-        row = [day]
-        for start, end in TIME_SLOTS:
-            match = next(
-                (e for e in timetable_entries 
-                 if e.day_of_week == day and 
-                    (e.start_time.hour*60 + e.start_time.minute) == start),
-                None
-            )
-            if match:
-                row.append(Paragraph(match.course.name, cell_style))
-            else:
-                letter = None
-                for br in BREAKS:
-                    if start >= br['start_min'] and start < br['end_min']:
-                        letter = br['letters'][i]
-                        break
-                row.append(Paragraph(letter if letter else "—", cell_style))
-        timetable_matrix.append(row)
-
-    data = [header] + timetable_matrix
-
-    # PDF Generation
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4),
-                            leftMargin=inch/2, rightMargin=inch/2,
-                            topMargin=inch/2, bottomMargin=inch/2)
-    elements = []
-
-    elements.append(Paragraph(f"<b>{child_profile.full_name} — Class Timetable: {student_class}</b>", styles['Title']))
-    elements.append(Spacer(1, 12))
-
-    table = Table(data, colWidths=col_widths, repeatRows=1)
-
-    table_style = TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#4A90E2")),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#cccccc")),
-    ])
-
-    for i, row in enumerate(timetable_matrix):
-        bg_color = colors.HexColor("#f0f4f8") if i % 2 == 0 else colors.white
-        table_style.add('BACKGROUND', (0,i+1), (-1,i+1), bg_color)
-        if row[0] == today_name:
-            table_style.add('BACKGROUND', (0,i+1), (-1,i+1), colors.HexColor("#FFF4CC"))
-
-        for j, val in enumerate(row[1:], start=1):
-            text = val.getPlainText().strip()
-            if text in MORNING_LETTERS + LUNCH_LETTERS:
-                table_style.add('BACKGROUND', (j,i+1), (j,i+1), colors.HexColor("#FFD966"))
-                table_style.add('TEXTCOLOR', (j,i+1), (j,i+1), colors.HexColor("#222222"))
-                table_style.add('FONTNAME', (j,i+1), (j,i+1), 'Helvetica-Bold')
-
-    table.setStyle(table_style)
-    elements.append(table)
-
-    elements.append(Spacer(1,12))
-    elements.append(Paragraph(f"Generated on: {datetime.now().strftime('%d %b %Y %I:%M %p')}", styles['Normal']))
-
-    doc.build(elements)
-    buffer.seek(0)
-
-    return send_file(buffer, as_attachment=True,
-                     download_name=f"{child_profile.full_name}_{student_class}_timetable.pdf",
-                     mimetype='application/pdf')
-
-
+    'student/timetable.html',
+    student_class=student.current_class,
+    time_ticks=time_ticks,
+    day_blocks=day_blocks,
+    vlines=vlines,
+    col_template=col_template,
+    total_minutes=total_minutes,
+    download_ts=int(datetime.utcnow().timestamp()),
+    is_parent=True,  # <-- flag for template
+    selected_child_name=student.user.full_name
+)
