@@ -1,8 +1,10 @@
+import logging
 from flask import Blueprint, app, current_app, render_template, abort, request, redirect, url_for, flash, jsonify, session, send_from_directory
 from flask_login import login_required, current_user, login_user
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
-from models import PasswordResetRequest, PasswordResetToken, StudentFeeBalance, User, Admin, StudentProfile, ParentProfile, Quiz, Question, Option, StudentQuizSubmission, Assignment, CourseMaterial, Course, CourseLimit, TimetableEntry, TeacherProfile, AcademicCalendar, AcademicYear, ClassFeeStructure, StudentFeeTransaction, ParentChildLink, Exam, ExamSubmission, ExamQuestion, ExamAttempt, ExamOption, ExamSet, ExamSetQuestion, SchoolClass
+from admissions.models import AdmissionVoucher, Application
+from models import PasswordResetRequest, PasswordResetToken, StudentFeeBalance, db, User, Admin, StudentProfile, ParentProfile, Quiz, Question, Option, StudentQuizSubmission, Assignment, CourseMaterial, Course, CourseLimit, TimetableEntry, TeacherProfile, AcademicCalendar, AcademicYear, ClassFeeStructure, StudentFeeTransaction, ParentChildLink, Exam, ExamSubmission, ExamQuestion, ExamAttempt, ExamOption, ExamSet, ExamSetQuestion, SchoolClass
 from datetime import date, datetime, timedelta, time
 from sqlalchemy import extract, asc, desc
 from sqlalchemy.orm import joinedload
@@ -15,7 +17,7 @@ from utils.score import calculate_student_score
 from utils.backup import generate_quiz_csv_backup, backup_students_to_csv
 from utils.serializers import (serialize_admin, serialize_submission, serialize_user, serialize_student, serialize_quiz, serialize_question, serialize_option, serialize_submission)
 from utils.receipts import generate_receipt  # ✅ import the receipt generator
-from utils.email_utils import send_temporary_password_email, send_password_reset_email
+from utils.email import send_approval_credentials_email, send_email, send_temporary_password_email, send_password_reset_email
 from utils.notifications import create_assignment_notification, create_fee_notification
 import uuid, secrets
 from zipfile import ZipFile
@@ -207,7 +209,7 @@ def register_user():
                     qualification=request.form.get('qualification', '').strip(),
                     specialization=request.form.get('specialization', '').strip(),
                     years_of_experience=int(request.form.get('years_of_experience') or 0),
-                    courses_taught=request.form.get('courses_taught', '').strip(),
+                    subjects_taught=request.form.get('subjects_taught', '').strip(),
                     employment_type=request.form.get('employment_type', '').strip(),
                     department=request.form.get('department', '').strip(),
                     date_of_hire=date_of_hire,
@@ -597,39 +599,43 @@ def edit_quiz(quiz_id):
     quiz = Quiz.query.get_or_404(quiz_id)
     form = QuizForm(obj=quiz)
 
-    # FORM CHOICES
+    # FORM CHOICES (SAME AS ADD)
     form.assigned_class.choices = get_class_choices()
-    selected_class = request.form.get('assigned_class') or quiz.assigned_class
-    form.course_name.choices = get_course_choices(selected_class) if selected_class else []
 
-    # Helper: build questions payload for template
+    selected_class = request.form.get('assigned_class') or quiz.assigned_class
+    if selected_class:
+        form.course_name.choices = get_course_choices(selected_class)
+    else:
+        form.course_name.choices = []
+
+    # HELPER: BUILD QUESTIONS
     def build_quiz_questions_payload(qz):
         payload = []
         for q in qz.questions:
             payload.append({
-                "id": q.id,  # include DB id for safe updating
                 "text": q.text,
                 "type": q.question_type,
                 "options": [
-                    {"id": o.id, "text": o.text, "is_correct": bool(o.is_correct)}
+                    {"text": o.text, "is_correct": bool(o.is_correct)}
                     for o in q.options
                 ]
             })
         return payload
 
-    # GET request: populate form
+    # GET
     if request.method == 'GET':
         form.course_id.data = quiz.course_id
         form.course_name.data = quiz.course_name
+
         return render_template(
             'admin/edit_quiz.html',
             form=form,
             quiz=quiz,
             quiz_questions=build_quiz_questions_payload(quiz),
-            selected_course_id=quiz.course_id
+            selected_course_id=quiz.course_id   # 🔥 ADD THIS
         )
 
-    # POST request
+    # POST (VALIDATION SAME AS ADD)
     if not form.validate_on_submit():
         return render_template(
             'admin/edit_quiz.html',
@@ -639,7 +645,7 @@ def edit_quiz(quiz_id):
         )
 
     try:
-        # BASIC METADATA
+        # BASIC FIELDS
         assigned_class = form.assigned_class.data
         title = form.title.data.strip()
         start_datetime = form.start_datetime.data
@@ -651,8 +657,12 @@ def edit_quiz(quiz_id):
             flash("Invalid start and end time.", "danger")
             return redirect(request.url)
 
-        # COURSE
+        # COURSE (EXACT SAME AS ADD)
         course_id = request.form.get('course_id', type=int)
+        if not course_id:
+            flash("Please select a valid course.", "danger")
+            return redirect(request.url)
+
         course = Course.query.get(course_id)
         if not course:
             flash("Selected course does not exist.", "danger")
@@ -675,11 +685,12 @@ def edit_quiz(quiz_id):
             Quiz.start_datetime < end_datetime,
             Quiz.end_datetime > start_datetime
         ).first()
+
         if overlap:
             flash("Another quiz is already scheduled during this time.", "danger")
             return redirect(request.url)
 
-        # UPDATE QUIZ METADATA
+        # UPDATE QUIZ (PARALLELS CREATE)
         quiz.assigned_class = assigned_class
         quiz.course_id = course.id
         quiz.course_name = course.name
@@ -698,67 +709,67 @@ def edit_quiz(quiz_id):
             content_file.save(os.path.join(UPLOAD_FOLDER, filename))
             quiz.content_file = filename
 
-        # --- UPDATE QUESTIONS IN PLACE ---
+        # DELETE OLD QUESTIONS
+        for q in quiz.questions:
+            Option.query.filter_by(question_id=q.id).delete()
+        Question.query.filter_by(quiz_id=quiz.id).delete()
+        db.session.flush()
+
+        # REBUILD QUESTIONS (IDENTICAL TO ADD)
         for key in request.form:
-            # Only consider question text fields
-            m = re.match(r'^questions\[(\d+)\]\[text\]$', key)
-            if not m:
+            if not re.match(r'^questions\[\d+\]\[text\]$', key):
                 continue
 
-            q_index = m.group(1)
+            q_index = key.split('[')[1].split(']')[0]
             q_text = request.form.get(key, '').strip()
             if not q_text:
                 continue
 
-            q_type = 'fill_in' if re.findall(r'_{3,}', q_text) else request.form.get(f'questions[{q_index}][type]', 'mcq')
-            question_id = request.form.get(f'questions[{q_index}][id]', type=int)
+            blanks = re.findall(r'_{3,}', q_text)
+            q_type = 'fill_in' if blanks else request.form.get(
+                f'questions[{q_index}][type]', 'mcq'
+            )
 
-            if question_id:
-                # Update existing question
-                question = Question.query.get(question_id)
-                if question:
-                    question.text = q_text
-                    question.question_type = q_type
-            else:
-                # New question
-                question = Question(
-                    quiz_id=quiz.id,
-                    text=q_text,
-                    question_type=q_type
-                )
-                db.session.add(question)
-                db.session.flush()  # get question.id
+            question = Question(
+                quiz_id=quiz.id,
+                text=q_text,
+                question_type=q_type
+            )
+            db.session.add(question)
+            db.session.flush()
 
-            # --- OPTIONS ---
-            # Track option IDs to update or add
-            o_index = 0
-            while True:
-                t_key = f'questions[{q_index}][options][{o_index}][text]'
-                c_key = f'questions[{q_index}][options][{o_index}][is_correct]'
-                option_id_key = f'questions[{q_index}][options][{o_index}][id]'
+            if q_type == 'mcq':
+                o_index = 0
+                while True:
+                    t_key = f'questions[{q_index}][options][{o_index}][text]'
+                    c_key = f'questions[{q_index}][options][{o_index}][is_correct]'
+                    if t_key not in request.form:
+                        break
 
-                if t_key not in request.form:
-                    break
-
-                text = request.form.get(t_key, '').strip()
-                is_correct = c_key in request.form
-                option_id = request.form.get(option_id_key, type=int)
-
-                if option_id:
-                    # update existing option
-                    option = Option.query.get(option_id)
-                    if option:
-                        option.text = text
-                        option.is_correct = is_correct
-                else:
-                    # new option
+                    text = request.form.get(t_key, '').strip()
                     if text:
                         db.session.add(Option(
                             question_id=question.id,
                             text=text,
-                            is_correct=is_correct
+                            is_correct=(c_key in request.form)
                         ))
-                o_index += 1
+                    o_index += 1
+
+            elif q_type == 'fill_in':
+                a_index = 0
+                while True:
+                    a_key = f'questions[{q_index}][answers][{a_index}]'
+                    if a_key not in request.form:
+                        break
+
+                    ans = request.form.get(a_key, '').strip()
+                    if ans:
+                        db.session.add(Option(
+                            question_id=question.id,
+                            text=ans,
+                            is_correct=True
+                        ))
+                    a_index += 1
 
         db.session.commit()
         flash("Quiz updated successfully!", "success")
@@ -1087,25 +1098,25 @@ def create_exam_question(exam_id):
 @admin_bp.route('/exams/add', methods=['GET', 'POST'])
 @login_required
 def add_exam():
+    admin_only()
     form = ExamForm()
-    
-    # Populate course_id choices from database
-    form.course_id.choices = [
-        (course.id, course.name) for course in Course.query.all()
-    ]
-    
-    # Populate assigned_class choices from database
-    # Note: Using SchoolClass, not Class
-    form.assigned_class.choices = [
-        (cls.id, cls.name) for cls in SchoolClass.query.all()
-    ]
-    
+
+    # Populate class choices
+    form.assigned_class.choices = get_class_choices()
+
+    # Populate course choices for the selected class (default to first class if GET)
+    selected_class = form.assigned_class.data or (form.assigned_class.choices[0][0] if form.assigned_class.choices else None)
+    if selected_class:
+        courses = Course.query.filter_by(assigned_class=selected_class).all()
+        form.course_id.choices = [(c.id, c.name) for c in courses]
+    else:
+        form.course_id.choices = []
+
     if form.validate_on_submit():
-        # Handle form submission
         exam = Exam(
-            title=form.title.data,
-            course_id=form.course_id.data,
-            assigned_class=form.assigned_class.data,  # This stores the class name/ID
+            title=form.title.data.strip(),
+            course_id=form.course_id.data,  # now valid choice
+            assigned_class=form.assigned_class.data,
             start_datetime=form.start_datetime.data,
             end_datetime=form.end_datetime.data,
             duration_minutes=form.duration_minutes.data,
@@ -1114,11 +1125,11 @@ def add_exam():
         )
         db.session.add(exam)
         db.session.commit()
-        flash('Exam created successfully!', 'success')
-        return redirect(url_for('admin.exams'))
-    
+        flash("Exam created successfully!", "success")
+        return redirect(url_for('admin.manage_exams'))
+
     return render_template('admin/add_exam.html', form=form)
-    
+
 @admin_bp.route("/edit_exam/<int:exam_id>", methods=["GET", "POST"])
 @login_required
 def edit_exam(exam_id):
@@ -1126,30 +1137,19 @@ def edit_exam(exam_id):
     exam = Exam.query.get_or_404(exam_id)
     form = ExamForm(obj=exam)
 
-    form.assigned_class.choices = [
-        (c.name, c.name) for c in SchoolClass.query.order_by(SchoolClass.name)
-    ]
-
-    # Load courses ONLY for this exam's class
-    form.course_id.choices = [
-        (c.id, c.name)
-        for c in Course.query.filter_by(assigned_class=exam.assigned_class)
-    ]
-
-    if request.method == "GET":
-        form.course_id.data = exam.course_id
+    # Populate class choices from SchoolClass table
+    form.assigned_class.choices = [(c.name, c.name) for c in SchoolClass.query.order_by(SchoolClass.name).all()]
 
     if form.validate_on_submit():
         exam.title = form.title.data.strip()
-        exam.course_id = form.course_id.data
+        exam.subject = form.subject.data.strip()
         exam.assigned_class = form.assigned_class.data
         exam.start_datetime = form.start_datetime.data
         exam.end_datetime = form.end_datetime.data
         exam.duration_minutes = form.duration_minutes.data
         exam.assignment_mode = form.assignment_mode.data
-        exam.assignment_seed = form.assignment_seed.data or None
+        exam.assignment_seed = (form.assignment_seed.data or None)
         db.session.commit()
-
         flash("Exam updated successfully!", "success")
         return redirect(url_for("admin.manage_exams"))
 
@@ -2453,6 +2453,93 @@ def delete_timetable_entry(entry_id):
 #--------------- Student Fees Management ---------------
 from collections import defaultdict
 
+from datetime import datetime
+
+def create_fee_notification(fee_group, sender=None):
+    """
+    Create a notification for a fee assignment.
+
+    Args:
+        fee_group: ClassFeeStructure object
+        sender: User/Admin object creating the notification. Defaults to current_user.
+    """
+    if sender is None:
+        sender = current_user
+
+    # Determine sender_id and type
+    if hasattr(sender, 'admin_id'):
+        sender_id = sender.admin_id
+        sender_type = 'admin'
+    elif hasattr(sender, 'user_id'):
+        sender_id = sender.user_id
+        sender_type = 'user'
+    else:
+        sender_id = None
+        sender_type = 'system'
+
+    # Parse items if stored as JSON
+    items = fee_group.items
+    if isinstance(items, str):
+        try:
+            items = json.loads(items)
+        except Exception:
+            items = []
+
+    # Build message text
+    items_text = '\n'.join([f"  • {item['description']}: {item['amount']} GHS" for item in items])
+    message = (
+        f"A new fee has been assigned for your class {fee_group.class_level}.\n\n"
+        f"Academic Year: {fee_group.academic_year}\n"
+        f"Semester: {fee_group.semester}\n"
+        f"Description: {fee_group.description}\n"
+        f"Total Amount: {fee_group.amount} GHS\n\n"
+        f"Breakdown:\n{items_text}\n\n"
+        f"Please check your Fees section for details."
+    )
+
+    # Create Notification object
+    notification = Notification(
+        type='fee',
+        title=f'New Fee Assigned: {fee_group.description}',
+        message=message,
+        sender_id=sender_id,
+        sender_type=sender_type,
+        related_type='fee',
+        related_id=fee_group.id,
+        created_at=datetime.utcnow()
+    )
+    db.session.add(notification)
+    db.session.flush()  # Get notification.id
+
+    # Map class_level string to SchoolClass
+    school_class = SchoolClass.query.filter_by(name=fee_group.class_level).first()
+    if not school_class:
+        db.session.rollback()
+        raise ValueError(f"No class found matching '{fee_group.class_level}'")
+
+    # Get all students in the class
+    students = User.query.filter_by(class_id=school_class.id, role='student').all()
+
+    # Create recipients for students and optionally parents
+    for student in students:
+        # Notify student
+        db.session.add(NotificationRecipient(
+            notification_id=notification.id,
+            user_id=student.user_id,
+            is_read=False
+        ))
+
+        # Notify parents if you have a relationship student.parents
+        if hasattr(student, 'parents'):
+            for parent in student.parents:
+                db.session.add(NotificationRecipient(
+                    notification_id=notification.id,
+                    user_id=parent.user_id,
+                    is_read=False
+                ))
+
+    db.session.commit()
+
 @admin_bp.route('/assign-fees', methods=['GET', 'POST'])
 @login_required
 def assign_fees():
@@ -2464,12 +2551,12 @@ def assign_fees():
         class_level = request.form.get('class_level')
         academic_year = request.form.get('academic_year')
         semester = request.form.get('semester')
-        group_title = request.form.get('group_title') or 'Default'  # optional extra field if you add it to the form
+        group_title = request.form.get('group_title') or 'Default'
 
         descriptions = request.form.getlist('description[]')
         amounts = request.form.getlist('amount[]')
 
-        # build items list
+        # Build items list
         items = []
         total = 0.0
         for desc, amt in zip(descriptions, amounts):
@@ -2477,12 +2564,12 @@ def assign_fees():
             items.append({'description': desc.strip(), 'amount': round(amt_f, 2)})
             total += amt_f
 
-        # ensure required
+        # Ensure required fields
         if not class_level or not academic_year or not semester or not items:
             flash("Missing required fields.", "danger")
             return redirect(url_for('admin.assign_fees'))
 
-        # check if a group with same (class, year, sem, title) exists
+        # Check if group already exists
         existing = ClassFeeStructure.query.filter_by(
             class_level=class_level,
             academic_year=academic_year,
@@ -2491,11 +2578,10 @@ def assign_fees():
         ).first()
 
         if existing:
-            # decide policy: reject, merge, or overwrite. Example: reject and ask user to edit existing group.
             flash(f"A fee group '{group_title}' already exists for {class_level} {academic_year} {semester}. Use edit to change it.", "warning")
             return redirect(url_for('admin.assign_fees'))
 
-        # create single group record
+        # Create fee structure group
         new_group = ClassFeeStructure(
             class_level=class_level,
             academic_year=academic_year,
@@ -2503,8 +2589,9 @@ def assign_fees():
             description=group_title,
             amount=round(total, 2),
         )
-        # store items depending on column type
-        if isinstance(new_group.items, str) or isinstance(new_group.items, type(None)):
+        
+        # Store items as JSON
+        if isinstance(new_group.items, str) or new_group.items is None:
             new_group.items = json.dumps(items)
         else:
             new_group.items = items
@@ -2512,13 +2599,17 @@ def assign_fees():
         db.session.add(new_group)
         db.session.commit()
 
-        # send one notification for the group (modify create_fee_notification to accept group)
-        create_fee_notification(new_group)
+        # Create notification (passes current_user automatically)
+        try:
+            create_fee_notification(new_group, sender=current_user)
+            flash("Fees assigned successfully, students notified.", "success")
+        except Exception as e:
+            flash(f"Fees assigned but notification failed: {str(e)}", "warning")
+            print(f"Notification error: {e}")
 
-        flash("Fees assigned successfully, students notified.", "success")
         return redirect(url_for('admin.assign_fees'))
 
-    # GET: fetch groups (each row is now a group)
+    # GET: fetch groups
     groups = ClassFeeStructure.query.order_by(
         ClassFeeStructure.class_level,
         ClassFeeStructure.academic_year,
@@ -2526,7 +2617,6 @@ def assign_fees():
         ClassFeeStructure.created_at.desc()
     ).all()
 
-    # optionally: compute pagination or transform to structure expected by template
     return render_template('admin/assign_fees.html', groups=groups)
     
 @admin_bp.route('/edit-fee/<int:fee_id>', methods=['GET', 'POST'])
@@ -2872,13 +2962,174 @@ def toggle_assessment_period(pid):
 
 
 
+# =====================================================
+# Admin - Manage Admissions
+# =====================================================
+@admin_bp.route('/admissions')
+@login_required
+def manage_admissions():
+    status = request.args.get('status')
+
+    query = Application.query
+    if status:
+        query = query.filter_by(status=status)
+
+    applications = query.order_by(Application.submitted_at.desc()).all()
+
+    stats = {
+        'total': Application.query.count(),
+        'submitted': Application.query.filter_by(status='submitted').count(),
+        'approved': Application.query.filter_by(status='approved').count(),
+        'rejected': Application.query.filter_by(status='rejected').count()
+    }
+
+    return render_template(
+        'admin/manage_admissions.html',
+        applications=applications,
+        status=status,
+        stats=stats
+    )
+
+@admin_bp.route('/admissions/<int:app_id>')
+@login_required
+def view_application(app_id):
+    application = Application.query.get_or_404(app_id)
+
+    return render_template(
+        'admin/view_application.html',
+        application=application,
+        documents=application.documents,
+        results=application.exam_results
+    )
 
 
+@admin_bp.route('/admissions/<int:app_id>/update-status/<string:new_status>', methods=['POST'])
+@login_required
+def update_application_status(app_id, new_status):
+    application = Application.query.get_or_404(app_id)
+    
+    if new_status not in ['draft', 'submitted', 'approved', 'rejected']:
+        flash('Invalid status.', 'danger')
+        return redirect(url_for('admin.manage_admissions'))
 
+    # Update status
+    application.status = new_status
+    db.session.commit()
+    flash(f'Application status updated to {new_status}.', 'success')
 
+    # Auto-register student and send credentials if approved
+    if new_status == 'approved':
+        # Prefer application.applicant if you use separate Applicant model
+        applicant_email = application.email or (application.applicant.email if getattr(application, 'applicant', None) else None)
+        existing_user = User.query.filter_by(email=applicant_email).first() if applicant_email else None
 
+        if not existing_user:
+            # Generate unique username
+            username = generate_unique_username(
+                application.other_names or '',
+                '',  # middle name if you have it
+                application.surname or '',
+                'student'
+            )
 
+            # Generate unique student ID
+            prefix = 'STD'
+            base_count = User.query.filter_by(role='student').count() + 1
+            count = base_count
+            while True:
+                student_id = f"{prefix}{count:03d}"
+                if not User.query.filter_by(user_id=student_id).first():
+                    break
+                count += 1
 
+            # Generate temporary password
+            temp_password = uuid.uuid4().hex[:8]
 
+            new_user = User(
+                user_id=student_id,
+                username=username,
+                email=applicant_email,
+                first_name=application.other_names,
+                last_name=application.surname,
+                role='student',
+                profile_picture='default_avatar.png'
+            )
+            new_user.set_password(temp_password)
+            db.session.add(new_user)
 
+            student_profile = StudentProfile(
+                user_id=student_id,
+                dob=application.dob,
+                gender=application.gender,
+                nationality=application.nationality,
+                address=application.postal_address,
+                phone=application.phone,
+                email=applicant_email,
+                guardian_name=application.guardian_name,
+                guardian_relation=application.guardian_relation,
+                guardian_contact=application.guardian_phone,
+                current_class=application.first_choice,
+                academic_year=datetime.utcnow().year
+            )
+            db.session.add(student_profile)
 
+            try:
+                db.session.commit()
+                flash(f"Student account created! Username: {username}", "success")
+
+                # Send credentials to applicant
+                sent = send_approval_credentials_email(application, username, student_id, temp_password)
+                if sent:
+                    flash("Credentials email sent to the applicant.", "info")
+                else:
+                    flash("Student created but failed to send credentials email. Check mail logs.", "warning")
+
+            except Exception as e:
+                db.session.rollback()
+                logging.exception("Failed creating student account")
+                flash(f"Error creating student account: {e}", "danger")
+        else:
+            # Optionally, re-send credentials if admin requests
+            flash("Student account already exists for this applicant.", "info")
+
+    return redirect(url_for('admin.manage_admissions'))
+
+@admin_bp.route('/vouchers', methods=['GET', 'POST'])
+def manage_vouchers():
+    if request.method == 'POST':
+        try:
+            count = int(request.form.get('count', 1))
+        except ValueError:
+            count = 1
+
+        amount_raw = request.form.get('amount', None)
+        if amount_raw:
+            try:
+                amount = float(amount_raw)
+            except ValueError:
+                amount = float(current_app.config.get('VOUCHER_DEFAULT_AMOUNT', 50.0))
+        else:
+            amount = float(current_app.config.get('VOUCHER_DEFAULT_AMOUNT', 50.0))
+
+        vouchers = []
+        for _ in range(max(1, count)):
+            pin = f"{random.randint(100000, 999999)}"
+            serial = f"{random.randint(10000000, 99999999)}"
+            v = AdmissionVoucher(pin=pin, serial=serial, amount=amount)
+            db.session.add(v)
+            vouchers.append(v)
+
+        db.session.commit()
+        flash(f'Generated {len(vouchers)} voucher(s).', 'success')
+        return redirect(url_for('admin.manage_vouchers'))
+
+    # Fetch all vouchers with related applicant info
+    vouchers = AdmissionVoucher.query.order_by(AdmissionVoucher.created_at.desc()).all()
+    return render_template('admin/vouchers.html', vouchers=vouchers)
+
+@admin_bp.route('/vouchers/create', methods=['GET', 'POST'])
+def create_voucher():
+    if request.method == 'POST':
+        # handle form submission here
+        pass
+    return render_template('admin/create_voucher.html')
